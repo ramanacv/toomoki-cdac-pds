@@ -1,4 +1,5 @@
-PDS_LEDGER_BACKEND=fabric-envelope
+PDS_LEDGER_BACKEND=chaincode-runtime
+PDS_CHAINCODE_STATE_PATH=./tmp/chaincode-world-state.json
 PDS_FABRIC_CLIENT_ORG=FoodAndCivilSupplies
 PDS_STATE_PATH=./tmp/pds-state.json
 PDS_LEDGER_JOURNAL_PATH=./tmp/pds-ledger.ndjson

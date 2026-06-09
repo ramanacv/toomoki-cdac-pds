@@ -15,6 +15,7 @@ describe('postgres state store', () => {
     expect(adapter.executed).toHaveLength(buildSnapshotWritePlan(engine.exportState()).length);
     expect(adapter.executed[0]?.text).toBe('BEGIN');
     expect(adapter.executed.at(-1)?.text).toBe('COMMIT');
+    expect(adapter.executed.some((statement) => statement.text.includes('stock_positions'))).toBe(true);
   });
 
   it('loads a snapshot from postgres-shaped rows', () => {

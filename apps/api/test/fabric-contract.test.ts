@@ -6,7 +6,7 @@ describe('fabric contract router', () => {
   it('loads the manifest and exposes all declared operations', () => {
     const manifest = defaultFabricContractManifest();
     expect(manifest.network).toBe('pds-chain-fabric-network');
-    expect(manifest.operations).toHaveLength(16);
+    expect(manifest.operations).toHaveLength(17);
   });
 
   it('maps api routes to fabric operations', () => {

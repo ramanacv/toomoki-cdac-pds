@@ -34,4 +34,12 @@ It is a scaffold, not a live consortium deployment. The goal is to make the netw
 
 ## Status
 
-The files in this directory are used as contract artifacts for development and testing. They intentionally avoid hard dependency on a live Fabric installation.
+The files in this directory are used as contract artifacts for development and testing.
+
+Local chaincode execution is available through `PDS_LEDGER_BACKEND=chaincode-runtime`, which runs the `PdsChainContract` logic via `PdsChaincodeInvoker` and stores world state in `PDS_CHAINCODE_STATE_PATH`. Bootstrap with:
+
+```bash
+npm run fabric:bootstrap
+```
+
+A full Hyperledger Fabric peer/orderer deployment is still scaffold-only. The `docker-compose.fabric.yml` file documents the intended topology but is not wired into the root compose file yet.

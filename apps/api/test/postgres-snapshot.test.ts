@@ -43,4 +43,12 @@ describe('postgres snapshot mapper', () => {
     expect(state.authTransactions).toHaveLength(1);
     expect(state.authTransactions[0]?.authMode).toBe('MOCK_OTP');
   });
+
+  it('hydrates stock positions from postgres-shaped rows', () => {
+    const state = hydratePdsState({
+      stock: [['PROC-001:Rice', 10000]]
+    });
+
+    expect(state.stock).toEqual([['PROC-001:Rice', 10000]]);
+  });
 });

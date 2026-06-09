@@ -15,7 +15,8 @@ describe('fabric deployment scaffold', () => {
 
   it('documents the fabric env contract', () => {
     const env = read('blockchain/fabric-network/fabric-env.example');
-    expect(env).toContain('PDS_LEDGER_BACKEND=fabric-envelope');
+    expect(env).toContain('PDS_LEDGER_BACKEND=chaincode-runtime');
+    expect(env).toContain('PDS_CHAINCODE_STATE_PATH=');
     expect(env).toContain('PDS_FABRIC_CLIENT_ORG=FoodAndCivilSupplies');
   });
 });

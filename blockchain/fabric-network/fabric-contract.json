@@ -12,6 +12,7 @@
     { "name": "RegisterBeneficiaryHash", "category": "beneficiary" },
     { "name": "CreateMonthlyEntitlement", "category": "beneficiary" },
     { "name": "RecordDistribution", "category": "delivery" },
+    { "name": "RecordLedgerProof", "category": "audit" },
     { "name": "CheckDuplicateClaim", "category": "delivery" },
     { "name": "RaiseAuditFlag", "category": "audit" },
     { "name": "ResolveAuditFlag", "category": "audit" },

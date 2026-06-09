@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { defaultFabricContractManifest } from './fabric-contract.js';
 
-export type FabricBackendMode = 'local-file' | 'fabric-envelope';
+export type FabricBackendMode = 'local-file' | 'fabric-envelope' | 'chaincode-runtime' | 'fabric-gateway';
 
 export type FabricRuntimeConfig = {
   mode: FabricBackendMode;
@@ -10,6 +10,7 @@ export type FabricRuntimeConfig = {
   statePath: string;
   journalPath: string;
   envelopePath: string;
+  chaincodeStatePath: string;
   contractPath: string;
   connectionProfilePath: string;
   network: string;
@@ -28,6 +29,7 @@ export const loadFabricRuntimeConfig = (): FabricRuntimeConfig => {
   const statePath = process.env.PDS_STATE_PATH ?? resolve(process.cwd(), '../../tmp/pds-state.json');
   const journalPath = process.env.PDS_LEDGER_JOURNAL_PATH ?? resolve(process.cwd(), '../../tmp/pds-ledger.ndjson');
   const envelopePath = process.env.PDS_FABRIC_ENVELOPE_PATH ?? resolve(process.cwd(), '../../tmp/pds-fabric-envelope.ndjson');
+  const chaincodeStatePath = process.env.PDS_CHAINCODE_STATE_PATH ?? resolve(process.cwd(), '../../tmp/chaincode-world-state.json');
   const contractPath = resolve(process.cwd(), '../../blockchain/fabric-network/fabric-contract.json');
   const connectionProfilePath = resolve(process.cwd(), `../../blockchain/fabric-network/connection-profiles/${clientOrgToProfileFile(clientOrg)}`);
   const contract = defaultFabricContractManifest();
@@ -45,7 +47,7 @@ export const loadFabricRuntimeConfig = (): FabricRuntimeConfig => {
     throw new Error(`Unknown Fabric client organization: ${clientOrg}`);
   }
 
-  if (!['local-file', 'fabric-envelope'].includes(mode)) {
+  if (!['local-file', 'fabric-envelope', 'chaincode-runtime', 'fabric-gateway'].includes(mode)) {
     throw new Error(`Unsupported PDS_LEDGER_BACKEND mode: ${mode}`);
   }
 
@@ -64,6 +66,7 @@ export const loadFabricRuntimeConfig = (): FabricRuntimeConfig => {
     statePath,
     journalPath,
     envelopePath,
+    chaincodeStatePath,
     contractPath,
     connectionProfilePath,
     network: contract.network,

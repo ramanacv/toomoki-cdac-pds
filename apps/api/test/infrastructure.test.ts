@@ -17,7 +17,8 @@ describe('infrastructure contracts', () => {
     expect(compose).toContain('postgres:');
     expect(compose).toContain('api:');
     expect(compose).toContain('web:');
-    expect(compose).toContain('PDS_PERSISTENCE_BACKEND: file');
+    expect(compose).toContain('PDS_PERSISTENCE_BACKEND: postgres');
+    expect(compose).toContain('PDS_POSTGRES_DSN:');
   });
 
   it('exposes seed and reset scripts at the repo root', () => {
@@ -29,6 +30,7 @@ describe('infrastructure contracts', () => {
   it('documents the persistence backend in env example', () => {
     const env = readFileSync(resolve(process.cwd(), '../../.env.example'), 'utf8');
     expect(env).toContain('PDS_PERSISTENCE_BACKEND=file');
+    expect(env).toContain('PDS_CHAINCODE_STATE_PATH=');
     expect(env).toContain('PDS_POSTGRES_DSN=postgresql://pds:pds@localhost:5432/pds_chain');
   });
 

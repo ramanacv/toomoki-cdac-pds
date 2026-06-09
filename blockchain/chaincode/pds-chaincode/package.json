@@ -7,11 +7,14 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "lint": "eslint src --ext .ts",
+    "start:chaincode": "fabric-chaincode-node start",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@pds/shared-types": "*"
+    "@pds/shared-types": "*",
+    "fabric-contract-api": "^2.5.8",
+    "fabric-shim": "^2.5.8"
   },
   "devDependencies": {
     "@types/node": "^22.15.29"

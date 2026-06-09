@@ -408,6 +408,37 @@ export class PdsLedgerEngine {
     return distribution;
   }
 
+  applyLedgerEvent(event: LedgerEvent): { ledgerTxId: string } {
+    if (this.events.some((item) => item.ledgerTxId === event.ledgerTxId)) {
+      return { ledgerTxId: event.ledgerTxId };
+    }
+    this.events.push(event);
+    this.projectEventToState(event);
+    return { ledgerTxId: event.ledgerTxId };
+  }
+
+  getLedgerDigest(): string {
+    return hashReference(JSON.stringify(this.events));
+  }
+
+  verifyDatabaseHash(input: { digest: string }): { match: boolean; ledgerDigest: string } {
+    const ledgerDigest = this.getLedgerDigest();
+    return { match: ledgerDigest === input.digest, ledgerDigest };
+  }
+
+  checkDuplicateClaim(input: {
+    rationCardHash: string;
+    commodity: string;
+    month: string;
+    requestedQtyKg: number;
+  }): { allowed: boolean; availableBalanceKg: number } {
+    const entitlement = this.mustGetEntitlement(input.rationCardHash, input.commodity, input.month);
+    return {
+      allowed: entitlement.availableBalanceKg >= input.requestedQtyKg,
+      availableBalanceKg: entitlement.availableBalanceKg
+    };
+  }
+
   getLotHistory(lotId: string): LedgerEvent[] {
     return this.events.filter((event) => (event.entityType === 'lot' && event.entityId === lotId) || event.payload?.lotId === lotId);
   }
@@ -637,6 +668,62 @@ export class PdsLedgerEngine {
   private currentMonth(): string {
     return '2026-06';
   }
+
+  private projectEventToState(event: LedgerEvent): void {
+    const payload = event.payload;
+    switch (event.eventType) {
+      case 'RegisterStakeholder':
+        this.stakeholders.set(String(payload.stakeholderId), payload as unknown as Stakeholder);
+        break;
+      case 'CreateCommodityLot': {
+        const lot = payload as unknown as CommodityLot;
+        this.lots.set(lot.lotId, lot);
+        this.stock.set(keyFor(lot.currentOwner, lot.commodity), lot.quantityKg);
+        break;
+      }
+      case 'DispatchLot': {
+        const transfer = payload as unknown as TransferOrder;
+        this.transfers.set(transfer.transferId, transfer);
+        break;
+      }
+      case 'ReceiveLot': {
+        const transfer = payload as unknown as TransferOrder;
+        this.transfers.set(transfer.transferId, transfer);
+        break;
+      }
+      case 'AllocateToFPS': {
+        const allocation = payload as unknown as FPSAllocation;
+        this.allocations.set(allocation.allocationId, allocation);
+        break;
+      }
+      case 'RecordFPSReceipt': {
+        const allocation = payload as unknown as FPSAllocation;
+        this.allocations.set(allocation.allocationId, allocation);
+        break;
+      }
+      case 'AuthTransaction': {
+        const auth = payload as unknown as AuthTransaction;
+        this.authTransactions.set(auth.authTxnId, auth);
+        break;
+      }
+      case 'RecordDistribution': {
+        const distribution = payload as unknown as DistributionTransaction;
+        this.distributions.set(distribution.distributionId, distribution);
+        break;
+      }
+      case 'RaiseAuditFlag':
+      case 'ResolveAuditFlag': {
+        const alert = payload as unknown as AuditAlert;
+        this.alerts.set(alert.alertId, alert);
+        break;
+      }
+      default:
+        break;
+    }
+  }
 }
 
 export const createDemoLedgerEngine = (): PdsLedgerEngine => new PdsLedgerEngine(true);
+
+export { PdsChaincodeInvoker, loadWorldState, saveWorldState } from './invoker.js';
+export { CHAINCODE_OPERATIONS, isChaincodeOperation, isChaincodeQuery, type ChaincodeOperation } from './operations.js';

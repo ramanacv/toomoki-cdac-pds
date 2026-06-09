@@ -44,6 +44,8 @@ export const OPENAPI_SPEC = {
     },
     '/distributions/{distributionId}': { get: { summary: 'Get distribution receipt' } },
     '/trace/lots/{lotId}': { get: { summary: 'Verify lot trace' } },
+    '/trace/distributions/{distributionId}': { get: { summary: 'Verify distribution trace' } },
+    '/trace/verify': { post: { summary: 'Verify database digest against chain ledger' } },
     '/audit-alerts': { get: { summary: 'List audit alerts' } },
     '/audit-alerts/reconcile': { post: { summary: 'Reconcile alerts' } },
     '/audit-alerts/{alertId}/resolve': { post: { summary: 'Resolve audit alert' } }

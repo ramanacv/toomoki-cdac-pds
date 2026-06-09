@@ -6,5 +6,5 @@
     "declaration": true,
     "declarationMap": true
   },
-  "include": ["src", "test"]
+  "include": ["src/index.ts", "src/invoker.ts", "src/operations.ts", "test"]
 }

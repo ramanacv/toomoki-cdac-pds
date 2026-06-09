@@ -1,4 +1,21 @@
-import type { AuthTransaction, AuditAlert, DistributionTransaction, FPSAllocation, LedgerEvent, MonthlyEntitlement, Stakeholder, TransferOrder } from '@pds/shared-types';
+import {
+  AlertType,
+  AuthMode,
+  AuthResult,
+  LotStatus,
+  type AuthTransaction,
+  type AuditAlert,
+  type CommodityLot,
+  type DistributionTransaction,
+  type FPSAllocation,
+  type LedgerEvent,
+  type MonthlyEntitlement,
+  type Stakeholder,
+  type StakeholderStatus,
+  type StakeholderType,
+  type TransferOrder,
+  type TransferStatus
+} from '@pds/shared-types';
 import type { PdsLedgerState } from '@pds/pds-chaincode';
 
 export type SqlStatement = {
@@ -6,9 +23,118 @@ export type SqlStatement = {
   values: unknown[];
 };
 
+const asString = (value: unknown): string => String(value);
+const asNumber = (value: unknown): number => Number(value);
+const asOptionalString = (value: unknown): string | undefined => (value == null ? undefined : String(value));
+
+export const mapStakeholderRow = (row: Record<string, unknown>): Stakeholder => ({
+  stakeholderId: asString(row.stakeholder_id),
+  stakeholderType: asString(row.stakeholder_type) as StakeholderType,
+  name: asString(row.name),
+  district: asString(row.district),
+  licenseNo: asString(row.license_no),
+  status: asString(row.status) as StakeholderStatus
+});
+
+export const mapLotRow = (row: Record<string, unknown>): CommodityLot => ({
+  lotId: asString(row.lot_id),
+  commodity: asString(row.commodity),
+  season: asString(row.season),
+  quantityKg: asNumber(row.quantity_kg),
+  qualityGrade: asString(row.quality_grade),
+  source: asString(row.source),
+  currentOwner: asString(row.current_owner),
+  currentLocation: asString(row.current_location),
+  status: asString(row.status) as LotStatus
+});
+
+export const mapTransferRow = (row: Record<string, unknown>, toIsoString = asString): TransferOrder => ({
+  transferId: asString(row.transfer_id),
+  lotId: asString(row.lot_id),
+  fromOrg: asString(row.from_org),
+  toOrg: asString(row.to_org),
+  dispatchedQtyKg: asNumber(row.dispatched_qty_kg),
+  ...(row.received_qty_kg == null ? {} : { receivedQtyKg: asNumber(row.received_qty_kg) }),
+  ...(row.shortage_qty_kg == null ? {} : { shortageQtyKg: asNumber(row.shortage_qty_kg) }),
+  vehicleNo: asString(row.vehicle_no),
+  status: asString(row.status) as TransferStatus,
+  dispatchTimestamp: toIsoString(row.dispatch_timestamp),
+  ...(row.receive_timestamp == null ? {} : { receiveTimestamp: toIsoString(row.receive_timestamp) })
+});
+
+export const mapAllocationRow = (row: Record<string, unknown>): FPSAllocation => ({
+  allocationId: asString(row.allocation_id),
+  fpsId: asString(row.fps_id),
+  commodity: asString(row.commodity),
+  allocatedQtyKg: asNumber(row.allocated_qty_kg),
+  ...(row.received_qty_kg == null ? {} : { receivedQtyKg: asNumber(row.received_qty_kg) }),
+  month: asString(row.month),
+  sourceGodownId: asString(row.source_godown_id),
+  status: asString(row.status) as FPSAllocation['status']
+});
+
+export const mapEntitlementRow = (row: Record<string, unknown>): MonthlyEntitlement => ({
+  rationCardHash: asString(row.ration_card_hash),
+  commodity: asString(row.commodity),
+  month: asString(row.month),
+  monthlyEntitlementKg: asNumber(row.monthly_entitlement_kg),
+  alreadyLiftedKg: asNumber(row.already_lifted_kg),
+  availableBalanceKg: asNumber(row.available_balance_kg),
+  active: Boolean(row.active)
+});
+
+export const mapAuthTransactionRow = (row: Record<string, unknown>, toIsoString = asString): AuthTransaction => ({
+  authTxnId: asString(row.auth_txn_id),
+  beneficiaryRefHash: asString(row.beneficiary_ref_hash),
+  rationCardHash: asString(row.ration_card_hash),
+  authMode: asString(row.auth_mode) as AuthMode,
+  authResult: asString(row.auth_result) as AuthResult,
+  authTxnRefHash: asString(row.auth_txn_ref_hash),
+  ...(row.approved_by == null ? {} : { approvedBy: asString(row.approved_by) }),
+  timestamp: toIsoString(row.timestamp)
+});
+
+export const mapDistributionRow = (row: Record<string, unknown>, toIsoString = asString): DistributionTransaction => ({
+  distributionId: asString(row.distribution_id),
+  fpsId: asString(row.fps_id),
+  rationCardHash: asString(row.ration_card_hash),
+  beneficiaryRefHash: asString(row.beneficiary_ref_hash),
+  commodity: asString(row.commodity),
+  deliveredKg: asNumber(row.delivered_kg),
+  authMode: asString(row.auth_mode) as AuthMode,
+  authResult: asString(row.auth_result) as AuthResult,
+  authTxnRefHash: asString(row.auth_txn_ref_hash),
+  dealerId: asString(row.dealer_id),
+  ...(row.ledger_tx_id == null ? {} : { ledgerTxId: asString(row.ledger_tx_id) }),
+  timestamp: toIsoString(row.timestamp)
+});
+
+export const mapAlertRow = (row: Record<string, unknown>, toIsoString = asString): AuditAlert => ({
+  alertId: asString(row.alert_id),
+  alertType: asString(row.alert_type) as AlertType,
+  entityId: asString(row.entity_id),
+  riskLevel: asString(row.risk_level) as AuditAlert['riskLevel'],
+  message: asString(row.message),
+  status: asString(row.status) as AuditAlert['status'],
+  evidence: (typeof row.evidence === 'string' ? JSON.parse(row.evidence) : row.evidence) as AuditAlert['evidence'],
+  createdAt: toIsoString(row.created_at),
+  ...(row.resolved_at == null ? {} : { resolvedAt: toIsoString(row.resolved_at) }),
+  ...(row.resolved_by == null ? {} : { resolvedBy: asString(row.resolved_by) }),
+  ...(row.resolution_note == null ? {} : { resolutionNote: asString(row.resolution_note) })
+});
+
+export const mapEventRow = (row: Record<string, unknown>, toIsoString = asString): LedgerEvent => ({
+  ledgerTxId: asString(row.ledger_tx_id),
+  entityType: asString(row.entity_type) as LedgerEvent['entityType'],
+  entityId: asString(row.entity_id),
+  eventType: asString(row.event_type),
+  payload: (typeof row.payload === 'string' ? JSON.parse(row.payload) : row.payload) as Record<string, unknown>,
+  timestamp: toIsoString(row.timestamp)
+});
+
 export type PostgresTableRows = {
   stakeholders?: Stakeholder[];
-  lots?: Array<Record<string, unknown>>;
+  lots?: CommodityLot[];
   transfers?: TransferOrder[];
   allocations?: FPSAllocation[];
   entitlements?: MonthlyEntitlement[];
@@ -16,6 +142,7 @@ export type PostgresTableRows = {
   distributions?: DistributionTransaction[];
   alerts?: AuditAlert[];
   events?: LedgerEvent[];
+  stock?: Array<readonly [string, number]>;
 };
 
 const json = (value: unknown): unknown => JSON.stringify(value);
@@ -24,7 +151,7 @@ export const buildSnapshotWritePlan = (state: PdsLedgerState): SqlStatement[] =>
   const statements: SqlStatement[] = [
     { text: 'BEGIN', values: [] },
     {
-      text: 'TRUNCATE stakeholders, commodity_lots, transfer_orders, fps_allocations, monthly_entitlements, auth_transactions, distribution_transactions, audit_alerts, ledger_events, ledger_tx_index RESTART IDENTITY CASCADE',
+      text: 'TRUNCATE stakeholders, commodity_lots, stock_positions, transfer_orders, fps_allocations, monthly_entitlements, auth_transactions, distribution_transactions, audit_alerts, ledger_events, ledger_tx_index RESTART IDENTITY CASCADE',
       values: []
     }
   ];
@@ -162,13 +289,23 @@ export const buildSnapshotWritePlan = (state: PdsLedgerState): SqlStatement[] =>
     });
   }
 
+  for (const [stockKey, quantityKg] of state.stock) {
+    const separatorIndex = stockKey.lastIndexOf(':');
+    const stakeholderId = stockKey.slice(0, separatorIndex);
+    const commodity = stockKey.slice(separatorIndex + 1);
+    statements.push({
+      text: 'INSERT INTO stock_positions (stakeholder_id, commodity, quantity_kg, lot_id, month) VALUES ($1, $2, $3, NULL, NULL) ON CONFLICT (stakeholder_id, commodity, lot_id, month) DO UPDATE SET quantity_kg = EXCLUDED.quantity_kg, updated_at = NOW()',
+      values: [stakeholderId, commodity, quantityKg]
+    });
+  }
+
   statements.push({ text: 'COMMIT', values: [] });
   return statements;
 };
 
 export const hydratePdsState = (tables: PostgresTableRows): PdsLedgerState => ({
   stakeholders: tables.stakeholders ?? [],
-  lots: (tables.lots ?? []).map((row) => row as PdsLedgerState['lots'][number]),
+  lots: tables.lots ?? [],
   transfers: tables.transfers ?? [],
   allocations: tables.allocations ?? [],
   entitlements: tables.entitlements ?? [],
@@ -176,5 +313,5 @@ export const hydratePdsState = (tables: PostgresTableRows): PdsLedgerState => ({
   distributions: tables.distributions ?? [],
   alerts: tables.alerts ?? [],
   events: tables.events ?? [],
-  stock: []
+  stock: (tables.stock ?? []) as PdsLedgerState['stock']
 });

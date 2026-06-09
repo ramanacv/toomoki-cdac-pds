@@ -1,18 +1,7 @@
-import { useEffect, useState } from 'react';
-import type { AuditAlert, AuthTransaction, CommodityLot, DashboardSummary, DistributionTransaction, FPSAllocation, MonthlyEntitlement, Stakeholder } from '@pds/shared-types';
-import {
-  buildApiUrl,
-  loadAuthTransactions,
-  loadAllocations,
-  loadAlerts,
-  loadDashboardSummary,
-  loadDistributions,
-  loadEntitlements,
-  loadLots,
-  loadStakeholders,
-  loadTransfers,
-  probeApi
-} from './api.js';
+import { useCallback, useEffect, useState } from 'react';
+import type { AuditAlert, AuthTransaction, CommodityLot, DashboardSummary, DistributionTransaction, FPSAllocation, MonthlyEntitlement, Stakeholder, TransferOrder } from '@pds/shared-types';
+import { buildApiUrl, loadWorkspaceData, probeApi } from './api.js';
+import { WorkflowActionPanel } from './WorkflowActionPanel.js';
 import {
   demoDistributions,
   demoAllocations,
@@ -68,7 +57,7 @@ export function App() {
   const [authTransactions, setAuthTransactions] = useState<AuthTransaction[]>(demoAuthTransactions);
   const [entitlements, setEntitlements] = useState<MonthlyEntitlement[]>(demoEntitlements);
   const [distributions, setDistributions] = useState<DistributionTransaction[]>(demoDistributions);
-  const [transfers, setTransfers] = useState(demoTransfers);
+  const [transfers, setTransfers] = useState<TransferOrder[]>(demoTransfers);
   const [alerts, setAlerts] = useState<AuditAlert[]>(getScenarioAlerts('happy-path'));
   const [role, setRole] = useState<DemoRole>('AUDITOR');
   const [scenario, setScenario] = useState<DemoScenario>('happy-path');
@@ -77,47 +66,30 @@ export function App() {
   const [selectedLotId, setSelectedLotId] = useState('LOT-RICE-2026-001');
   const [selectedDistributionId, setSelectedDistributionId] = useState('DIST-2026-001');
 
-  useEffect(() => {
-    let active = true;
+  const refreshWorkspace = useCallback(async () => {
+    const apiStatus = await probeApi();
+    setApiOnline(apiStatus);
 
-    const load = async () => {
-      const [apiStatus, nextSummary, nextStakeholders, nextAlerts] = await Promise.all([
-        probeApi(),
-        loadDashboardSummary(),
-        loadStakeholders(),
-        loadAlerts(scenario)
-      ]);
-      const [nextLots, nextTransfers, nextAllocations, nextAuthTransactions, nextEntitlements, nextDistributions] = await Promise.all([
-        loadLots(),
-        loadTransfers(),
-        loadAllocations(),
-        loadAuthTransactions(),
-        loadEntitlements(),
-        loadDistributions()
-      ]);
+    if (!apiStatus) {
+      setAlerts(getScenarioAlerts(scenario));
+      return;
+    }
 
-      if (!active) {
-        return;
-      }
-
-      setApiOnline(apiStatus);
-      setSummary(nextSummary);
-      setStakeholders(nextStakeholders);
-      setLots(nextLots);
-      setTransfers(nextTransfers);
-      setAllocations(nextAllocations);
-      setAuthTransactions(nextAuthTransactions);
-      setEntitlements(nextEntitlements);
-      setDistributions(nextDistributions);
-      setAlerts(nextAlerts);
-    };
-
-    void load();
-
-    return () => {
-      active = false;
-    };
+    const workspace = await loadWorkspaceData(scenario);
+    setSummary(workspace.summary);
+    setStakeholders(workspace.stakeholders);
+    setLots(workspace.lots);
+    setTransfers(workspace.transfers);
+    setAllocations(workspace.allocations);
+    setAuthTransactions(workspace.authTransactions);
+    setEntitlements(workspace.entitlements);
+    setDistributions(workspace.distributions);
+    setAlerts(workspace.alerts);
   }, [scenario]);
+
+  useEffect(() => {
+    void refreshWorkspace();
+  }, [refreshWorkspace]);
 
   useEffect(() => {
     const allowedScreens = getRoleScreens(role);
@@ -224,6 +196,20 @@ export function App() {
             seeded demo data.
           </p>
         </article>
+
+        {(activeScreen === 'dashboard' || activeScreen === 'transfers' || activeScreen === 'distribution') && (
+          <WorkflowActionPanel
+            apiOnline={apiOnline}
+            role={role}
+            lots={lots}
+            transfers={transfers}
+            allocations={allocations}
+            authTransactions={authTransactions}
+            distributions={distributions}
+            allowDuplicateClaim={scenario === 'duplicate-claim'}
+            onComplete={refreshWorkspace}
+          />
+        )}
 
         {activeScreen === 'dashboard' && (
           <>

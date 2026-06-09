@@ -32,7 +32,7 @@ export function validateFabricArtifacts() {
     throw new Error('Fabric compose scaffold is incomplete');
   }
 
-  if (!env.includes('PDS_LEDGER_BACKEND=fabric-envelope') || !env.includes('PDS_FABRIC_CLIENT_ORG=')) {
+  if (!env.includes('PDS_LEDGER_BACKEND=chaincode-runtime') || !env.includes('PDS_CHAINCODE_STATE_PATH=')) {
     throw new Error('Fabric env example is incomplete');
   }
 

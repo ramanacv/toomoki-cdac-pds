@@ -184,6 +184,19 @@ export class PdsController {
     return this.service.getTraceForLot(lotId);
   }
 
+  @Get('/trace/distributions/:distributionId')
+  distributionTrace(@Param('distributionId') distributionId: string) {
+    return {
+      distribution: this.service.getDistributionReceipt(distributionId),
+      history: this.service.getDistributionHistoryFromChain(distributionId)
+    };
+  }
+
+  @Post('/trace/verify')
+  verifyLedger(@Body() body: { digest: string }) {
+    return this.service.verifyLedgerDigest(body.digest);
+  }
+
   @Get('/audit-alerts')
   alerts() {
     return this.service.getAlerts();

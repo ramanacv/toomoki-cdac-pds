@@ -11,6 +11,9 @@ VALUES
 INSERT INTO commodity_lots (lot_id, commodity, season, quantity_kg, quality_grade, source, current_owner, current_location, status)
 VALUES ('LOT-RICE-2026-001', 'Rice', 'Kharif 2026', 10000, 'A', 'Procurement Centre 01', 'PROC-001', 'Procurement Yard', 'CREATED');
 
+INSERT INTO stock_positions (stakeholder_id, commodity, quantity_kg, lot_id, month)
+VALUES ('PROC-001', 'Rice', 10000, 'LOT-RICE-2026-001', NULL);
+
 INSERT INTO ration_cards_mock (ration_card_hash, household_size, district, status)
 VALUES ('demo-ration-card-hash', 5, 'Demo District', 'ACTIVE');
 

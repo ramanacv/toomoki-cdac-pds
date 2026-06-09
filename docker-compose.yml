@@ -18,7 +18,11 @@ services:
       dockerfile: apps/api/Dockerfile
     environment:
       PORT: 3000
-      PDS_PERSISTENCE_BACKEND: file
+      PDS_PERSISTENCE_BACKEND: postgres
+      PDS_POSTGRES_DSN: postgresql://pds:pds@postgres:5432/pds_chain
+      PDS_LEDGER_BACKEND: chaincode-runtime
+      PDS_CHAINCODE_STATE_PATH: /app/tmp/chaincode-world-state.json
+      PDS_LEDGER_JOURNAL_PATH: /app/tmp/pds-ledger.ndjson
     ports:
       - '3000:3000'
     depends_on:
