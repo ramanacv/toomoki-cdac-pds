@@ -1,0 +1,25 @@
+{
+  "name": "fps-connection-profile",
+  "version": "0.1.0",
+  "client": {
+    "organization": "FairPriceShop"
+  },
+  "channels": {
+    "pdschannel": {
+      "peers": {
+        "peer0.fps.example.com": {
+          "endorsingPeer": true,
+          "chaincodeQuery": true,
+          "ledgerQuery": true,
+          "eventSource": true
+        }
+      }
+    }
+  },
+  "peers": {
+    "peer0.fps.example.com": {
+      "url": "grpcs://peer0.fps.example.com:10051",
+      "mspid": "FairPriceShopMSP"
+    }
+  }
+}

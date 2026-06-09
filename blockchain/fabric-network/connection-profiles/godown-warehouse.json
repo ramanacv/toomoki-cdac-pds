@@ -1,0 +1,25 @@
+{
+  "name": "godown-warehouse-connection-profile",
+  "version": "0.1.0",
+  "client": {
+    "organization": "GodownWarehouse"
+  },
+  "channels": {
+    "pdschannel": {
+      "peers": {
+        "peer0.godown.example.com": {
+          "endorsingPeer": true,
+          "chaincodeQuery": true,
+          "ledgerQuery": true,
+          "eventSource": true
+        }
+      }
+    }
+  },
+  "peers": {
+    "peer0.godown.example.com": {
+      "url": "grpcs://peer0.godown.example.com:9051",
+      "mspid": "GodownWarehouseMSP"
+    }
+  }
+}

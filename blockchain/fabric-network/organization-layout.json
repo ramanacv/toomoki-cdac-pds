@@ -1,0 +1,35 @@
+{
+  "channel": "pdschannel",
+  "organizations": [
+    {
+      "org": "FoodAndCivilSupplies",
+      "mspId": "FoodAndCivilSuppliesMSP",
+      "peer": "peer0.food.example.com",
+      "role": "DEPARTMENT"
+    },
+    {
+      "org": "ProcurementMiller",
+      "mspId": "ProcurementMillerMSP",
+      "peer": "peer0.procurement.example.com",
+      "role": "PROCUREMENT_CENTER"
+    },
+    {
+      "org": "GodownWarehouse",
+      "mspId": "GodownWarehouseMSP",
+      "peer": "peer0.godown.example.com",
+      "role": "STATE_GODOWN"
+    },
+    {
+      "org": "FairPriceShop",
+      "mspId": "FairPriceShopMSP",
+      "peer": "peer0.fps.example.com",
+      "role": "FAIR_PRICE_SHOP"
+    },
+    {
+      "org": "AuditAuthority",
+      "mspId": "AuditAuthorityMSP",
+      "peer": "peer0.audit.example.com",
+      "role": "AUDITOR"
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "name": "procurement-miller-connection-profile",
+  "version": "0.1.0",
+  "client": {
+    "organization": "ProcurementMiller"
+  },
+  "channels": {
+    "pdschannel": {
+      "peers": {
+        "peer0.procurement.example.com": {
+          "endorsingPeer": true,
+          "chaincodeQuery": true,
+          "ledgerQuery": true,
+          "eventSource": true
+        }
+      }
+    }
+  },
+  "peers": {
+    "peer0.procurement.example.com": {
+      "url": "grpcs://peer0.procurement.example.com:8051",
+      "mspid": "ProcurementMillerMSP"
+    }
+  }
+}

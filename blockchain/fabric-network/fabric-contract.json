@@ -1,0 +1,23 @@
+{
+  "network": "pds-chain-fabric-network",
+  "channel": "pdschannel",
+  "chaincode": "pds-chaincode",
+  "operations": [
+    { "name": "RegisterStakeholder", "category": "registry" },
+    { "name": "CreateCommodityLot", "category": "supply-chain" },
+    { "name": "DispatchLot", "category": "supply-chain" },
+    { "name": "ReceiveLot", "category": "supply-chain" },
+    { "name": "AllocateToFPS", "category": "allocation" },
+    { "name": "RecordFPSReceipt", "category": "allocation" },
+    { "name": "RegisterBeneficiaryHash", "category": "beneficiary" },
+    { "name": "CreateMonthlyEntitlement", "category": "beneficiary" },
+    { "name": "RecordDistribution", "category": "delivery" },
+    { "name": "CheckDuplicateClaim", "category": "delivery" },
+    { "name": "RaiseAuditFlag", "category": "audit" },
+    { "name": "ResolveAuditFlag", "category": "audit" },
+    { "name": "GetLotHistory", "category": "query" },
+    { "name": "GetDistributionHistory", "category": "query" },
+    { "name": "GetCurrentStock", "category": "query" },
+    { "name": "VerifyDatabaseHash", "category": "query" }
+  ]
+}

@@ -1,0 +1,5 @@
+PDS_LEDGER_BACKEND=fabric-envelope
+PDS_FABRIC_CLIENT_ORG=FoodAndCivilSupplies
+PDS_STATE_PATH=./tmp/pds-state.json
+PDS_LEDGER_JOURNAL_PATH=./tmp/pds-ledger.ndjson
+PDS_FABRIC_ENVELOPE_PATH=./tmp/pds-fabric-envelope.ndjson

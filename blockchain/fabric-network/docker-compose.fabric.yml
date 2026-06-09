@@ -1,0 +1,62 @@
+version: '3.9'
+
+services:
+  orderer.pds.example.com:
+    image: hyperledger/fabric-orderer:2.5
+    container_name: orderer.pds.example.com
+    environment:
+      - ORDERER_GENERAL_LOGLEVEL=info
+      - ORDERER_GENERAL_LISTENADDRESS=0.0.0.0
+      - ORDERER_GENERAL_GENESISFILE=/var/hyperledger/orderer/orderer.genesis.block
+    ports:
+      - '7050:7050'
+
+  peer0.food.example.com:
+    image: hyperledger/fabric-peer:2.5
+    container_name: peer0.food.example.com
+    environment:
+      - CORE_PEER_ID=peer0.food.example.com
+      - CORE_PEER_LOCALMSPID=FoodAndCivilSuppliesMSP
+      - CORE_PEER_ADDRESS=peer0.food.example.com:7051
+    ports:
+      - '7051:7051'
+
+  peer0.procurement.example.com:
+    image: hyperledger/fabric-peer:2.5
+    container_name: peer0.procurement.example.com
+    environment:
+      - CORE_PEER_ID=peer0.procurement.example.com
+      - CORE_PEER_LOCALMSPID=ProcurementMillerMSP
+      - CORE_PEER_ADDRESS=peer0.procurement.example.com:8051
+    ports:
+      - '8051:8051'
+
+  peer0.godown.example.com:
+    image: hyperledger/fabric-peer:2.5
+    container_name: peer0.godown.example.com
+    environment:
+      - CORE_PEER_ID=peer0.godown.example.com
+      - CORE_PEER_LOCALMSPID=GodownWarehouseMSP
+      - CORE_PEER_ADDRESS=peer0.godown.example.com:9051
+    ports:
+      - '9051:9051'
+
+  peer0.fps.example.com:
+    image: hyperledger/fabric-peer:2.5
+    container_name: peer0.fps.example.com
+    environment:
+      - CORE_PEER_ID=peer0.fps.example.com
+      - CORE_PEER_LOCALMSPID=FairPriceShopMSP
+      - CORE_PEER_ADDRESS=peer0.fps.example.com:10051
+    ports:
+      - '10051:10051'
+
+  peer0.audit.example.com:
+    image: hyperledger/fabric-peer:2.5
+    container_name: peer0.audit.example.com
+    environment:
+      - CORE_PEER_ID=peer0.audit.example.com
+      - CORE_PEER_LOCALMSPID=AuditAuthorityMSP
+      - CORE_PEER_ADDRESS=peer0.audit.example.com:11051
+    ports:
+      - '11051:11051'

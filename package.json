@@ -1,0 +1,32 @@
+{
+  "name": "pds-chain",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "blockchain/chaincode/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "lint": "eslint apps packages blockchain/chaincode --ext .ts,.tsx --max-warnings 0",
+    "pretest": "npm run build --workspace=@pds/shared-types && npm run build --workspace=@pds/pds-chaincode",
+    "demo:happy": "node scripts/demo/happy-path.mjs",
+    "demo:exception": "node scripts/demo/exception-path.mjs",
+    "smoke": "npm run build && node scripts/smoke.mjs",
+    "seed": "node scripts/seed.mjs",
+    "reset": "node scripts/reset.mjs",
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.29.0",
+    "@types/node": "^22.15.29",
+    "eslint": "^9.29.0",
+    "prettier": "^3.5.3",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.36.0",
+    "vitest": "^3.2.4"
+  }
+}

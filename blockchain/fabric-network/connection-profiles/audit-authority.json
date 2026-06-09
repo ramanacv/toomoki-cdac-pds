@@ -1,0 +1,25 @@
+{
+  "name": "audit-authority-connection-profile",
+  "version": "0.1.0",
+  "client": {
+    "organization": "AuditAuthority"
+  },
+  "channels": {
+    "pdschannel": {
+      "peers": {
+        "peer0.audit.example.com": {
+          "endorsingPeer": true,
+          "chaincodeQuery": true,
+          "ledgerQuery": true,
+          "eventSource": true
+        }
+      }
+    }
+  },
+  "peers": {
+    "peer0.audit.example.com": {
+      "url": "grpcs://peer0.audit.example.com:11051",
+      "mspid": "AuditAuthorityMSP"
+    }
+  }
+}

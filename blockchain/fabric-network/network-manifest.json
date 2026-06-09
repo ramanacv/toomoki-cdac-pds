@@ -1,0 +1,52 @@
+{
+  "name": "pds-chain-fabric-network",
+  "version": "0.1.0",
+  "channel": "pdschannel",
+  "orderingService": {
+    "type": "raft",
+    "nodes": 1
+  },
+  "stateDatabase": "couchdb",
+  "organizations": [
+    {
+      "name": "FoodAndCivilSupplies",
+      "mspId": "FoodAndCivilSuppliesMSP",
+      "peerHost": "peer0.food.example.com",
+      "peerPort": 7051,
+      "role": "DEPARTMENT"
+    },
+    {
+      "name": "ProcurementMiller",
+      "mspId": "ProcurementMillerMSP",
+      "peerHost": "peer0.procurement.example.com",
+      "peerPort": 8051,
+      "role": "PROCUREMENT_CENTER"
+    },
+    {
+      "name": "GodownWarehouse",
+      "mspId": "GodownWarehouseMSP",
+      "peerHost": "peer0.godown.example.com",
+      "peerPort": 9051,
+      "role": "STATE_GODOWN"
+    },
+    {
+      "name": "FairPriceShop",
+      "mspId": "FairPriceShopMSP",
+      "peerHost": "peer0.fps.example.com",
+      "peerPort": 10051,
+      "role": "FAIR_PRICE_SHOP"
+    },
+    {
+      "name": "AuditAuthority",
+      "mspId": "AuditAuthorityMSP",
+      "peerHost": "peer0.audit.example.com",
+      "peerPort": 11051,
+      "role": "AUDITOR"
+    }
+  ],
+  "chaincode": {
+    "name": "pds-chaincode",
+    "language": "typescript",
+    "path": "../../chaincode/pds-chaincode"
+  }
+}
