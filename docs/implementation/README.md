@@ -6,6 +6,7 @@ This folder contains implementation guidance derived from the product and techni
 
 - [MVP implementation plan](mvp-implementation-plan.md)
 - [Sprint backlog](sprint-backlog.md)
+- [Mock data and fixtures](mock-data.md)
 
 ## Intended Use
 
@@ -14,6 +15,6 @@ Start with the MVP implementation plan before creating code. It defines:
 - Build order.
 - Suggested repository structure.
 - Backend, blockchain, and frontend workstreams.
-- Seed data and demo flow.
+- Seed data, mock fixtures, and demo flow.
 - Acceptance gates.
 - Deferred items that should not enter the 2-week MVP.

@@ -70,11 +70,6 @@ export function App() {
     const apiStatus = await probeApi();
     setApiOnline(apiStatus);
 
-    if (!apiStatus) {
-      setAlerts(getScenarioAlerts(scenario));
-      return;
-    }
-
     const workspace = await loadWorkspaceData(scenario);
     setSummary(workspace.summary);
     setStakeholders(workspace.stakeholders);

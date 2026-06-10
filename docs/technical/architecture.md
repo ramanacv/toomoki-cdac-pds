@@ -32,7 +32,7 @@ Dashboard And Traceability UI
 
 ### External And Demo Data Sources
 
-For MVP, data is seeded or submitted through mock APIs. Future integrations may consume CSV, batch files, REST APIs, event streams, or approved government system feeds.
+For MVP, data is seeded or submitted through mock APIs and JSON fixtures. Canonical demo records live in `mock/` and are loaded through `@pds/fixtures`. Future integrations may consume CSV, batch files, REST APIs, event streams, or approved government system feeds.
 
 Potential future sources:
 
@@ -50,7 +50,7 @@ The adapter layer normalizes input from demo data, CSV imports, batch feeds, and
 
 MVP adapters:
 
-- Seed data adapter.
+- Fixture/seed data adapter (`mock/` + `@pds/fixtures` for API, chaincode, PostgreSQL, and web fallback).
 - Mock SMART-PDS adapter.
 - Mock beneficiary authentication adapter.
 
@@ -138,6 +138,14 @@ The UI provides:
 - Beneficiary distribution log with masked identifiers.
 - Audit alert view.
 - Proof-of-integrity verification.
+
+The web app supports explicit data modes through `VITE_DATA_SOURCE`:
+
+- `api` — live REST API only.
+- `mock` — fixture workspace from `mock/` via `@pds/fixtures`.
+- `auto` — API when online, fixtures when offline (default).
+
+UI role/screen configuration stays in application source; domain mock records stay in `mock/`. See [Mock data and fixtures](../implementation/mock-data.md).
 
 ## Blockchain Network Design
 

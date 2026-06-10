@@ -47,14 +47,18 @@ blockchain/
   chaincode/
     pds-chaincode/
 infra/
-  docker/
+  postgres/
+mock/
+  entities/
+  seed/
+  scenarios/
+  workspace/
 docs/
   implementation/
 packages/
   shared-types/
-  config/
+  fixtures/
 scripts/
-  seed/
   demo/
 ```
 
@@ -64,10 +68,13 @@ Structure intent:
 - `apps/web`: React + Vite dashboard and workflow UI.
 - `blockchain/fabric-network`: Fabric bootstrap artifacts, org config, connection profiles, CA config.
 - `blockchain/chaincode/pds-chaincode`: chaincode implementation.
-- `infra/docker`: Docker Compose files and local environment wiring.
+- `infra/postgres`: schema and generated seed SQL.
+- `mock/`: canonical JSON mock and seed data (single source of truth).
 - `packages/shared-types`: DTOs, enums, event names, and shared validation constants.
-- `scripts/seed`: seed data loading.
+- `packages/fixtures`: typed loader for `mock/` (`@pds/fixtures`).
 - `scripts/demo`: scripted happy-path and exception-path demo helpers.
+
+See [Mock data and fixtures](mock-data.md) for editing, regeneration, and live/mock switching.
 
 ## Technology Decisions To Lock Now
 
@@ -89,7 +96,7 @@ These decisions should not be reopened during MVP implementation unless there is
 Deliverables:
 
 - Monorepo or workspace initialized with `apps`, `packages`, `blockchain`, `infra`, and `scripts`.
-- Base `.env.example` for API, DB, JWT, Fabric gateway, and frontend settings.
+- Base `.env.example` for API, DB, JWT, Fabric gateway, frontend settings, and `VITE_DATA_SOURCE`.
 - Docker Compose file for PostgreSQL, Fabric components, CouchDB, API, and frontend.
 - Shared linting and formatting setup.
 - Shared TypeScript configuration.
@@ -233,9 +240,11 @@ Deliverables:
   - `distribution_transactions`
   - `ledger_tx_index`
   - `audit_alerts`
-- Seed scripts for one complete district dataset.
+- Canonical mock data under `mock/` with typed loading through `@pds/fixtures`.
+- Generated PostgreSQL seed at `infra/postgres/seed.sql` from `mock/seed/backend.json`.
+- Runtime seed commands: `npm run seed`, `npm run fabric:bootstrap`, `npm run fixtures:sql`.
 
-Seed dataset:
+Seed dataset (defined in `mock/`):
 
 - One district.
 - One procurement centre.
@@ -244,20 +253,23 @@ Seed dataset:
 - One block godown.
 - One FPS.
 - One auditor.
-- Five mock beneficiaries.
 - One active ration card scenario ready for June 2026.
 - One rice lot `LOT-RICE-2026-001`.
+- Richer workspace entities for web demo scenarios under `mock/entities/` and `mock/scenarios/`.
 
 Implementation notes:
 
+- Keep JSON fixtures as the single source of truth; do not duplicate seed records in source files.
 - Seed hashes directly rather than deriving them from real PII.
 - Maintain deterministic IDs so demo scripts and UI flows are stable.
 - Store current stock by stakeholder and commodity to simplify dashboard queries.
+- Regenerate SQL after backend seed changes: `npm run fixtures:sql`.
 
 Exit criteria:
 
 - Fresh environment can be seeded with one command.
 - Demo accounts and business data are available immediately after bootstrap.
+- API, chaincode, PostgreSQL, and web mock fallback read from the same fixture set.
 
 ## 5. Authentication And Entitlement Simulation
 
@@ -505,11 +517,11 @@ Manual end-to-end scenarios:
 
 Start with these concrete tasks:
 
-1. Create repo skeleton under `apps`, `blockchain`, `infra`, `packages`, and `scripts`.
+1. Create repo skeleton under `apps`, `blockchain`, `infra`, `mock`, `packages`, and `scripts`.
 2. Bootstrap NestJS API and React app.
 3. Add Docker Compose with PostgreSQL and placeholder API/web services.
 4. Define shared enums for roles, stakeholder types, lot status, transfer status, auth mode, auth result, and alert type.
-5. Create PostgreSQL schema and seed scripts.
+5. Add `mock/` JSON fixtures, `@pds/fixtures`, PostgreSQL schema, and generated seed SQL.
 6. Implement stakeholder registration end to end, including first ledger write.
 
 This sprint gives the project a real foundation and validates the DB plus ledger integration early.

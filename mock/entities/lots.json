@@ -1,0 +1,24 @@
+[
+  {
+    "lotId": "LOT-RICE-2026-001",
+    "commodity": "Rice",
+    "season": "Kharif 2026",
+    "quantityKg": 10000,
+    "qualityGrade": "A",
+    "source": "Procurement Centre 01",
+    "currentOwner": "GODOWN-B-001",
+    "currentLocation": "Block Godown 01",
+    "status": "RECEIVED"
+  },
+  {
+    "lotId": "LOT-RICE-2026-002",
+    "commodity": "Rice",
+    "season": "Kharif 2026",
+    "quantityKg": 2500,
+    "qualityGrade": "A",
+    "source": "Procurement Centre 01",
+    "currentOwner": "FPS-101",
+    "currentLocation": "FPS 101",
+    "status": "DISPATCHED"
+  }
+]

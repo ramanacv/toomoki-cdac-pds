@@ -1,0 +1,21 @@
+[
+  {
+    "allocationId": "ALLOC-2026-001",
+    "fpsId": "FPS-101",
+    "commodity": "Rice",
+    "allocatedQtyKg": 1000,
+    "receivedQtyKg": 1000,
+    "month": "2026-06",
+    "sourceGodownId": "GODOWN-B-001",
+    "status": "RECEIVED"
+  },
+  {
+    "allocationId": "ALLOC-2026-002",
+    "fpsId": "FPS-101",
+    "commodity": "Rice",
+    "allocatedQtyKg": 500,
+    "month": "2026-07",
+    "sourceGodownId": "GODOWN-B-001",
+    "status": "ALLOCATED"
+  }
+]

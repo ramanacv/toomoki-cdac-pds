@@ -20,6 +20,7 @@ The problem statement and solution proposal are treated as the primary inputs. T
 4. [Technical Architecture](technical/architecture.md)
 5. [Technical Design](technical/design.md)
 6. [Technical Stack](technical/technical-stack.md)
+7. [Mock Data and Fixtures](implementation/mock-data.md) — for developers editing demo/seed data
 
 ## MVP Positioning
 
@@ -39,6 +40,12 @@ Procurement Centre
 ```
 
 The MVP uses mock data and simulated integrations. Real Aadhaar/UIDAI, SMART-PDS, ePoS, PFMS/DBT, IoT-GPS, AI/ML, and offline mobile integrations are future roadmap capabilities.
+
+### Mock data and live switching
+
+Canonical mock and seed data lives in the repository `mock/` folder and is loaded through `@pds/fixtures`. The web UI supports explicit data modes via `VITE_DATA_SOURCE` (`api`, `mock`, or `auto`).
+
+See [Mock data and fixtures](implementation/mock-data.md) for layout, regeneration commands, and switching guidance.
 
 ## Core Privacy Rule
 

@@ -1,0 +1,34 @@
+{
+  "initialLot": {
+    "lotId": "LOT-RICE-2026-001",
+    "commodity": "Rice",
+    "season": "Kharif 2026",
+    "quantityKg": 10000,
+    "qualityGrade": "A",
+    "source": "Procurement Centre 01",
+    "currentOwner": "PROC-001",
+    "currentLocation": "Procurement Yard"
+  },
+  "initialEntitlement": {
+    "rationCardHash": "demo-ration-card-hash",
+    "commodity": "Rice",
+    "month": "2026-06",
+    "monthlyEntitlementKg": 25,
+    "alreadyLiftedKg": 0,
+    "availableBalanceKg": 25,
+    "active": true
+  },
+  "beneficiaryRegistry": {
+    "beneficiaryRefHash": "beneficiary-hash",
+    "nameMasked": "Beneficiary ****01",
+    "district": "Demo District",
+    "rationCardHash": "demo-ration-card-hash",
+    "active": true
+  },
+  "rationCard": {
+    "rationCardHash": "demo-ration-card-hash",
+    "householdSize": 5,
+    "district": "Demo District",
+    "status": "ACTIVE"
+  }
+}

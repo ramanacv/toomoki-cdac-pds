@@ -1,0 +1,38 @@
+{
+  "id": "duplicate-claim",
+  "title": "Duplicate claim block",
+  "tagline": "A beneficiary attempts to lift the same monthly entitlement twice and the system blocks it.",
+  "dashboardSummary": {
+    "openAlerts": 2,
+    "completedDistributions": 0
+  },
+  "alerts": [
+    {
+      "alertId": "ALERT-DUP-001",
+      "alertType": "DUPLICATE_CLAIM",
+      "entityId": "demo-ration-card-hash",
+      "riskLevel": "HIGH",
+      "message": "Beneficiary already lifted this month's entitlement.",
+      "status": "OPEN",
+      "evidence": {
+        "rationCardHash": "demo-ration-card-hash",
+        "month": "2026-06",
+        "authTxnRefHash": "auth-ref-2026-001"
+      },
+      "createdAt": "2026-06-09T10:10:30.000Z"
+    },
+    {
+      "alertId": "ALERT-DB-001",
+      "alertType": "DB_LEDGER_MISMATCH",
+      "entityId": "FPS-101",
+      "riskLevel": "MEDIUM",
+      "message": "Dashboard state must be reconciled with the immutable ledger snapshot.",
+      "status": "OPEN",
+      "evidence": {
+        "trackedStockKg": 10700,
+        "ledgerTxId": "ledger-tx-dist-001"
+      },
+      "createdAt": "2026-06-09T10:12:00.000Z"
+    }
+  ]
+}

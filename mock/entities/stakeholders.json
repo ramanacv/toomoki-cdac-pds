@@ -1,0 +1,58 @@
+[
+  {
+    "stakeholderId": "FOOD-001",
+    "stakeholderType": "DEPARTMENT",
+    "name": "Food Department",
+    "district": "Demo District",
+    "licenseNo": "FD-LIC-001",
+    "status": "ACTIVE"
+  },
+  {
+    "stakeholderId": "PROC-001",
+    "stakeholderType": "PROCUREMENT_CENTER",
+    "name": "Procurement Centre 01",
+    "district": "Demo District",
+    "licenseNo": "PROC-LIC-001",
+    "status": "ACTIVE"
+  },
+  {
+    "stakeholderId": "MLL-001",
+    "stakeholderType": "MILLER",
+    "name": "Miller 01",
+    "district": "Demo District",
+    "licenseNo": "MLL-LIC-001",
+    "status": "ACTIVE"
+  },
+  {
+    "stakeholderId": "GODOWN-S-001",
+    "stakeholderType": "STATE_GODOWN",
+    "name": "State Godown 01",
+    "district": "Demo District",
+    "licenseNo": "SG-LIC-001",
+    "status": "ACTIVE"
+  },
+  {
+    "stakeholderId": "GODOWN-B-001",
+    "stakeholderType": "BLOCK_GODOWN",
+    "name": "Block Godown 01",
+    "district": "Demo District",
+    "licenseNo": "BG-LIC-001",
+    "status": "ACTIVE"
+  },
+  {
+    "stakeholderId": "FPS-101",
+    "stakeholderType": "FAIR_PRICE_SHOP",
+    "name": "FPS 101",
+    "district": "Demo District",
+    "licenseNo": "FPS-LIC-101",
+    "status": "ACTIVE"
+  },
+  {
+    "stakeholderId": "AUD-001",
+    "stakeholderType": "AUDITOR",
+    "name": "Auditor 01",
+    "district": "Demo District",
+    "licenseNo": "AUD-LIC-001",
+    "status": "ACTIVE"
+  }
+]

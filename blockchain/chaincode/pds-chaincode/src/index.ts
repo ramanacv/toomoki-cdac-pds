@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { backendSeed, stakeholders as fixtureStakeholders } from '@pds/fixtures';
 import {
   AlertType,
   AuthMode,
@@ -97,86 +98,13 @@ export class PdsLedgerEngine {
       return this.snapshot();
     }
 
-    [
-      {
-        stakeholderId: 'PROC-001',
-        stakeholderType: StakeholderType.PROCUREMENT_CENTER,
-        name: 'Procurement Centre 01',
-        district: 'Demo District',
-        licenseNo: 'PROC-LIC-001',
-        status: StakeholderStatus.ACTIVE
-      },
-      {
-        stakeholderId: 'MLL-001',
-        stakeholderType: StakeholderType.MILLER,
-        name: 'Miller 01',
-        district: 'Demo District',
-        licenseNo: 'MLL-LIC-001',
-        status: StakeholderStatus.ACTIVE
-      },
-      {
-        stakeholderId: 'GODOWN-S-001',
-        stakeholderType: StakeholderType.STATE_GODOWN,
-        name: 'State Godown 01',
-        district: 'Demo District',
-        licenseNo: 'SG-LIC-001',
-        status: StakeholderStatus.ACTIVE
-      },
-      {
-        stakeholderId: 'GODOWN-B-001',
-        stakeholderType: StakeholderType.BLOCK_GODOWN,
-        name: 'Block Godown 01',
-        district: 'Demo District',
-        licenseNo: 'BG-LIC-001',
-        status: StakeholderStatus.ACTIVE
-      },
-      {
-        stakeholderId: 'FPS-101',
-        stakeholderType: StakeholderType.FAIR_PRICE_SHOP,
-        name: 'FPS 101',
-        district: 'Demo District',
-        licenseNo: 'FPS-LIC-101',
-        status: StakeholderStatus.ACTIVE
-      },
-      {
-        stakeholderId: 'FOOD-001',
-        stakeholderType: StakeholderType.DEPARTMENT,
-        name: 'Food Department',
-        district: 'Demo District',
-        licenseNo: 'FD-LIC-001',
-        status: StakeholderStatus.ACTIVE
-      },
-      {
-        stakeholderId: 'AUD-001',
-        stakeholderType: StakeholderType.AUDITOR,
-        name: 'Auditor 01',
-        district: 'Demo District',
-        licenseNo: 'AUD-LIC-001',
-        status: StakeholderStatus.ACTIVE
-      }
-    ].forEach((stakeholder) => this.stakeholders.set(stakeholder.stakeholderId, stakeholder));
+    fixtureStakeholders.forEach((stakeholder) =>
+      this.stakeholders.set(stakeholder.stakeholderId, { ...stakeholder })
+    );
 
-    const lot = this.createCommodityLot({
-      lotId: 'LOT-RICE-2026-001',
-      commodity: 'Rice',
-      season: 'Kharif 2026',
-      quantityKg: 10000,
-      qualityGrade: 'A',
-      source: 'Procurement Centre 01',
-      currentOwner: 'PROC-001',
-      currentLocation: 'Procurement Yard'
-    });
-
-    this.stock.set(keyFor('PROC-001', 'Rice'), lot.quantityKg);
-    this.entitlements.set('demo-ration-card-hash:Rice:2026-06', {
-      rationCardHash: 'demo-ration-card-hash',
-      commodity: 'Rice',
-      month: '2026-06',
-      monthlyEntitlementKg: 25,
-      alreadyLiftedKg: 0,
-      availableBalanceKg: 25,
-      active: true
-    });
+    const lot = this.createCommodityLot({ ...backendSeed.initialLot });
+    this.stock.set(keyFor(lot.currentOwner, lot.commodity), lot.quantityKg);
+    this.createOrUpdateEntitlement({ ...backendSeed.initialEntitlement });
 
     return this.snapshot();
   }

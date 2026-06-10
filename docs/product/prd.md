@@ -140,7 +140,7 @@ An auditor views lot history, distribution receipts, pending receipts, duplicate
 - Use role-based access control.
 - Provide OpenAPI/Swagger documentation.
 - Run MVP with Docker Compose.
-- Support seeded demo data.
+- Support seeded demo data from canonical JSON fixtures (`mock/` via `@pds/fixtures`).
 - Keep business APIs integration-ready for future SMART-PDS/state system adapters.
 - Store operational state in PostgreSQL and immutable audit records in Fabric.
 

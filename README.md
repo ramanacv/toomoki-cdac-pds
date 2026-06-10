@@ -45,8 +45,14 @@ blockchain/
   chaincode/pds-chaincode/   Shared ledger engine + Fabric contract
   fabric-network/            Fabric topology scaffold and connection profiles
 infra/
-  postgres/     schema.sql and seed.sql
+  postgres/     schema.sql and seed.sql (generated from mock seed)
+mock/
+  entities/     Canonical mock domain records (JSON)
+  seed/         Backend bootstrap payload
+  scenarios/    Per-demo scenario overrides
+  workspace/    Dashboard mock aggregates
 packages/
+  fixtures/     Typed loader for mock/ data (@pds/fixtures)
   shared-types/ DTOs, enums, shared constants
 scripts/
   demo/         Happy-path and exception-path demos
@@ -90,7 +96,7 @@ docker compose up --build
 | OpenAPI spec | http://localhost:3000/openapi.json |
 | PostgreSQL | `localhost:5432` (db: `pds_chain`, user/pass: `pds`/`pds`) |
 
-The web UI works offline with embedded demo data if the API is unreachable. When the API is online, it loads live workspace data.
+The web UI data mode is controlled by `VITE_DATA_SOURCE` (default `auto`): use the live API when online, fixtures from `mock/` when offline, or force `api` / `mock` explicitly. See [Mock data and fixtures](docs/implementation/mock-data.md).
 
 ### Demo Scenarios in the UI
 
@@ -175,8 +181,20 @@ Open http://localhost:4173. The Vite dev server proxies `/api` to `http://localh
 | `PDS_LEDGER_JOURNAL_PATH` | `./tmp/pds-ledger.ndjson` | Append-only ledger journal |
 | `PDS_CHAINCODE_STATE_PATH` | `./tmp/chaincode-world-state.json` | Chaincode world state file |
 | `PDS_FABRIC_ENVELOPE_PATH` | `./tmp/pds-fabric-envelope.ndjson` | Fabric envelope journal |
+| `VITE_DATA_SOURCE` | `auto` | Web data mode: `api`, `mock`, or `auto` |
+| `VITE_API_BASE_URL` | `/api` | Web API base URL |
 
 Docker Compose overrides these for container networking. See [DEPLOYMENT.md](DEPLOYMENT.md) for full deployment and backend-mode guidance.
+
+### Mock data and live switching
+
+Mock entities live under `mock/` and are loaded through `@pds/fixtures`. The API and chaincode seed from `mock/seed/backend.json`; PostgreSQL seed SQL is generated from the same source (`npm run fixtures:sql`).
+
+| `VITE_DATA_SOURCE` | Web behavior |
+|--------------------|--------------|
+| `api` | Fetch only from the REST API |
+| `mock` | Use fixtures only (no API reads) |
+| `auto` | Use API when online, otherwise fixtures (default) |
 
 ## NPM Scripts
 
@@ -190,6 +208,7 @@ Docker Compose overrides these for container networking. See [DEPLOYMENT.md](DEP
 | `npm run demo:happy` | Run happy-path demo script |
 | `npm run demo:exception` | Run exception-path demo script |
 | `npm run fabric:bootstrap` | Initialize chaincode runtime world state |
+| `npm run fixtures:sql` | Regenerate `infra/postgres/seed.sql` from mock seed |
 | `npm run seed` | Reset `tmp/` and seed file-based demo state |
 | `npm run reset` | Remove `tmp/` runtime artifacts |
 

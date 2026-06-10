@@ -1,0 +1,8 @@
+{
+  "trackedStockKg": 10700,
+  "activeLots": 1,
+  "completedDistributions": 1,
+  "pendingReceipts": 0,
+  "openAlerts": 1,
+  "highRiskFps": ["FPS-101"]
+}

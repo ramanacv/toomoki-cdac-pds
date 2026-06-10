@@ -10,18 +10,9 @@ import type {
   TransferOrder
 } from '@pds/shared-types';
 import { AuthMode, AuthResult } from '@pds/shared-types';
-import {
-  demoAuthTransactions,
-  demoAllocations,
-  demoDistributions,
-  demoEntitlements,
-  demoLots,
-  demoStakeholders,
-  demoSummaryFallback,
-  demoTransfers,
-  getScenarioAlerts,
-  type DemoScenario
-} from './demo-model.js';
+import { getWorkspaceSnapshot, type DemoScenario } from '@pds/fixtures';
+import { getDataSourceMode, usesMockData } from './data-source.js';
+import { getScenarioAlerts } from './demo-model.js';
 import type { WorkflowActionRequest } from './workflow-actions.js';
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? '/api';
@@ -37,6 +28,8 @@ export type WorkspaceData = {
   distributions: DistributionTransaction[];
   alerts: AuditAlert[];
 };
+
+const mockWorkspace = (scenario: DemoScenario): WorkspaceData => getWorkspaceSnapshot(scenario);
 
 async function fetchJson<T>(path: string): Promise<T> {
   const response = await fetch(`${apiBaseUrl}${path}`);
@@ -61,79 +54,59 @@ async function postJson<T>(path: string, body: unknown): Promise<T> {
   return (await response.json()) as T;
 }
 
-export async function loadDashboardSummary(): Promise<DashboardSummary> {
-  try {
-    return await fetchJson<DashboardSummary>('/dashboard/summary');
-  } catch {
-    return demoSummaryFallback;
+async function loadFromApiOrMock<T>(
+  path: string,
+  mockValue: T,
+  apiOnline: boolean
+): Promise<T> {
+  if (usesMockData(apiOnline)) {
+    return mockValue;
   }
+
+  return fetchJson<T>(path);
 }
 
-export async function loadStakeholders(): Promise<Stakeholder[]> {
-  try {
-    return await fetchJson<Stakeholder[]>('/stakeholders');
-  } catch {
-    return demoStakeholders;
-  }
+export async function loadDashboardSummary(apiOnline = true): Promise<DashboardSummary> {
+  return loadFromApiOrMock('/dashboard/summary', mockWorkspace('happy-path').summary, apiOnline);
 }
 
-export async function loadLots(): Promise<CommodityLot[]> {
-  try {
-    return await fetchJson<CommodityLot[]>('/lots');
-  } catch {
-    return demoLots;
-  }
+export async function loadStakeholders(apiOnline = true): Promise<Stakeholder[]> {
+  return loadFromApiOrMock('/stakeholders', mockWorkspace('happy-path').stakeholders, apiOnline);
 }
 
-export async function loadTransfers(): Promise<TransferOrder[]> {
-  try {
-    return await fetchJson<TransferOrder[]>('/transfers');
-  } catch {
-    return demoTransfers;
-  }
+export async function loadLots(apiOnline = true): Promise<CommodityLot[]> {
+  return loadFromApiOrMock('/lots', mockWorkspace('happy-path').lots, apiOnline);
 }
 
-export async function loadAllocations(): Promise<FPSAllocation[]> {
-  try {
-    return await fetchJson<FPSAllocation[]>('/fps-allocations');
-  } catch {
-    return demoAllocations;
-  }
+export async function loadTransfers(apiOnline = true): Promise<TransferOrder[]> {
+  return loadFromApiOrMock('/transfers', mockWorkspace('happy-path').transfers, apiOnline);
 }
 
-export async function loadAuthTransactions(): Promise<AuthTransaction[]> {
-  try {
-    return await fetchJson<AuthTransaction[]>('/auth/transactions');
-  } catch {
-    return demoAuthTransactions;
-  }
+export async function loadAllocations(apiOnline = true): Promise<FPSAllocation[]> {
+  return loadFromApiOrMock('/fps-allocations', mockWorkspace('happy-path').allocations, apiOnline);
 }
 
-export async function loadEntitlements(): Promise<MonthlyEntitlement[]> {
-  try {
-    return await fetchJson<MonthlyEntitlement[]>('/entitlements');
-  } catch {
-    return demoEntitlements;
-  }
+export async function loadAuthTransactions(apiOnline = true): Promise<AuthTransaction[]> {
+  return loadFromApiOrMock('/auth/transactions', mockWorkspace('happy-path').authTransactions, apiOnline);
 }
 
-export async function loadDistributions(): Promise<DistributionTransaction[]> {
-  try {
-    return await fetchJson<DistributionTransaction[]>('/distributions');
-  } catch {
-    return demoDistributions;
-  }
+export async function loadEntitlements(apiOnline = true): Promise<MonthlyEntitlement[]> {
+  return loadFromApiOrMock('/entitlements', mockWorkspace('happy-path').entitlements, apiOnline);
 }
 
-export async function loadAlerts(scenario: DemoScenario): Promise<AuditAlert[]> {
-  try {
-    return await fetchJson<AuditAlert[]>('/audit-alerts');
-  } catch {
-    return getScenarioAlerts(scenario);
-  }
+export async function loadDistributions(apiOnline = true): Promise<DistributionTransaction[]> {
+  return loadFromApiOrMock('/distributions', mockWorkspace('happy-path').distributions, apiOnline);
+}
+
+export async function loadAlerts(scenario: DemoScenario, apiOnline = true): Promise<AuditAlert[]> {
+  return loadFromApiOrMock('/audit-alerts', getScenarioAlerts(scenario), apiOnline);
 }
 
 export async function probeApi(): Promise<boolean> {
+  if (getDataSourceMode() === 'mock') {
+    return false;
+  }
+
   try {
     const response = await fetch(`${apiBaseUrl}/health`);
     return response.ok;
@@ -143,17 +116,23 @@ export async function probeApi(): Promise<boolean> {
 }
 
 export async function loadWorkspaceData(scenario: DemoScenario): Promise<WorkspaceData> {
+  const apiOnline = await probeApi();
+
+  if (usesMockData(apiOnline)) {
+    return mockWorkspace(scenario);
+  }
+
   const [summary, stakeholders, lots, transfers, allocations, authTransactions, entitlements, distributions, alerts] =
     await Promise.all([
-      loadDashboardSummary(),
-      loadStakeholders(),
-      loadLots(),
-      loadTransfers(),
-      loadAllocations(),
-      loadAuthTransactions(),
-      loadEntitlements(),
-      loadDistributions(),
-      loadAlerts(scenario)
+      loadDashboardSummary(apiOnline),
+      loadStakeholders(apiOnline),
+      loadLots(apiOnline),
+      loadTransfers(apiOnline),
+      loadAllocations(apiOnline),
+      loadAuthTransactions(apiOnline),
+      loadEntitlements(apiOnline),
+      loadDistributions(apiOnline),
+      loadAlerts(scenario, apiOnline)
     ]);
 
   return {

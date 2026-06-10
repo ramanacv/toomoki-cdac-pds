@@ -1,0 +1,38 @@
+{
+  "id": "short-receipt",
+  "title": "Short receipt exception",
+  "tagline": "A custody mismatch is detected when a transfer arrives short and the audit engine flags it.",
+  "dashboardSummary": {
+    "openAlerts": 2,
+    "pendingReceipts": 1
+  },
+  "alerts": [
+    {
+      "alertId": "ALERT-SHORT-001",
+      "alertType": "SHORT_RECEIPT",
+      "entityId": "TRANSFER-002",
+      "riskLevel": "HIGH",
+      "message": "Received quantity is below dispatch quantity for the lot transfer.",
+      "status": "OPEN",
+      "evidence": {
+        "dispatchedQtyKg": 1000,
+        "receivedQtyKg": 700,
+        "shortageQtyKg": 300
+      },
+      "createdAt": "2026-06-09T09:40:00.000Z"
+    },
+    {
+      "alertId": "ALERT-DB-001",
+      "alertType": "DB_LEDGER_MISMATCH",
+      "entityId": "FPS-101",
+      "riskLevel": "MEDIUM",
+      "message": "Dashboard state must be reconciled with the immutable ledger snapshot.",
+      "status": "OPEN",
+      "evidence": {
+        "trackedStockKg": 10700,
+        "ledgerTxId": "ledger-tx-dist-001"
+      },
+      "createdAt": "2026-06-09T10:12:00.000Z"
+    }
+  ]
+}

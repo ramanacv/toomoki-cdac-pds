@@ -87,6 +87,7 @@ Selected:
 
 - React.
 - Vite.
+- `@pds/fixtures` for mock workspace data loaded from `mock/`.
 - Recharts or Apache ECharts.
 - QR code library.
 
@@ -116,7 +117,7 @@ MVP:
 - PostgreSQL container.
 - CouchDB containers.
 - Frontend container.
-- `.env`-driven local configuration.
+- `.env`-driven local configuration, including `VITE_DATA_SOURCE` for web read mode (`api`, `mock`, `auto`).
 
 Future production:
 

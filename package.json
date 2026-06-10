@@ -8,9 +8,10 @@
     "blockchain/chaincode/*"
   ],
   "scripts": {
-    "build": "npm run build --workspaces --if-present",
+    "build": "npm run build --workspace=@pds/shared-types && npm run build --workspace=@pds/fixtures && npm run build --workspaces --if-present",
     "lint": "eslint apps packages blockchain/chaincode --ext .ts,.tsx --max-warnings 0",
-    "pretest": "npm run build --workspace=@pds/shared-types && npm run build --workspace=@pds/pds-chaincode",
+    "fixtures:sql": "node scripts/generate-postgres-seed.mjs",
+    "pretest": "npm run build --workspace=@pds/shared-types && npm run build --workspace=@pds/fixtures && npm run build --workspace=@pds/pds-chaincode",
     "demo:happy": "node scripts/demo/happy-path.mjs",
     "demo:exception": "node scripts/demo/exception-path.mjs",
     "smoke": "npm run build && node scripts/smoke.mjs",

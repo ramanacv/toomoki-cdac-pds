@@ -232,6 +232,31 @@ When a live Fabric network is available:
 4. Set `PDS_FABRIC_CLIENT_ORG` to the submitting organization's name.
 5. Provide valid connection profile and crypto material paths (extend env as implemented in `apps/api/src/fabric-config.ts`).
 
+## Mock Data and SQL Generation
+
+Canonical mock and seed data lives in `mock/` and is exposed through `@pds/fixtures`. See [docs/implementation/mock-data.md](docs/implementation/mock-data.md) for the full layout and editing workflow.
+
+| Path | Purpose |
+|------|---------|
+| `mock/entities/` | Workspace entity JSON used by the web mock layer |
+| `mock/seed/backend.json` | API, chaincode, and PostgreSQL bootstrap payload |
+| `mock/scenarios/` | Scenario-specific dashboard and alert overrides |
+| `infra/postgres/seed.sql` | Generated SQL (do not edit by hand) |
+
+Regenerate PostgreSQL seed after changing mock seed data:
+
+```bash
+npm run fixtures:sql
+```
+
+Web data source modes (`VITE_DATA_SOURCE`):
+
+| Value | Behavior |
+|-------|----------|
+| `api` | Live API only |
+| `mock` | Fixtures only |
+| `auto` | API when online, fixtures otherwise (default) |
+
 ## Data Management
 
 ### Reset runtime files

@@ -19,6 +19,23 @@ Core entities:
 - LedgerTxIndex: mapping of application records to blockchain transaction IDs.
 - AuditAlert: exception raised by rule engine or auditor.
 
+## Mock Data And Fixtures
+
+MVP mock records are not embedded in business logic. They are defined as JSON under `mock/` and loaded through `@pds/fixtures`.
+
+| Location | Role |
+|----------|------|
+| `mock/entities/` | Workspace entity arrays for web mock/auto mode |
+| `mock/seed/backend.json` | Shared backend bootstrap for API, chaincode, and PostgreSQL |
+| `mock/scenarios/` | Scenario-specific alerts and dashboard overrides |
+| `packages/fixtures/` | Typed exports consumed by web, API seed path, and chaincode |
+
+PostgreSQL seed SQL at `infra/postgres/seed.sql` is generated from the same backend seed payload (`npm run fixtures:sql`).
+
+Beneficiary and ration card mock tables (`beneficiary_registry_mock`, `ration_cards_mock`) are populated from `mock/seed/backend.json`. Operational entitlement rows align with the same ration card hash used across fixtures.
+
+Full editing and switching guidance: [Mock data and fixtures](../implementation/mock-data.md).
+
 ## Chaincode Assets
 
 - Stakeholder.
@@ -203,17 +220,16 @@ Core entities:
 
 ## Demo Seed Data
 
-- One district.
-- One procurement centre.
-- One miller.
-- One state godown.
-- One block godown.
-- One FPS.
-- One auditor.
-- Five mock ration cards or beneficiary records.
+Canonical records are defined in `mock/` and loaded through `@pds/fixtures`. Key identifiers:
+
+- One district demo set with seven stakeholders (procurement through auditor).
+- One ration card hash: `demo-ration-card-hash`.
+- One beneficiary ref hash: `beneficiary-hash` (backend seed) / `demo-beneficiary-ref-hash` (workspace entities).
 - One rice lot: `LOT-RICE-2026-001`.
-- One allocation: `ALLOC-FPS-101-JUN2026`.
-- One successful distribution: `DIST-00091`.
+- Workspace allocations: `ALLOC-2026-001`, `ALLOC-2026-002`.
+- One successful distribution: `DIST-2026-001`.
+
+Backend bootstrap uses `mock/seed/backend.json`. Richer workspace/demo state uses `mock/entities/` and `mock/scenarios/`. See [Mock data and fixtures](../implementation/mock-data.md).
 
 ## Data Privacy Design
 

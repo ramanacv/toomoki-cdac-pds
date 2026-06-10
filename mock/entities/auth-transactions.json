@@ -1,0 +1,11 @@
+[
+  {
+    "authTxnId": "AUTH-2026-001",
+    "beneficiaryRefHash": "demo-beneficiary-ref-hash",
+    "rationCardHash": "demo-ration-card-hash",
+    "authMode": "MOCK_OTP",
+    "authResult": "SUCCESS",
+    "authTxnRefHash": "auth-ref-2026-001",
+    "timestamp": "2026-06-09T10:05:00.000Z"
+  }
+]

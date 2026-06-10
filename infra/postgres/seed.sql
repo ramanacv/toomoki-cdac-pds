@@ -1,3 +1,6 @@
+-- Generated from mock/entities/stakeholders.json and mock/seed/backend.json
+-- Regenerate with: npm run fixtures:sql
+
 INSERT INTO stakeholders (stakeholder_id, stakeholder_type, name, district, license_no, status)
 VALUES
   ('FOOD-001', 'DEPARTMENT', 'Food Department', 'Demo District', 'FD-LIC-001', 'ACTIVE'),
@@ -22,3 +25,4 @@ VALUES ('beneficiary-hash', 'Beneficiary ****01', 'Demo District', 'demo-ration-
 
 INSERT INTO monthly_entitlements (ration_card_hash, commodity, month, monthly_entitlement_kg, already_lifted_kg, available_balance_kg, active)
 VALUES ('demo-ration-card-hash', 'Rice', '2026-06', 25, 0, 25, TRUE);
+

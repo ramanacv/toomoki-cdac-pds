@@ -1,0 +1,21 @@
+{
+  "id": "happy-path",
+  "title": "Happy-path distribution",
+  "tagline": "A seeded rice lot moves from procurement to the FPS with an auditable receipt trail.",
+  "dashboardSummary": {},
+  "alerts": [
+    {
+      "alertId": "ALERT-DB-001",
+      "alertType": "DB_LEDGER_MISMATCH",
+      "entityId": "FPS-101",
+      "riskLevel": "MEDIUM",
+      "message": "Dashboard state must be reconciled with the immutable ledger snapshot.",
+      "status": "OPEN",
+      "evidence": {
+        "trackedStockKg": 10700,
+        "ledgerTxId": "ledger-tx-dist-001"
+      },
+      "createdAt": "2026-06-09T10:12:00.000Z"
+    }
+  ]
+}

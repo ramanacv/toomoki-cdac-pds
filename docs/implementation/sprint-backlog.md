@@ -6,7 +6,7 @@ This backlog turns the implementation plan into an execution sequence. The order
 
 Goal: create the skeleton and local development baseline.
 
-- Create the monorepo folders under `apps`, `blockchain`, `infra`, `packages`, and `scripts`.
+- Create the monorepo folders under `apps`, `blockchain`, `infra`, `mock`, `packages`, and `scripts`.
 - Add root TypeScript, lint, and formatting conventions.
 - Add `.env.example` entries for API, database, blockchain, and frontend settings.
 - Add Docker Compose wiring for PostgreSQL, Fabric services, and app containers.
@@ -22,7 +22,9 @@ Exit criteria:
 Goal: make the platform store and verify core PDS records.
 
 - Define PostgreSQL schema for stakeholders, lots, transfers, allocations, beneficiaries, entitlements, distributions, ledger references, and alerts.
-- Implement seed scripts for the demo district dataset.
+- Add canonical mock JSON under `mock/` and the `@pds/fixtures` loader package.
+- Generate PostgreSQL seed SQL from `mock/seed/backend.json` (`npm run fixtures:sql`).
+- Implement runtime seed commands for file and chaincode state (`npm run seed`, `npm run fabric:bootstrap`).
 - Stand up the minimal Fabric network for the MVP.
 - Implement chaincode asset models for stakeholder, lot, transfer, allocation, receipt, distribution, and alert.
 - Wire backend ledger gateway to submit and query Fabric transactions.

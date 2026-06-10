@@ -1,0 +1,11 @@
+[
+  {
+    "rationCardHash": "demo-ration-card-hash",
+    "commodity": "Rice",
+    "month": "2026-06",
+    "monthlyEntitlementKg": 25,
+    "alreadyLiftedKg": 25,
+    "availableBalanceKg": 0,
+    "active": true
+  }
+]

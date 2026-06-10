@@ -1,0 +1,14 @@
+[
+  {
+    "transferId": "TRANSFER-001",
+    "lotId": "LOT-RICE-2026-001",
+    "fromOrg": "GODOWN-S-001",
+    "toOrg": "GODOWN-B-001",
+    "dispatchedQtyKg": 1000,
+    "receivedQtyKg": 1000,
+    "vehicleNo": "KA01AB1234",
+    "status": "RECEIVED",
+    "dispatchTimestamp": "2026-06-09T08:15:00.000Z",
+    "receiveTimestamp": "2026-06-09T09:00:00.000Z"
+  }
+]
