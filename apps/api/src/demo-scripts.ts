@@ -13,7 +13,7 @@ import {
   type MonthlyEntitlement,
   type Stakeholder
 } from '@pds/shared-types';
-import { PdsService } from './pds.service.js';
+import { PdsRuntime } from './modules/core/pds-runtime.js';
 
 export type DemoFlowResult = {
   summary: DashboardSummary;
@@ -40,7 +40,7 @@ const createStatePath = (prefix: string): string => join(mkdtempSync(join(tmpdir
 
 export const runHappyPathDemo = (): DemoFlowResult => {
   const statePath = createStatePath('pds-demo-happy-');
-  const service = new PdsService(true, statePath);
+  const service = new PdsRuntime(true, statePath);
 
   try {
     service.dispatchLot({
@@ -127,7 +127,7 @@ export const runHappyPathDemo = (): DemoFlowResult => {
 
 export const runExceptionDemo = (): DemoExceptionResult => {
   const statePath = createStatePath('pds-demo-exception-');
-  const service = new PdsService(true, statePath);
+  const service = new PdsRuntime(true, statePath);
 
   try {
     service.dispatchLot({

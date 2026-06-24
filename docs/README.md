@@ -21,6 +21,7 @@ The problem statement and solution proposal are treated as the primary inputs. T
 5. [Technical Design](technical/design.md)
 6. [Technical Stack](technical/technical-stack.md)
 7. [Mock Data and Fixtures](implementation/mock-data.md) — for developers editing demo/seed data
+8. [Fabric Gateway + NestJS refactor](implementation/fabric-gateway-plus-refactor.md) — completed platform refactor (NestJS 11, ledger modes, Fabric 3.x stack)
 
 ## MVP Positioning
 
@@ -40,6 +41,8 @@ Procurement Centre
 ```
 
 The MVP uses mock data and simulated integrations. Real Aadhaar/UIDAI, SMART-PDS, ePoS, PFMS/DBT, IoT-GPS, AI/ML, and offline mobile integrations are future roadmap capabilities.
+
+**Ledger modes:** default demo (`PDS_LEDGER_MODE=demo`, in-process chaincode) or live Fabric (`PDS_LEDGER_MODE=fabric`, `--profile fabric`). See [DEPLOYMENT.md](../DEPLOYMENT.md).
 
 ### Mock data and live switching
 

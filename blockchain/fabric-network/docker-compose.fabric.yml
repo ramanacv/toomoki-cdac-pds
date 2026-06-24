@@ -1,62 +1,150 @@
 version: '3.9'
 
+networks:
+  pds-fabric:
+    name: pds-fabric
+
 services:
   orderer.pds.example.com:
-    image: hyperledger/fabric-orderer:2.5
+    profiles: [fabric]
+    image: hyperledger/fabric-orderer:3.1.5
     container_name: orderer.pds.example.com
     environment:
       - ORDERER_GENERAL_LOGLEVEL=info
       - ORDERER_GENERAL_LISTENADDRESS=0.0.0.0
-      - ORDERER_GENERAL_GENESISFILE=/var/hyperledger/orderer/orderer.genesis.block
+      - ORDERER_GENERAL_LISTENPORT=7050
+      - ORDERER_GENERAL_LOCALMSPID=OrdererMSP
+      - ORDERER_GENERAL_LOCALMSPDIR=/var/hyperledger/orderer/msp
+      - ORDERER_GENERAL_TLS_ENABLED=true
+      - ORDERER_GENERAL_TLS_PRIVATEKEY=/var/hyperledger/orderer/tls/server.key
+      - ORDERER_GENERAL_TLS_CERTIFICATE=/var/hyperledger/orderer/tls/server.crt
+      - ORDERER_GENERAL_TLS_ROOTCAS=[/var/hyperledger/orderer/tls/ca.crt]
+      - ORDERER_GENERAL_BOOTSTRAPMETHOD=none
+      - ORDERER_CHANNELPARTICIPATION_ENABLED=true
+      - ORDERER_ADMIN_TLS_ENABLED=true
+      - ORDERER_ADMIN_TLS_CERTIFICATE=/var/hyperledger/orderer/tls/server.crt
+      - ORDERER_ADMIN_TLS_PRIVATEKEY=/var/hyperledger/orderer/tls/server.key
+      - ORDERER_ADMIN_TLS_ROOTCAS=[/var/hyperledger/orderer/tls/ca.crt]
+      - ORDERER_ADMIN_TLS_CLIENTROOTCAS=[/var/hyperledger/orderer/tls/ca.crt]
+      - ORDERER_ADMIN_LISTENADDRESS=0.0.0.0:7053
     ports:
       - '7050:7050'
+      - '7053:7053'
+    volumes:
+      - ./crypto/ordererOrganizations/pds.example.com/orderers/orderer.pds.example.com:/var/hyperledger/orderer
+    networks:
+      - pds-fabric
 
   peer0.food.example.com:
-    image: hyperledger/fabric-peer:2.5
+    profiles: [fabric]
+    image: hyperledger/fabric-peer:3.1.5
     container_name: peer0.food.example.com
     environment:
       - CORE_PEER_ID=peer0.food.example.com
-      - CORE_PEER_LOCALMSPID=FoodAndCivilSuppliesMSP
       - CORE_PEER_ADDRESS=peer0.food.example.com:7051
+      - CORE_PEER_LISTENADDRESS=0.0.0.0:7051
+      - CORE_PEER_CHAINCODEADDRESS=peer0.food.example.com:7052
+      - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:7052
+      - CORE_PEER_LOCALMSPID=FoodAndCivilSuppliesMSP
+      - CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/msp
+      - CORE_PEER_TLS_ENABLED=true
+      - CORE_PEER_TLS_CERT_FILE=/etc/hyperledger/fabric/tls/server.crt
+      - CORE_PEER_TLS_KEY_FILE=/etc/hyperledger/fabric/tls/server.key
+      - CORE_PEER_TLS_ROOTCERT_FILE=/etc/hyperledger/fabric/tls/ca.crt
+      - CORE_LEDGER_STATE_STATEDATABASE=CouchDB
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_COUCHDBADDRESS=couchdb0:5984
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_USERNAME=admin
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_PASSWORD=adminpw
     ports:
       - '7051:7051'
-
-  peer0.procurement.example.com:
-    image: hyperledger/fabric-peer:2.5
-    container_name: peer0.procurement.example.com
-    environment:
-      - CORE_PEER_ID=peer0.procurement.example.com
-      - CORE_PEER_LOCALMSPID=ProcurementMillerMSP
-      - CORE_PEER_ADDRESS=peer0.procurement.example.com:8051
-    ports:
-      - '8051:8051'
+    volumes:
+      - ./crypto/peerOrganizations/food.example.com/peers/peer0.food.example.com:/etc/hyperledger/fabric
+    depends_on:
+      - couchdb0
+    networks:
+      - pds-fabric
 
   peer0.godown.example.com:
-    image: hyperledger/fabric-peer:2.5
+    profiles: [fabric]
+    image: hyperledger/fabric-peer:3.1.5
     container_name: peer0.godown.example.com
     environment:
       - CORE_PEER_ID=peer0.godown.example.com
-      - CORE_PEER_LOCALMSPID=GodownWarehouseMSP
       - CORE_PEER_ADDRESS=peer0.godown.example.com:9051
+      - CORE_PEER_LISTENADDRESS=0.0.0.0:9051
+      - CORE_PEER_CHAINCODEADDRESS=peer0.godown.example.com:9052
+      - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:9052
+      - CORE_PEER_LOCALMSPID=GodownWarehouseMSP
+      - CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/msp
+      - CORE_PEER_TLS_ENABLED=true
+      - CORE_PEER_TLS_CERT_FILE=/etc/hyperledger/fabric/tls/server.crt
+      - CORE_PEER_TLS_KEY_FILE=/etc/hyperledger/fabric/tls/server.key
+      - CORE_PEER_TLS_ROOTCERT_FILE=/etc/hyperledger/fabric/tls/ca.crt
+      - CORE_LEDGER_STATE_STATEDATABASE=CouchDB
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_COUCHDBADDRESS=couchdb1:5984
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_USERNAME=admin
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_PASSWORD=adminpw
     ports:
       - '9051:9051'
+    volumes:
+      - ./crypto/peerOrganizations/godown.example.com/peers/peer0.godown.example.com:/etc/hyperledger/fabric
+    depends_on:
+      - couchdb1
+    networks:
+      - pds-fabric
 
-  peer0.fps.example.com:
-    image: hyperledger/fabric-peer:2.5
-    container_name: peer0.fps.example.com
+  couchdb0:
+    profiles: [fabric]
+    image: couchdb:3.4
+    container_name: couchdb0
     environment:
-      - CORE_PEER_ID=peer0.fps.example.com
-      - CORE_PEER_LOCALMSPID=FairPriceShopMSP
-      - CORE_PEER_ADDRESS=peer0.fps.example.com:10051
+      - COUCHDB_USER=admin
+      - COUCHDB_PASSWORD=adminpw
     ports:
-      - '10051:10051'
+      - '5984:5984'
+    networks:
+      - pds-fabric
 
-  peer0.audit.example.com:
-    image: hyperledger/fabric-peer:2.5
-    container_name: peer0.audit.example.com
+  couchdb1:
+    profiles: [fabric]
+    image: couchdb:3.4
+    container_name: couchdb1
     environment:
-      - CORE_PEER_ID=peer0.audit.example.com
-      - CORE_PEER_LOCALMSPID=AuditAuthorityMSP
-      - CORE_PEER_ADDRESS=peer0.audit.example.com:11051
+      - COUCHDB_USER=admin
+      - COUCHDB_PASSWORD=adminpw
     ports:
-      - '11051:11051'
+      - '6984:5984'
+    networks:
+      - pds-fabric
+
+  ca.food.example.com:
+    profiles: [fabric]
+    image: hyperledger/fabric-ca:1.5.15
+    container_name: ca.food.example.com
+    environment:
+      - FABRIC_CA_HOME=/etc/hyperledger/fabric-ca-server
+      - FABRIC_CA_SERVER_CA_NAME=ca-food
+      - FABRIC_CA_SERVER_TLS_ENABLED=true
+      - FABRIC_CA_SERVER_PORT=7054
+    ports:
+      - '7054:7054'
+    volumes:
+      - ./crypto/fabric-ca/food:/etc/hyperledger/fabric-ca-server
+    networks:
+      - pds-fabric
+
+  ca.godown.example.com:
+    profiles: [fabric]
+    image: hyperledger/fabric-ca:1.5.15
+    container_name: ca.godown.example.com
+    environment:
+      - FABRIC_CA_HOME=/etc/hyperledger/fabric-ca-server
+      - FABRIC_CA_SERVER_CA_NAME=ca-godown
+      - FABRIC_CA_SERVER_TLS_ENABLED=true
+      - FABRIC_CA_SERVER_PORT=8054
+    ports:
+      - '8054:8054'
+    volumes:
+      - ./crypto/fabric-ca/godown:/etc/hyperledger/fabric-ca-server
+    networks:
+      - pds-fabric

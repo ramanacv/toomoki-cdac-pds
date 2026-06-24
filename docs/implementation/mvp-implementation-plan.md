@@ -20,6 +20,22 @@ Procurement Centre
 
 The implementation must follow the existing product and technical docs and preserve the core rule that sensitive beneficiary data stays off-chain.
 
+## Implementation progress (2026-06-24)
+
+| Gate | Status | Notes |
+|------|--------|-------|
+| **Gate 1: Platform Ready** | **Complete** | Docker Compose (demo + fabric profiles), PostgreSQL seed, NestJS 11 API with feature modules, 52/52 API tests |
+| **Gate 2: Supply Chain Ready** | **Complete** | Stakeholders, lots, transfers, lot history — demo mode and fabric gateway mode |
+| Gate 3: FPS And Beneficiary Ready | In progress | Core flows implemented; see acceptance criteria below |
+| Gate 4: Audit Ready | In progress | Audit rules and trace APIs implemented |
+
+Ledger modes:
+
+- **Demo** (`PDS_LEDGER_MODE=demo`, default): in-process chaincode + PostgreSQL — unchanged POC behavior.
+- **Fabric** (`PDS_LEDGER_MODE=fabric`): `@hyperledger/fabric-gateway` to `pds-chaincode` on `pdschannel` via Fabric 3.1.x 2-org stack.
+
+See [fabric-gateway-plus-refactor.md](fabric-gateway-plus-refactor.md) and [DEPLOYMENT.md](../../DEPLOYMENT.md) for bootstrap and compose profiles.
+
 ## Delivery Target
 
 The MVP is complete when a seeded demo can:
@@ -78,14 +94,15 @@ See [Mock data and fixtures](mock-data.md) for editing, regeneration, and live/m
 
 ## Technology Decisions To Lock Now
 
-- Blockchain: Hyperledger Fabric 2.5, Fabric CA, CouchDB, single-channel MVP network.
+- Blockchain: Hyperledger Fabric 3.1.x (2-org live demo via `--profile fabric`); demo mode uses in-process chaincode runtime. Full 5-org consortium documented in `network-manifest.json` for later expansion.
 - Chaincode language: TypeScript.
-- Backend: NestJS on Node.js.
-- Database access: Prisma is the practical choice for MVP speed and schema control.
+- Backend: NestJS 11 on Node.js 22; feature modules under `apps/api/src/modules/`.
+- Database access: raw `pg` client (Prisma noted as alternative; not adopted).
 - Frontend: React + Vite.
 - Charts: Recharts.
-- Auth: JWT for application users; mock beneficiary authentication only.
-- Deployment: Docker Compose.
+- Auth: JWT for application users (deferred); mock beneficiary authentication implemented.
+- Deployment: Docker Compose with `demo` (default) and `fabric` compose profiles.
+- Ledger switch: `PDS_LEDGER_MODE=demo|fabric` (legacy `PDS_LEDGER_BACKEND` mapped for compatibility).
 
 These decisions should not be reopened during MVP implementation unless there is a blocking issue.
 
@@ -109,9 +126,10 @@ Implementation notes:
 
 Exit criteria:
 
-- `docker compose up` starts PostgreSQL, Fabric dependencies, API, and frontend shell.
+- `docker compose up` starts PostgreSQL, API (demo mode), and frontend.
+- `docker compose --profile fabric up` (after bootstrap) starts live Fabric stack + gateway-backed API.
 - API can connect to PostgreSQL.
-- API can load Fabric connection settings.
+- API loads Fabric gateway settings when `PDS_LEDGER_MODE=fabric`.
 
 ## 2. Blockchain Network And Chaincode
 
@@ -158,7 +176,7 @@ Implementation notes:
 
 Exit criteria:
 
-- API can submit a test stakeholder registration transaction.
+- API can submit a test stakeholder registration transaction (demo and fabric modes).
 - API can fetch lot history from ledger after lot creation and transfer events.
 - Chaincode stores distribution receipts without raw PII.
 
@@ -166,23 +184,14 @@ Exit criteria:
 
 Deliverables:
 
-- NestJS application with modules:
-  - `auth`
-  - `users`
-  - `stakeholders`
-  - `lots`
-  - `transfers`
-  - `fps-allocations`
-  - `beneficiaries`
-  - `entitlements`
-  - `distributions`
-  - `audit-alerts`
-  - `trace`
-  - `dashboard`
-- Swagger/OpenAPI.
-- JWT login for application roles.
-- Fabric gateway integration service.
-- PostgreSQL schema and migrations.
+- NestJS 11 application with feature modules under `apps/api/src/modules/`:
+  - `core`, `ledger`, `fabric`, `config`
+  - `health`, `openapi`, `dashboard`
+  - `stakeholders`, `lots`, `transfers`, `allocations`
+  - `auth`, `entitlements`, `distributions`, `audit`, `trace`
+- Hand-rolled OpenAPI at `/openapi.json` and `/docs`.
+- Fabric gateway integration via `@hyperledger/fabric-gateway` (fabric mode).
+- PostgreSQL schema and seed SQL.
 
 Suggested backend layers:
 
@@ -452,17 +461,17 @@ This order keeps backend and ledger foundations ahead of UI and avoids rework.
 
 ## Gate 1: Platform Ready
 
-- Services start locally.
-- DB migration and seed scripts work.
-- API and frontend boot.
-- Fabric network is reachable.
+- [x] Services start locally (`docker compose up`).
+- [x] DB migration and seed scripts work.
+- [x] API (NestJS 11) and frontend boot.
+- [x] Fabric network reachable with `--profile fabric` after bootstrap.
 
 ## Gate 2: Supply Chain Ready
 
-- Stakeholders can be registered.
-- Lot creation works.
-- Transfer dispatch and receipt work.
-- Lot history is visible from ledger.
+- [x] Stakeholders can be registered.
+- [x] Lot creation works.
+- [x] Transfer dispatch and receipt work.
+- [x] Lot history is visible from ledger.
 
 ## Gate 3: FPS And Beneficiary Ready
 
@@ -483,7 +492,7 @@ Automated tests:
 
 - Unit tests for entitlement validation, stock checks, duplicate claim prevention, and alert rule evaluation.
 - Integration tests for API modules using seeded PostgreSQL state.
-- Ledger integration smoke tests for lot creation, transfer, and distribution receipt.
+- Ledger integration smoke tests for lot creation, transfer, and distribution receipt (`npm run smoke`, `scripts/smoke-fabric-gateway.mjs` for fabric profile).
 
 Manual end-to-end scenarios:
 

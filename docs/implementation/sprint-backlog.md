@@ -25,13 +25,13 @@ Goal: make the platform store and verify core PDS records.
 - Add canonical mock JSON under `mock/` and the `@pds/fixtures` loader package.
 - Generate PostgreSQL seed SQL from `mock/seed/backend.json` (`npm run fixtures:sql`).
 - Implement runtime seed commands for file and chaincode state (`npm run seed`, `npm run fabric:bootstrap`).
-- Stand up the minimal Fabric network for the MVP.
+- Stand up the Fabric 3.1.x 2-org demo network (`docker compose --profile fabric` after bootstrap).
 - Implement chaincode asset models for stakeholder, lot, transfer, allocation, receipt, distribution, and alert.
-- Wire backend ledger gateway to submit and query Fabric transactions.
+- Wire backend ledger gateway: demo mode (in-process) and fabric mode (`@hyperledger/fabric-gateway`).
 
 Exit criteria:
 
-- Stakeholder registration writes to both PostgreSQL and Fabric.
+- Stakeholder registration writes to PostgreSQL and ledger (demo or fabric mode).
 - Lot creation is traceable through a ledger transaction ID.
 
 ## Sprint 2: Workflow Services

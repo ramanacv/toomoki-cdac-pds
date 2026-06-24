@@ -5,6 +5,7 @@ This folder contains implementation guidance derived from the product and techni
 ## Documents
 
 - [MVP implementation plan](mvp-implementation-plan.md)
+- [NestJS 11 + Fabric Gateway refactor](fabric-gateway-plus-refactor.md) — completed implementation plan
 - [Sprint backlog](sprint-backlog.md)
 - [Mock data and fixtures](mock-data.md)
 

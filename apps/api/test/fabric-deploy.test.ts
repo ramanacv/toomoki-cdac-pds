@@ -10,7 +10,7 @@ describe('fabric deployment scaffold', () => {
     const compose = read('blockchain/fabric-network/docker-compose.fabric.yml');
     expect(compose).toContain('orderer.pds.example.com');
     expect(compose).toContain('peer0.food.example.com');
-    expect(compose).toContain('peer0.audit.example.com');
+    expect(compose).toContain('peer0.godown.example.com');
   });
 
   it('documents the fabric env contract', () => {

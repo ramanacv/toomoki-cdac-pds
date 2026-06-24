@@ -28,11 +28,11 @@ export function validateFabricArtifacts() {
     throw new Error('Fabric contract is not aligned with the manifest');
   }
 
-  if (!compose.includes('orderer.pds.example.com') || !compose.includes('peer0.audit.example.com')) {
+  if (!compose.includes('orderer.pds.example.com') || !compose.includes('peer0.godown.example.com')) {
     throw new Error('Fabric compose scaffold is incomplete');
   }
 
-  if (!env.includes('PDS_LEDGER_BACKEND=chaincode-runtime') || !env.includes('PDS_CHAINCODE_STATE_PATH=')) {
+  if (!env.includes('PDS_LEDGER_MODE=') || !env.includes('PDS_CHAINCODE_STATE_PATH=')) {
     throw new Error('Fabric env example is incomplete');
   }
 

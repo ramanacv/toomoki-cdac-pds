@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-node blockchain/fabric-network/scripts/validate-fabric-artifacts.mjs
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-echo "PDS-Chain Fabric network scaffold"
-echo "This script documents the intended bootstrap flow for the MVP."
-echo "Planned channel: pdschannel"
-echo "Planned chaincode: pds-chaincode"
-echo "Planned organizations: FoodAndCivilSupplies, ProcurementMiller, GodownWarehouse, FairPriceShop, AuditAuthority"
-echo "No live Fabric deployment is performed by this scaffold script."
-echo "For local chaincode execution, run: npm run fabric:bootstrap && PDS_LEDGER_BACKEND=chaincode-runtime npm run start --workspace=@pds/api"
+"${ROOT}/scripts/generate-crypto.sh"
+"${ROOT}/scripts/configtxgen.sh"
+"${ROOT}/scripts/generate-connection-profiles.sh"
+
+echo "Bootstrap complete for channel pdschannel and chaincode pds-chaincode."
+echo "  docker compose -f blockchain/fabric-network/docker-compose.fabric.yml --profile fabric up -d"
+echo "Then join channel and deploy chaincode:"
+echo "  ${ROOT}/scripts/osnadmin-channel-join.sh"
+echo "  ${ROOT}/scripts/peer-channel-join.sh"
+echo "  ${ROOT}/scripts/deploy-chaincode.sh"

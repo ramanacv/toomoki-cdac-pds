@@ -24,13 +24,26 @@ Procurement Centre
 
 Sensitive beneficiary data stays **off-chain**. Aadhaar numbers, biometrics, OTPs, mobile numbers, and full ration card numbers must not be written to the ledger. Only privacy-preserving hashes, references, and audit proofs are stored on-chain.
 
+## Architecture Overview
+
+PDS-Chain supports two ledger modes via `PDS_LEDGER_MODE`:
+
+| Mode | Value | Ledger | Fabric containers |
+|------|-------|--------|-------------------|
+| **Demo** (default) | `demo` | In-process `PdsChaincodeInvoker` + PostgreSQL snapshots | Not required |
+| **Fabric** | `fabric` | `@hyperledger/fabric-gateway` → `pds-chaincode` on `pdschannel` | `--profile fabric` |
+
+Legacy `PDS_LEDGER_BACKEND=chaincode-runtime` maps to demo; `fabric-gateway` maps to fabric.
+
+The NestJS API is organized into feature modules under `apps/api/src/modules/` (health, stakeholders, lots, transfers, allocations, auth, entitlements, distributions, trace, audit, dashboard, ledger, fabric).
+
 ## Technology Stack
 
 | Layer | Technology |
 |-------|------------|
-| Blockchain | Hyperledger Fabric 2.5 (scaffold + local chaincode runtime) |
+| Blockchain | Hyperledger Fabric 3.1.x (2-org demo) or in-process chaincode runtime (demo mode) |
 | Chaincode | TypeScript (`blockchain/chaincode/pds-chaincode`) |
-| API | NestJS on Node.js 22 |
+| API | NestJS 11 on Node.js 22 |
 | Database | PostgreSQL 16 |
 | Frontend | React 19 + Vite 7 |
 | Monorepo | npm workspaces |
@@ -43,7 +56,7 @@ apps/
   web/          React dashboard and workflow UI
 blockchain/
   chaincode/pds-chaincode/   Shared ledger engine + Fabric contract
-  fabric-network/            Fabric topology scaffold and connection profiles
+  fabric-network/            Fabric 3.x 2-org stack, bootstrap scripts, connection profiles
 infra/
   postgres/     schema.sql and seed.sql (generated from mock seed)
 mock/
@@ -94,7 +107,7 @@ docker compose up --build
 | API | http://localhost:3000 |
 | API health | http://localhost:3000/health |
 | OpenAPI spec | http://localhost:3000/openapi.json |
-| PostgreSQL | `localhost:5432` (db: `pds_chain`, user/pass: `pds`/`pds`) |
+| PostgreSQL | `localhost:5433` (db: `pds_chain`, user/pass: `pds`/`pds`) |
 
 The web UI data mode is controlled by `VITE_DATA_SOURCE` (default `auto`): use the live API when online, fixtures from `mock/` when offline, or force `api` / `mock` explicitly. See [Mock data and fixtures](docs/implementation/mock-data.md).
 
@@ -107,6 +120,23 @@ Use the scenario selector in the dashboard:
 - **Duplicate claim** — second distribution in the same month is blocked
 
 Role views: Department, Procurement, Godown, FPS, Auditor.
+
+### Fabric profile (live blockchain)
+
+Requires Fabric CLI tools on the host (`peer`, `osnadmin`, `configtxgen`). See [DEPLOYMENT.md](DEPLOYMENT.md) for the full sequence.
+
+```bash
+# 1. Generate crypto, channel config, deploy chaincode
+blockchain/fabric-network/scripts/bootstrap-network.sh
+
+# 2. Start postgres + API (fabric mode) + web + Fabric peers/orderer/CAs
+PDS_LEDGER_MODE=fabric docker compose --profile fabric up --build
+
+# 3. Smoke test (API must be healthy; expects verificationSource=chaincode)
+node scripts/smoke-fabric-gateway.mjs
+```
+
+Default `docker compose up` keeps demo mode (`PDS_LEDGER_MODE=demo`) unchanged. The API container joins the `pds-fabric` Docker network for peer connectivity when the fabric profile is active.
 
 ## Local Development (Without Docker)
 
@@ -122,7 +152,7 @@ npm ci
 cp .env.example .env
 ```
 
-Default `.env.example` values use file persistence and chaincode-runtime ledger mode.
+Default `.env.example` values use file persistence and demo ledger mode (`PDS_LEDGER_BACKEND=chaincode-runtime` → `PDS_LEDGER_MODE=demo`).
 
 ### 3. Bootstrap chaincode runtime state
 
@@ -173,10 +203,13 @@ Open http://localhost:4173. The Vite dev server proxies `/api` to `http://localh
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PORT` | `3000` | API listen port |
+| `PDS_LEDGER_MODE` | `demo` | `demo` (in-process chaincode) or `fabric` (gateway client) |
 | `PDS_PERSISTENCE_BACKEND` | `file` | `file` or `postgres` |
 | `PDS_POSTGRES_DSN` | `postgresql://pds:pds@localhost:5432/pds_chain` | PostgreSQL connection string |
-| `PDS_LEDGER_BACKEND` | `chaincode-runtime` | See [DEPLOYMENT.md](DEPLOYMENT.md) |
-| `PDS_FABRIC_CLIENT_ORG` | `FoodAndCivilSupplies` | Fabric client org identity |
+| `PDS_LEDGER_BACKEND` | `chaincode-runtime` | **Deprecated alias** — use `PDS_LEDGER_MODE`; see [DEPLOYMENT.md](DEPLOYMENT.md) |
+| `PDS_FABRIC_CLIENT_ORG` | `FoodAndCivilSupplies` | Fabric client org identity (fabric mode) |
+| `PDS_FABRIC_CHANNEL` | `pdschannel` | Fabric channel (fabric mode) |
+| `PDS_FABRIC_CHAINCODE` | `pds-chaincode` | Chaincode name (fabric mode) |
 | `PDS_STATE_PATH` | `./tmp/pds-state.json` | Local file state (file persistence) |
 | `PDS_LEDGER_JOURNAL_PATH` | `./tmp/pds-ledger.ndjson` | Append-only ledger journal |
 | `PDS_CHAINCODE_STATE_PATH` | `./tmp/chaincode-world-state.json` | Chaincode world state file |
@@ -233,11 +266,14 @@ Key endpoints (full spec at `/openapi.json`):
 ## Verification
 
 ```bash
-# Unit and integration tests
+# Unit and integration tests (52 API tests)
 npm test
 
-# Full smoke (happy + exception flows)
+# Full smoke (happy + exception flows, demo mode)
 npm run smoke
+
+# Fabric gateway smoke (requires --profile fabric stack)
+node scripts/smoke-fabric-gateway.mjs
 
 # API health (when running)
 curl http://localhost:3000/health
@@ -252,7 +288,8 @@ Start with [docs/README.md](docs/README.md):
 3. [Feature Specification](docs/product/feature-spec.md)
 4. [Technical Architecture](docs/technical/architecture.md)
 5. [MVP Implementation Plan](docs/implementation/mvp-implementation-plan.md)
+6. [Fabric Gateway refactor](docs/implementation/fabric-gateway-plus-refactor.md) — completed NestJS 11 + ledger modes
 
 ## Deployment
 
-For Docker Compose, environment matrices, ledger modes, Fabric scaffold status, and production notes, see **[DEPLOYMENT.md](DEPLOYMENT.md)**.
+For Docker Compose, environment matrices, demo vs fabric ledger modes, Fabric bootstrap, and production notes, see **[DEPLOYMENT.md](DEPLOYMENT.md)**.

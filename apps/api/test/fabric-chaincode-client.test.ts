@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { describe, expect, it } from 'vitest';
 import { StakeholderStatus, StakeholderType } from '@pds/shared-types';
 import { FabricChaincodeLedgerPort } from '../src/fabric-chaincode-ledger-port.js';
-import { PdsService } from '../src/pds.service.js';
+import { PdsRuntime } from '../src/pds-runtime.js';
 
 describe('fabric chaincode ledger port', () => {
   it('mirrors api ledger events into chaincode world state', () => {
@@ -14,7 +14,7 @@ describe('fabric chaincode ledger port', () => {
 
     try {
       const port = new FabricChaincodeLedgerPort(statePath, join(dir, 'journal.ndjson'), chaincodeStatePath);
-      const service = new PdsService(true, port);
+      const service = new PdsRuntime(true, port);
 
       service.registerStakeholder({
         stakeholderId: 'TEST-CHAIN-001',

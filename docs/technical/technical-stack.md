@@ -4,11 +4,11 @@
 
 The MVP stack is standardized on:
 
-- Hyperledger Fabric 2.5 for permissioned blockchain.
-- Node.js and NestJS for backend APIs.
+- Hyperledger Fabric 3.1.x for live demo (`PDS_LEDGER_MODE=fabric`); in-process chaincode for default demo mode.
+- Node.js 22 and NestJS 11 for backend APIs.
 - PostgreSQL for operational state.
-- React and Vite for frontend dashboard.
-- Docker Compose for local/demo deployment.
+- React 19 and Vite 7 for frontend dashboard.
+- Docker Compose for local/demo deployment (demo and fabric profiles).
 
 This stack matches the expert proposal and supports a practical 2-week MVP while leaving room for production hardening.
 
@@ -16,13 +16,14 @@ This stack matches the expert proposal and supports a practical 2-week MVP while
 
 Selected:
 
-- Hyperledger Fabric 2.5 LTS.
+- Hyperledger Fabric 3.1.x (2-org live demo stack).
+- In-process chaincode runtime for default demo mode (`PDS_LEDGER_MODE=demo`).
 - Fabric CA for identities.
-- Fabric Gateway SDK for Node.js.
+- `@hyperledger/fabric-gateway` for Node.js (fabric mode).
 - CouchDB as Fabric world state DB.
-- TypeScript or Go chaincode.
-- Single main PDS channel for MVP.
-- Single-node Raft orderer for demo.
+- TypeScript chaincode.
+- Single main PDS channel (`pdschannel`) for MVP.
+- Single-node Raft orderer with channel participation for demo.
 
 Rationale:
 
@@ -41,12 +42,12 @@ Rejected:
 
 Selected:
 
-- Node.js.
-- NestJS.
-- Fabric Gateway SDK for Node.js.
-- PostgreSQL client or ORM selected during implementation.
-- Swagger/OpenAPI for API documentation.
-- JWT-based role login for MVP.
+- Node.js 22.
+- NestJS 11 with feature modules under `apps/api/src/modules/`.
+- `@hyperledger/fabric-gateway` for fabric ledger mode.
+- `pg` PostgreSQL client.
+- Hand-rolled OpenAPI at `/openapi.json` and `/docs`.
+- JWT-based role login for MVP (guards deferred).
 
 Rationale:
 
@@ -111,13 +112,13 @@ Rationale:
 
 MVP:
 
-- Docker Compose.
-- Fabric network containers.
-- Backend API container.
+- Docker Compose with demo (default) and `--profile fabric` stacks.
+- Fabric 3.1.x network containers (fabric profile).
+- Backend API container (NestJS 11).
 - PostgreSQL container.
-- CouchDB containers.
+- CouchDB containers (fabric profile).
 - Frontend container.
-- `.env`-driven local configuration, including `VITE_DATA_SOURCE` for web read mode (`api`, `mock`, `auto`).
+- `.env`-driven configuration: `PDS_LEDGER_MODE`, `VITE_DATA_SOURCE`, gateway vars in `blockchain/fabric-network/fabric-env.example`.
 
 Future production:
 

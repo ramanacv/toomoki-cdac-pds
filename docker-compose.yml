@@ -6,7 +6,12 @@ services:
       POSTGRES_USER: pds
       POSTGRES_PASSWORD: pds
     ports:
-      - '5432:5432'
+      - '5433:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U pds -d pds_chain']
+      interval: 2s
+      timeout: 5s
+      retries: 10
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./infra/postgres/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
@@ -18,15 +23,30 @@ services:
       dockerfile: apps/api/Dockerfile
     environment:
       PORT: 3000
+      PDS_LEDGER_MODE: ${PDS_LEDGER_MODE:-demo}
       PDS_PERSISTENCE_BACKEND: postgres
       PDS_POSTGRES_DSN: postgresql://pds:pds@postgres:5432/pds_chain
-      PDS_LEDGER_BACKEND: chaincode-runtime
+      PDS_LEDGER_BACKEND: ${PDS_LEDGER_BACKEND:-chaincode-runtime}
       PDS_CHAINCODE_STATE_PATH: /app/tmp/chaincode-world-state.json
       PDS_LEDGER_JOURNAL_PATH: /app/tmp/pds-ledger.ndjson
+      PDS_FABRIC_PEER_ENDPOINT: ${PDS_FABRIC_PEER_ENDPOINT:-peer0.food.example.com:7051}
+      PDS_FABRIC_PEER_TLS_CERT_PATH: ${PDS_FABRIC_PEER_TLS_CERT_PATH:-/app/blockchain/fabric-network/crypto/peerOrganizations/food.example.com/peers/peer0.food.example.com/tls/ca.crt}
+      PDS_FABRIC_PEER_HOST_ALIAS: ${PDS_FABRIC_PEER_HOST_ALIAS:-peer0.food.example.com}
+      PDS_FABRIC_MSP_ID: ${PDS_FABRIC_MSP_ID:-FoodAndCivilSuppliesMSP}
+      PDS_FABRIC_CERT_PATH: ${PDS_FABRIC_CERT_PATH:-/app/blockchain/fabric-network/crypto/peerOrganizations/food.example.com/users/User1@food.example.com/msp/signcerts/cert.pem}
+      PDS_FABRIC_KEY_PATH: ${PDS_FABRIC_KEY_PATH:-/app/blockchain/fabric-network/crypto/peerOrganizations/food.example.com/users/User1@food.example.com/msp/keystore}
+      PDS_FABRIC_CHANNEL: ${PDS_FABRIC_CHANNEL:-pdschannel}
+      PDS_FABRIC_CHAINCODE: ${PDS_FABRIC_CHAINCODE:-pds-chaincode}
     ports:
       - '3000:3000'
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./blockchain/fabric-network/crypto:/app/blockchain/fabric-network/crypto:ro
+    networks:
+      - default
+      - pds-fabric
 
   web:
     build:
@@ -37,5 +57,53 @@ services:
     depends_on:
       - api
 
+  orderer.pds.example.com:
+    profiles: [fabric]
+    extends:
+      file: ./blockchain/fabric-network/docker-compose.fabric.yml
+      service: orderer.pds.example.com
+
+  peer0.food.example.com:
+    profiles: [fabric]
+    extends:
+      file: ./blockchain/fabric-network/docker-compose.fabric.yml
+      service: peer0.food.example.com
+
+  peer0.godown.example.com:
+    profiles: [fabric]
+    extends:
+      file: ./blockchain/fabric-network/docker-compose.fabric.yml
+      service: peer0.godown.example.com
+
+  couchdb0:
+    profiles: [fabric]
+    extends:
+      file: ./blockchain/fabric-network/docker-compose.fabric.yml
+      service: couchdb0
+
+  couchdb1:
+    profiles: [fabric]
+    extends:
+      file: ./blockchain/fabric-network/docker-compose.fabric.yml
+      service: couchdb1
+
+  ca.food.example.com:
+    profiles: [fabric]
+    extends:
+      file: ./blockchain/fabric-network/docker-compose.fabric.yml
+      service: ca.food.example.com
+
+  ca.godown.example.com:
+    profiles: [fabric]
+    extends:
+      file: ./blockchain/fabric-network/docker-compose.fabric.yml
+      service: ca.godown.example.com
+
 volumes:
   postgres_data:
+
+networks:
+  default:
+    name: pds-compose
+  pds-fabric:
+    name: pds-fabric

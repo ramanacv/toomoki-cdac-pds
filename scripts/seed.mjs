@@ -1,13 +1,13 @@
 import { rmSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { PdsService } from '../apps/api/dist/src/pds.service.js';
+import { PdsRuntime } from '../apps/api/dist/src/pds-runtime.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const statePath = resolve(root, 'tmp/pds-state.json');
 
 rmSync(resolve(root, 'tmp'), { recursive: true, force: true });
-const service = new PdsService(true, statePath);
+const service = new PdsRuntime(true, statePath);
 
 console.log(
   JSON.stringify(

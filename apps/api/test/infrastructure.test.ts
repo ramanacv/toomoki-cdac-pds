@@ -35,7 +35,7 @@ describe('infrastructure contracts', () => {
   });
 
   it('exposes a local openapi contract', () => {
-    const openapi = readFileSync(resolve(process.cwd(), 'src/openapi.ts'), 'utf8');
+    const openapi = readFileSync(resolve(process.cwd(), 'src/modules/openapi/openapi.document.ts'), 'utf8');
     expect(openapi).toContain('/stakeholders');
     expect(openapi).toContain('/distributions/{distributionId}');
     expect(openapi).toContain('/auth/transactions/{authTxnId}');

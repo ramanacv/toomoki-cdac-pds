@@ -63,7 +63,12 @@ Future adapters:
 
 ### Backend Business API
 
-The backend owns validation, workflow orchestration, role checks, database writes, ledger submission, and audit trigger calls.
+The backend (NestJS 11, modular structure under `apps/api/src/modules/`) owns validation, workflow orchestration, role checks, database writes, ledger submission, and audit trigger calls.
+
+Ledger modes:
+
+- **Demo** (`PDS_LEDGER_MODE=demo`): in-process `PdsChaincodeInvoker` — default for stakeholder demos without Fabric containers.
+- **Fabric** (`PDS_LEDGER_MODE=fabric`): `@hyperledger/fabric-gateway` client submitting to `pds-chaincode` on channel `pdschannel`.
 
 API groups:
 
@@ -149,7 +154,15 @@ UI role/screen configuration stays in application source; domain mock records st
 
 ## Blockchain Network Design
 
-MVP organizations:
+MVP network (implemented):
+
+- **Demo mode:** in-process chaincode runtime; no Fabric containers required.
+- **Fabric mode:** Hyperledger Fabric **3.1.x** 2-org demo (Food Department + Godown).
+- Channel: `pdschannel`; chaincode: `pds-chaincode`.
+- Single-node Raft orderer with channel participation (no system channel).
+- Fabric CA for identities; CouchDB world state on peers.
+
+Documented consortium (5 orgs in `network-manifest.json`):
 
 - Org1: Food and Civil Supplies Department.
 - Org2: Procurement/Miller.
@@ -157,16 +170,7 @@ MVP organizations:
 - Org4: Fair Price Shop.
 - Org5: Auditor/Inspection Authority.
 
-MVP network:
-
-- Hyperledger Fabric 2.5.
-- One main PDS channel.
-- One peer per organization.
-- Single-node Raft ordering service for demo.
-- Fabric CA for identities.
-- CouchDB state database.
-
-Production hardening may use multi-node Raft, multiple peers per organization, private data collections, HSM-backed keys, and separate channels by state/district or data-sharing boundary.
+Production hardening may deploy all five orgs with multi-node Raft, multiple peers per organization, private data collections, HSM-backed keys, and separate channels by state/district or data-sharing boundary.
 
 ## On-Chain Versus Off-Chain Boundary
 
@@ -205,7 +209,14 @@ Off-chain:
 Demo mode:
 
 - Mock data and simulated APIs.
-- Suitable for 2-week MVP demonstration.
+- In-process chaincode ledger (`PDS_LEDGER_MODE=demo`).
+- Suitable for 2-week MVP demonstration without Fabric infrastructure.
+
+Fabric demo mode:
+
+- Live 2-org Fabric stack via `docker compose --profile fabric`.
+- Gateway-backed API (`PDS_LEDGER_MODE=fabric`).
+- Bootstrap: `blockchain/fabric-network/scripts/bootstrap-network.sh`.
 
 Pilot mode:
 
@@ -220,11 +231,10 @@ Production mode:
 
 MVP:
 
-- Docker Compose.
-- Fabric network containers.
-- Backend API container.
+- Docker Compose with **demo** (default) and **fabric** profiles.
+- Fabric 3.1.x network containers (fabric profile): orderer, 2 peers, CouchDB, CAs.
+- Backend API container (NestJS 11) joins `pds-fabric` network in fabric profile.
 - PostgreSQL container.
-- CouchDB containers.
 - Frontend container.
 
 Future production:

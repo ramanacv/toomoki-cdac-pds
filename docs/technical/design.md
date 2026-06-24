@@ -36,6 +36,25 @@ Beneficiary and ration card mock tables (`beneficiary_registry_mock`, `ration_ca
 
 Full editing and switching guidance: [Mock data and fixtures](../implementation/mock-data.md).
 
+## Backend Structure
+
+The NestJS 11 API lives under `apps/api/src/modules/`:
+
+| Module | Responsibility |
+|--------|----------------|
+| `config` | Env validation (`PDS_LEDGER_MODE`, persistence, Fabric gateway vars) |
+| `core` | `PdsLedgerFacade`, bootstrap `OnModuleInit` |
+| `ledger` | Ledger port factory; demo vs fabric adapter selection |
+| `fabric` | Gateway connection, identity, chaincode client ports |
+| Domain modules | Thin controllers per API group (stakeholders, lots, transfers, …) |
+
+**Ledger modes:**
+
+- `PDS_LEDGER_MODE=demo` (default): in-process `PdsChaincodeInvoker` + PostgreSQL snapshots.
+- `PDS_LEDGER_MODE=fabric`: `@hyperledger/fabric-gateway` to `pds-chaincode` on `pdschannel`.
+
+Legacy `PDS_LEDGER_BACKEND` values map to these modes for backward compatibility.
+
 ## Chaincode Assets
 
 - Stakeholder.

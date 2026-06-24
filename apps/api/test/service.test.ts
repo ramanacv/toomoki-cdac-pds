@@ -3,15 +3,15 @@ import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { describe, expect, it } from 'vitest';
 import { AuthMode, AuthResult, StakeholderStatus, StakeholderType } from '@pds/shared-types';
-import { PdsService } from '../src/pds.service.js';
+import { PdsRuntime } from '../src/pds-runtime.js';
 
 const createStatePath = (): string => join(mkdtempSync(join(tmpdir(), 'pds-api-')), 'state.json');
 
-describe('PdsService', () => {
+describe('PdsRuntime', () => {
   it('persists state across service instances', () => {
     const statePath = createStatePath();
     try {
-      const first = new PdsService(true, statePath);
+      const first = new PdsRuntime(true, statePath);
       first.registerStakeholder({
         stakeholderId: 'TEST-001',
         stakeholderType: StakeholderType.DEPARTMENT,
@@ -21,7 +21,7 @@ describe('PdsService', () => {
         status: StakeholderStatus.ACTIVE
       });
 
-      const second = new PdsService(false, statePath);
+      const second = new PdsRuntime(false, statePath);
       expect(second.listStakeholders().some((stakeholder) => stakeholder.stakeholderId === 'TEST-001')).toBe(true);
     } finally {
       rmSync(dirname(statePath), { recursive: true, force: true });
@@ -31,7 +31,7 @@ describe('PdsService', () => {
   it('provides a seeded summary', () => {
     const statePath = createStatePath();
     try {
-      const service = new PdsService(true, statePath);
+      const service = new PdsRuntime(true, statePath);
       const summary = service.getDashboardSummary();
       expect(summary.activeLots).toBeGreaterThan(0);
       expect(service.listLots().length).toBeGreaterThan(0);
@@ -43,7 +43,7 @@ describe('PdsService', () => {
   it('returns direct lookups for lot, transfer, and allocation records', () => {
     const statePath = createStatePath();
     try {
-      const service = new PdsService(true, statePath);
+      const service = new PdsRuntime(true, statePath);
       expect(service.getLot('LOT-RICE-2026-001').lotId).toBe('LOT-RICE-2026-001');
       expect(() => service.getTransfer('TR-000')).toThrow();
       service.dispatchLot({
@@ -122,7 +122,7 @@ describe('PdsService', () => {
   it('supports end-to-end distribution flow', () => {
     const statePath = createStatePath();
     try {
-      const service = new PdsService(true, statePath);
+      const service = new PdsRuntime(true, statePath);
       service.dispatchLot({
         transferId: 'TR-API-001',
         lotId: 'LOT-RICE-2026-001',
@@ -201,7 +201,7 @@ describe('PdsService', () => {
   it('resolves an audit alert', () => {
     const statePath = createStatePath();
     try {
-      const service = new PdsService(true, statePath);
+      const service = new PdsRuntime(true, statePath);
       service.dispatchLot({
         transferId: 'TR-ALERT-001',
         lotId: 'LOT-RICE-2026-001',

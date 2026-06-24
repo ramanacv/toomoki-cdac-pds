@@ -1,45 +1,46 @@
-# Fabric Network Scaffold
+# Fabric Network (2-org demo)
 
-This folder defines the intended Hyperledger Fabric topology for the PDS-Chain MVP.
-
-It is a scaffold, not a live consortium deployment. The goal is to make the network shape explicit so the runtime can later swap from the local envelope adapter to real Fabric connectivity without changing product logic.
+This folder defines the Hyperledger Fabric topology for the PDS-Chain MVP and ships a **Fabric 3.1.x** two-organization demo (Food Department + Godown).
 
 ## Topology
 
-- Org1: Food and Civil Supplies Department.
-- Org2: Procurement/Miller.
-- Org3: Godown/Warehouse.
-- Org4: Fair Price Shop.
-- Org5: Auditor/Inspection Authority.
+- **Orderer:** single Raft orderer with channel participation (no system channel)
+- **Org1:** Food and Civil Supplies (`peer0.food.example.com`)
+- **Org2:** Godown/Warehouse (`peer0.godown.example.com`)
+- **Channel:** `pdschannel`
+- **Chaincode:** `pds-chaincode` (TypeScript, `blockchain/chaincode/pds-chaincode`)
 
-## Planned Components
+## Bootstrap
 
-- Single PDS channel for the MVP.
-- One peer per organization.
-- One orderer for demo bootstrap.
-- Fabric CA for identities.
-- CouchDB world state for each peer.
-- TypeScript chaincode package at `blockchain/chaincode/pds-chaincode`.
+```bash
+./scripts/bootstrap-network.sh
+```
 
-## Local Bootstrap Artifacts
+Individual steps:
 
-- `network-manifest.json` captures the intended network topology.
-- `fabric-contract.json` captures the intended chaincode client contract.
-- `docker-compose.fabric.yml` captures the intended local Fabric deployment topology.
-- `fabric-env.example` captures the expected runtime env contract.
-- `connection-profiles/*.json` define client connectivity targets.
-- `scripts/bootstrap-network.sh` is a demo bootstrap entrypoint.
-- `scripts/generate-connection-profiles.sh` regenerates the client profiles.
-- The API-side route-to-operation plan is kept in sync through tests, not by a live Fabric deployment.
+1. `generate-crypto.sh` — dev crypto (`cryptogen` when available)
+2. `configtxgen.sh` — channel block for `pdschannel`
+3. `generate-connection-profiles.sh` — TLS-aware client profiles
+4. Start stack: `docker compose --profile fabric up` from repo root
+5. `osnadmin-channel-join.sh` — orderer joins channel
+6. `peer-channel-join.sh` — both peers join
+7. `deploy-chaincode.sh` — package/install/approve/commit lifecycle
+8. `smoke-fabric.sh` — API smoke against running gateway
+
+## API integration
+
+Set `PDS_LEDGER_MODE=fabric` on the NestJS API. The API uses `@hyperledger/fabric-gateway` to submit and evaluate transactions on `pds-chaincode` while continuing to persist operational snapshots in PostgreSQL.
+
+Legacy `PDS_LEDGER_BACKEND=fabric-gateway` is mapped to fabric mode. Demo mode (`PDS_LEDGER_MODE=demo`, default) keeps the in-process `PdsChaincodeInvoker` path.
+
+## Artifacts
+
+- `network-manifest.json` — intended consortium layout (5 orgs documented; 2 orgs deployed in demo)
+- `fabric-contract.json` — chaincode operation manifest
+- `docker-compose.fabric.yml` — Fabric 3.x services (orderer, peers, CouchDB, CA)
+- `connection-profiles/*.json` — client connectivity targets
+- `fabric-env.example` — gateway env contract
 
 ## Status
 
-The files in this directory are used as contract artifacts for development and testing.
-
-Local chaincode execution is available through `PDS_LEDGER_BACKEND=chaincode-runtime`, which runs the `PdsChainContract` logic via `PdsChaincodeInvoker` and stores world state in `PDS_CHAINCODE_STATE_PATH`. Bootstrap with:
-
-```bash
-npm run fabric:bootstrap
-```
-
-A full Hyperledger Fabric peer/orderer deployment is still scaffold-only. The `docker-compose.fabric.yml` file documents the intended topology but is not wired into the root compose file yet.
+The Docker stack and bootstrap scripts are implemented for local demo. Full lifecycle deployment requires Fabric CLI binaries (`peer`, `osnadmin`, `configtxgen`) and enrolled admin identities on your host.

@@ -1,7 +1,7 @@
 import type { LedgerEvent } from '@pds/shared-types';
 import type { PdsLedgerState } from '@pds/pds-chaincode';
 import type { ChainQueryPort } from './chain-query-port.js';
-import { FabricChaincodeClient } from './fabric-chaincode-client.js';
+import { FabricChaincodeClient } from '../modules/fabric/fabric-chaincode-client.js';
 import { FilePdsLedgerPort, type PdsLedgerPort } from './ledger-port.js';
 import { PostgresPdsLedgerPort } from './postgres-ledger-port.js';
 import type { PgPoolSnapshotAdapter } from './postgres-adapter.js';
@@ -17,6 +17,10 @@ export class PostgresChaincodeLedgerPort implements PdsLedgerPort, ChainQueryPor
 
   loadState(): PdsLedgerState | null {
     return this.postgresPort.loadState();
+  }
+
+  loadStateAsync(): Promise<PdsLedgerState | null> {
+    return this.postgresPort.loadStateAsync();
   }
 
   saveState(state: PdsLedgerState): void {
