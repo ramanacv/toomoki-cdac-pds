@@ -49,7 +49,43 @@ export enum AlertType {
   DB_LEDGER_MISMATCH = 'DB_LEDGER_MISMATCH',
   IN_TRANSIT_DELAY = 'IN_TRANSIT_DELAY',
   FPS_CLOSING_STOCK_MISMATCH = 'FPS_CLOSING_STOCK_MISMATCH',
-  DISTRIBUTION_TAMPERED = 'DISTRIBUTION_TAMPERED'
+  DISTRIBUTION_TAMPERED = 'DISTRIBUTION_TAMPERED',
+  GRIEVANCE_SLA_BREACH = 'GRIEVANCE_SLA_BREACH'
+}
+
+export enum RationCardType {
+  APL = 'APL',
+  BPL = 'BPL',
+  AAY = 'AAY',
+  PHH = 'PHH'
+}
+
+export enum RationCardStatus {
+  ISSUED = 'ISSUED',
+  ACTIVE = 'ACTIVE',
+  SUSPENDED = 'SUSPENDED',
+  CANCELLED = 'CANCELLED'
+}
+
+export enum GrievanceType {
+  NOT_RECEIVED = 'NOT_RECEIVED',
+  QUANTITY_SHORT = 'QUANTITY_SHORT',
+  QUALITY_POOR = 'QUALITY_POOR',
+  UNAUTHORIZED_CHARGE = 'UNAUTHORIZED_CHARGE',
+  OTHER = 'OTHER'
+}
+
+export enum GrievanceStatus {
+  OPEN = 'OPEN',
+  ACKNOWLEDGED = 'ACKNOWLEDGED',
+  ESCALATED = 'ESCALATED',
+  RESOLVED = 'RESOLVED'
+}
+
+export enum EntitlementRuleStatus {
+  PENDING_APPROVAL = 'PENDING_APPROVAL',
+  ACTIVE = 'ACTIVE',
+  SUPERSEDED = 'SUPERSEDED'
 }
 
 export type Stakeholder = {
@@ -106,6 +142,7 @@ export type MonthlyEntitlement = {
   alreadyLiftedKg: number;
   availableBalanceKg: number;
   active: boolean;
+  category?: RationCardType;
 };
 
 export type AuthTransaction = {
@@ -150,11 +187,51 @@ export type AuditAlert = {
 
 export type LedgerEvent = {
   ledgerTxId: string;
-  entityType: 'stakeholder' | 'lot' | 'transfer' | 'allocation' | 'auth' | 'distribution' | 'audit';
+  entityType: 'stakeholder' | 'lot' | 'transfer' | 'allocation' | 'auth' | 'distribution' | 'audit' | 'rationcard' | 'grievance' | 'entitlementrule';
   entityId: string;
   eventType: string;
   payload: Record<string, unknown>;
   timestamp: string;
+};
+
+export type RationCard = {
+  rationCardHash: string;
+  cardType: RationCardType;
+  assignedFpsId: string;
+  issuedAt: string;
+  status: RationCardStatus;
+  suspendedAt?: string;
+  suspendReason?: string;
+  cancelledAt?: string;
+  transferHistory: Array<{ fromFps: string; toFps: string; at: string; authorizedBy: string }>;
+};
+
+export type Grievance = {
+  grievanceId: string;
+  rationCardHash: string;
+  fpsId: string;
+  grievanceType: GrievanceType;
+  description: string;
+  status: GrievanceStatus;
+  filedAt: string;
+  slaDeadlineAt: string;
+  acknowledgedAt?: string;
+  escalatedAt?: string;
+  resolvedAt?: string;
+  resolvedBy?: string;
+  resolutionNote?: string;
+};
+
+export type EntitlementRule = {
+  ruleId: string;
+  category: RationCardType;
+  commodity: string;
+  monthlyKg: number;
+  effectiveFrom: string;
+  effectiveTo?: string;
+  status: EntitlementRuleStatus;
+  proposedBy: string;
+  approvedBy?: string;
 };
 
 export type DashboardSummary = {
@@ -174,6 +251,9 @@ export type DemoSnapshot = {
   entitlements: MonthlyEntitlement[];
   distributions: DistributionTransaction[];
   alerts: AuditAlert[];
+  rationCards: RationCard[];
+  grievances: Grievance[];
+  entitlementRules: EntitlementRule[];
 };
 
 export const maskHash = (value: string) => `${value.slice(0, 4)}****${value.slice(-4)}`;

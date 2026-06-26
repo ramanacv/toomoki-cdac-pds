@@ -1,4 +1,4 @@
-import { PdsChainContract } from './contract.js';
+import { PdsControlContract, PdsDataContract } from './contract.js';
 
-export { PdsChainContract };
-export const contracts = [PdsChainContract];
+export { PdsControlContract, PdsDataContract };
+export const contracts = [PdsControlContract, PdsDataContract];

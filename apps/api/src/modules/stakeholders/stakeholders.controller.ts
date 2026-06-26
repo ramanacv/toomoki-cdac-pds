@@ -1,7 +1,9 @@
+import { Plane } from '../../infrastructure/plane.decorator.js';
 import { Body, Controller, Get, Inject, Post } from '@nestjs/common';
 import { PdsLedgerFacade } from '../core/pds-ledger.facade.js';
 import { StakeholderCreateDto } from './dto/stakeholder.dto.js';
 
+@Plane('control')
 @Controller()
 export class StakeholdersController {
   constructor(@Inject(PdsLedgerFacade) private readonly ledger: PdsLedgerFacade) {}

@@ -1,9 +1,12 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Plane } from '../../infrastructure/plane.decorator.js';
+import { Body, Controller, Get, Inject, Param, Post } from '@nestjs/common';
 import { PdsLedgerFacade } from '../core/pds-ledger.facade.js';
+import { VerifyLedgerDto } from './dto/verify-ledger.dto.js';
 
+@Plane('data')
 @Controller()
 export class TraceController {
-  constructor(private readonly ledger: PdsLedgerFacade) {}
+  constructor(@Inject(PdsLedgerFacade) private readonly ledger: PdsLedgerFacade) {}
 
   @Get('/trace/lots/:lotId')
   lotTrace(@Param('lotId') lotId: string) {
@@ -19,7 +22,7 @@ export class TraceController {
   }
 
   @Post('/trace/verify')
-  verifyLedger(@Body() body: { digest: string }) {
+  verifyLedger(@Body() body: VerifyLedgerDto) {
     return this.ledger.verifyLedgerDigest(body.digest);
   }
 }

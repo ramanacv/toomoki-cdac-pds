@@ -1,11 +1,13 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Plane } from '../../infrastructure/plane.decorator.js';
+import { Body, Controller, Get, Inject, Param, Post } from '@nestjs/common';
 import { PdsLedgerFacade } from '../core/pds-ledger.facade.js';
 import { TransferReceiveDto } from '../transfers/dto/transfer.dto.js';
 import { AllocationDto } from './dto/allocation.dto.js';
 
+@Plane('data')
 @Controller()
 export class AllocationsController {
-  constructor(private readonly ledger: PdsLedgerFacade) {}
+  constructor(@Inject(PdsLedgerFacade) private readonly ledger: PdsLedgerFacade) {}
 
   @Get('/fps-allocations')
   allocations() {

@@ -1,11 +1,13 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Plane } from '../../infrastructure/plane.decorator.js';
+import { Body, Controller, Get, Inject, Param, Post } from '@nestjs/common';
 import { AuthMode, AuthResult } from '@pds/shared-types';
 import { PdsLedgerFacade } from '../core/pds-ledger.facade.js';
 import { AuthOtpDto, SupervisorExceptionAuthDto } from './dto/auth.dto.js';
 
+@Plane('data')
 @Controller()
 export class AuthController {
-  constructor(private readonly ledger: PdsLedgerFacade) {}
+  constructor(@Inject(PdsLedgerFacade) private readonly ledger: PdsLedgerFacade) {}
 
   @Get('/auth/transactions')
   authTransactions() {

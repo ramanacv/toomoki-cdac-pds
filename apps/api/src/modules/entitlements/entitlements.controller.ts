@@ -1,10 +1,12 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Plane } from '../../infrastructure/plane.decorator.js';
+import { Body, Controller, Get, Inject, Param, Post, Query } from '@nestjs/common';
 import { PdsLedgerFacade } from '../core/pds-ledger.facade.js';
 import { EntitlementValidateDto } from './dto/entitlement.dto.js';
 
+@Plane('control')
 @Controller()
 export class EntitlementsController {
-  constructor(private readonly ledger: PdsLedgerFacade) {}
+  constructor(@Inject(PdsLedgerFacade) private readonly ledger: PdsLedgerFacade) {}
 
   @Get('/entitlements/:rationCardHash')
   entitlements(
