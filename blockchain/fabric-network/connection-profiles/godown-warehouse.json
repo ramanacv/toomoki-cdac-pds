@@ -1,25 +1,30 @@
 {
-  "name": "godown-warehouse-connection-profile",
-  "version": "0.1.0",
+  "name": "GodownWarehouse",
+  "version": "1.0.0",
   "client": {
-    "organization": "GodownWarehouse"
-  },
-  "channels": {
-    "pdschannel": {
-      "peers": {
-        "peer0.godown.example.com": {
-          "endorsingPeer": true,
-          "chaincodeQuery": true,
-          "ledgerQuery": true,
-          "eventSource": true
-        }
+    "organization": "GodownWarehouse",
+    "connection": {
+      "timeout": {
+        "peer": { "endorser": "300" }
       }
+    }
+  },
+  "organizations": {
+    "GodownWarehouse": {
+      "mspid": "GodownWarehouseMSP",
+      "peers": ["peer0.godown.example.com"]
     }
   },
   "peers": {
     "peer0.godown.example.com": {
       "url": "grpcs://peer0.godown.example.com:9051",
-      "mspid": "GodownWarehouseMSP"
+      "tlsCACerts": {
+        "path": "../crypto/peerOrganizations/godown.example.com/peers/peer0.godown.example.com/tls/ca.crt"
+      },
+      "grpcOptions": {
+        "ssl-target-name-override": "peer0.godown.example.com",
+        "hostnameOverride": "peer0.godown.example.com"
+      }
     }
   }
 }

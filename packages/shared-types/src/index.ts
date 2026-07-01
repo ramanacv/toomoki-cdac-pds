@@ -1,12 +1,21 @@
 export type UUID = string;
 
 export enum StakeholderType {
+  DFPD = 'DFPD',
+  FCI = 'FCI',
+  FCI_BUFFER_GODOWN = 'FCI_BUFFER_GODOWN',
   PROCUREMENT_CENTER = 'PROCUREMENT_CENTER',
   MILLER = 'MILLER',
   TRANSPORTER = 'TRANSPORTER',
   STATE_GODOWN = 'STATE_GODOWN',
   BLOCK_GODOWN = 'BLOCK_GODOWN',
+  ISSUE_POINT = 'ISSUE_POINT',
   FAIR_PRICE_SHOP = 'FAIR_PRICE_SHOP',
+  WELFARE_INSTITUTE = 'WELFARE_INSTITUTE',
+  SHIV_BHOJAN_EATERY = 'SHIV_BHOJAN_EATERY',
+  DIVISIONAL_OFFICE = 'DIVISIONAL_OFFICE',
+  DISTRICT_SUPPLY_OFFICE = 'DISTRICT_SUPPLY_OFFICE',
+  TALUKA_SUPPLY_OFFICE = 'TALUKA_SUPPLY_OFFICE',
   DEPARTMENT = 'DEPARTMENT',
   AUDITOR = 'AUDITOR'
 }
@@ -54,10 +63,11 @@ export enum AlertType {
 }
 
 export enum RationCardType {
-  APL = 'APL',
-  BPL = 'BPL',
   AAY = 'AAY',
-  PHH = 'PHH'
+  PHH = 'PHH',
+  NPH = 'NPH',
+  APL = 'NPH',
+  BPL = 'PHH'
 }
 
 export enum RationCardStatus {
@@ -95,6 +105,8 @@ export type Stakeholder = {
   district: string;
   licenseNo: string;
   status: StakeholderStatus;
+  jurisdiction?: 'CENTRAL' | 'STATE';
+  capacityKg?: number;
 };
 
 export type CommodityLot = {
@@ -107,6 +119,7 @@ export type CommodityLot = {
   currentOwner: string;
   currentLocation: string;
   status: LotStatus;
+  transformedFromLotId?: string;
 };
 
 export type TransferOrder = {
@@ -121,6 +134,13 @@ export type TransferOrder = {
   status: TransferStatus;
   dispatchTimestamp: string;
   receiveTimestamp?: string;
+  stage?: 'I' | 'II';
+  authorizedBy?: string;
+  authorizedAt?: string;
+  approvalStatus?: 'PENDING' | 'APPROVED' | 'REJECTED' | 'BLOCKED';
+  roRef?: string;
+  transporterId?: string;
+  transformedFromLotId?: string;
 };
 
 export type FPSAllocation = {
@@ -187,7 +207,7 @@ export type AuditAlert = {
 
 export type LedgerEvent = {
   ledgerTxId: string;
-  entityType: 'stakeholder' | 'lot' | 'transfer' | 'allocation' | 'auth' | 'distribution' | 'audit' | 'rationcard' | 'grievance' | 'entitlementrule';
+  entityType: 'stakeholder' | 'lot' | 'transfer' | 'allocation' | 'auth' | 'distribution' | 'audit' | 'rationcard' | 'grievance' | 'entitlementrule' | 'workflow';
   entityId: string;
   eventType: string;
   payload: Record<string, unknown>;

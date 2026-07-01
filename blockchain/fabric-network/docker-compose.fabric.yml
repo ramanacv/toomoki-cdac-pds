@@ -7,7 +7,7 @@ networks:
 services:
   orderer.pds.example.com:
     profiles: [fabric]
-    image: hyperledger/fabric-orderer:3.1.5
+    image: hyperledger/fabric-orderer:2.5.13
     container_name: orderer.pds.example.com
     environment:
       - ORDERER_GENERAL_LOGLEVEL=info
@@ -37,7 +37,7 @@ services:
 
   peer0.food.example.com:
     profiles: [fabric]
-    image: hyperledger/fabric-peer:3.1.5
+    image: hyperledger/fabric-peer:2.5.13
     container_name: peer0.food.example.com
     environment:
       - CORE_PEER_ID=peer0.food.example.com
@@ -52,13 +52,17 @@ services:
       - CORE_PEER_TLS_KEY_FILE=/etc/hyperledger/fabric/tls/server.key
       - CORE_PEER_TLS_ROOTCERT_FILE=/etc/hyperledger/fabric/tls/ca.crt
       - CORE_LEDGER_STATE_STATEDATABASE=CouchDB
+      - CORE_VM_ENDPOINT=unix:///var/run/docker.sock
+      - CORE_CHAINCODE_EXECUTETIMEOUT=300s
       - CORE_LEDGER_STATE_COUCHDBCONFIG_COUCHDBADDRESS=couchdb0:5984
-      - CORE_LEDGER_STATE_COUCHDBCONFIG_USERNAME=admin
-      - CORE_LEDGER_STATE_COUCHDBCONFIG_PASSWORD=adminpw
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_USERNAME=${PDS_COUCHDB_USER:-pds_couch}
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_PASSWORD=${PDS_COUCHDB_PASSWORD:-changeme-couch}
     ports:
       - '7051:7051'
     volumes:
-      - ./crypto/peerOrganizations/food.example.com/peers/peer0.food.example.com:/etc/hyperledger/fabric
+      - ./crypto/peerOrganizations/food.example.com/peers/peer0.food.example.com/msp:/etc/hyperledger/fabric/msp
+      - ./crypto/peerOrganizations/food.example.com/peers/peer0.food.example.com/tls:/etc/hyperledger/fabric/tls
+      - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       - couchdb0
     networks:
@@ -66,7 +70,7 @@ services:
 
   peer0.godown.example.com:
     profiles: [fabric]
-    image: hyperledger/fabric-peer:3.1.5
+    image: hyperledger/fabric-peer:2.5.13
     container_name: peer0.godown.example.com
     environment:
       - CORE_PEER_ID=peer0.godown.example.com
@@ -81,13 +85,17 @@ services:
       - CORE_PEER_TLS_KEY_FILE=/etc/hyperledger/fabric/tls/server.key
       - CORE_PEER_TLS_ROOTCERT_FILE=/etc/hyperledger/fabric/tls/ca.crt
       - CORE_LEDGER_STATE_STATEDATABASE=CouchDB
+      - CORE_VM_ENDPOINT=unix:///var/run/docker.sock
+      - CORE_CHAINCODE_EXECUTETIMEOUT=300s
       - CORE_LEDGER_STATE_COUCHDBCONFIG_COUCHDBADDRESS=couchdb1:5984
-      - CORE_LEDGER_STATE_COUCHDBCONFIG_USERNAME=admin
-      - CORE_LEDGER_STATE_COUCHDBCONFIG_PASSWORD=adminpw
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_USERNAME=${PDS_COUCHDB_USER:-pds_couch}
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_PASSWORD=${PDS_COUCHDB_PASSWORD:-changeme-couch}
     ports:
       - '9051:9051'
     volumes:
-      - ./crypto/peerOrganizations/godown.example.com/peers/peer0.godown.example.com:/etc/hyperledger/fabric
+      - ./crypto/peerOrganizations/godown.example.com/peers/peer0.godown.example.com/msp:/etc/hyperledger/fabric/msp
+      - ./crypto/peerOrganizations/godown.example.com/peers/peer0.godown.example.com/tls:/etc/hyperledger/fabric/tls
+      - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       - couchdb1
     networks:
@@ -98,10 +106,12 @@ services:
     image: couchdb:3.4
     container_name: couchdb0
     environment:
-      - COUCHDB_USER=admin
-      - COUCHDB_PASSWORD=adminpw
-    ports:
-      - '5984:5984'
+      - COUCHDB_USER=${PDS_COUCHDB_USER:-pds_couch}
+      - COUCHDB_PASSWORD=${PDS_COUCHDB_PASSWORD:-changeme-couch}
+    # No host port published — CouchDB is reachable only on the pds-fabric
+    # network (peers connect via couchdb0:5984). Exposing 5984 to the host
+    # would leak the state DB. Remove this comment only if you explicitly need
+    # host access for debugging.
     networks:
       - pds-fabric
 
@@ -110,10 +120,8 @@ services:
     image: couchdb:3.4
     container_name: couchdb1
     environment:
-      - COUCHDB_USER=admin
-      - COUCHDB_PASSWORD=adminpw
-    ports:
-      - '6984:5984'
+      - COUCHDB_USER=${PDS_COUCHDB_USER:-pds_couch}
+      - COUCHDB_PASSWORD=${PDS_COUCHDB_PASSWORD:-changeme-couch}
     networks:
       - pds-fabric
 

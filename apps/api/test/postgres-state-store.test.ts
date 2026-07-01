@@ -5,12 +5,12 @@ import { buildSnapshotWritePlan } from '../src/postgres-snapshot.js';
 import { InMemoryPostgresSnapshotAdapter, PostgresPdsStateStore } from '../src/postgres-state-store.js';
 
 describe('postgres state store', () => {
-  it('writes a snapshot through the adapter boundary', () => {
+  it('writes a snapshot through the adapter boundary', async () => {
     const engine = new PdsLedgerEngine(true);
     const adapter = new InMemoryPostgresSnapshotAdapter();
     const store = new PostgresPdsStateStore(adapter);
 
-    store.save(engine.exportState());
+    await store.save(engine.exportState());
 
     expect(adapter.executed).toHaveLength(buildSnapshotWritePlan(engine.exportState()).length);
     expect(adapter.executed[0]?.text).toBe('BEGIN');
@@ -18,7 +18,7 @@ describe('postgres state store', () => {
     expect(adapter.executed.some((statement) => statement.text.includes('stock_positions'))).toBe(true);
   });
 
-  it('loads a snapshot from postgres-shaped rows', () => {
+  it('loads a snapshot from postgres-shaped rows', async () => {
     const adapter = new InMemoryPostgresSnapshotAdapter();
     adapter.seed({
       stakeholders: [
@@ -34,7 +34,7 @@ describe('postgres state store', () => {
     });
 
     const store = new PostgresPdsStateStore(adapter);
-    const state = store.load();
+    const state = await store.load();
 
     expect(state?.stakeholders).toHaveLength(1);
     expect(state?.stakeholders[0]?.stakeholderId).toBe('PROC-001');

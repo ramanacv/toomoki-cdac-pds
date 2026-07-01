@@ -30,6 +30,7 @@ export type ClientIdentity = {
 const OPERATION_MSP_ALLOWLIST: Record<string, Set<string>> = {
   // Supply chain
   CreateCommodityLot: new Set(['ProcurementMillerMSP']),
+  TransformLot: new Set(['ProcurementMillerMSP']),
   DispatchLot: new Set(['ProcurementMillerMSP', 'GodownWarehouseMSP']),
   ReceiveLot: new Set(['GodownWarehouseMSP', 'ProcurementMillerMSP']),
   AllocateToFPS: new Set(['GodownWarehouseMSP']),

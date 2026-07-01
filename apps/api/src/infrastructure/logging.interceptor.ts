@@ -7,12 +7,22 @@ import {
   Optional
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import type { Request, Response } from 'express';
 import { Observable } from 'rxjs';
 import { tap, catchError } from 'rxjs/operators';
 import { throwError } from 'rxjs';
 import { PLANE_KEY, type PlaneType } from './plane.decorator.js';
 import type { MetricsService } from '../modules/metrics/metrics.service.js';
+
+type RequestLike = {
+  headers: Record<string, string | string[] | undefined>;
+  method: string;
+  path: string;
+  user?: { role?: string };
+};
+
+type ResponseLike = {
+  statusCode: number;
+};
 
 /**
  * Global structured request logger.
@@ -35,16 +45,17 @@ export class PdsLoggingInterceptor implements NestInterceptor {
   ) {}
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
-    const req = context.switchToHttp().getRequest<Request & { user?: { role?: string } }>();
-    const res = context.switchToHttp().getResponse<Response>();
+    const req = context.switchToHttp().getRequest<RequestLike>();
+    const res = context.switchToHttp().getResponse<ResponseLike>();
 
     const plane: PlaneType =
-      this.reflector.getAllAndOverride<PlaneType>(PLANE_KEY, [
+      this.reflector?.getAllAndOverride<PlaneType>(PLANE_KEY, [
         context.getHandler(),
         context.getClass()
       ]) ?? 'data';
 
-    const requestId = (req.headers['x-request-id'] as string | undefined) ?? `req-${Date.now().toString(36)}`;
+    const rawRequestId = req.headers['x-request-id'];
+    const requestId = (Array.isArray(rawRequestId) ? rawRequestId[0] : rawRequestId) ?? `req-${Date.now().toString(36)}`;
     const start = Date.now();
     const { method, path } = req;
     const role = req.user?.role ?? 'anonymous';

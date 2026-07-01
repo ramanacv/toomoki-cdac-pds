@@ -17,19 +17,19 @@ export class FabricEnvelopeLedgerPort implements PdsLedgerPort {
     this.fabricClient = new LocalFabricClient(envelopePath);
   }
 
-  loadState(): PdsLedgerState | null {
+  async loadState(): Promise<PdsLedgerState | null> {
     return this.filePort.loadState();
   }
 
-  saveState(state: PdsLedgerState): void {
-    this.filePort.saveState(state);
+  async saveState(state: PdsLedgerState): Promise<void> {
+    await this.filePort.saveState(state);
   }
 
-  appendEvents(events: LedgerEvent[]): void {
-    this.filePort.appendEvents(events);
+  async appendEvents(events: LedgerEvent[]): Promise<void> {
+    await this.filePort.appendEvents(events);
     if (events.length > 0) {
       for (const event of events) {
-        this.fabricClient.submit(toFabricTransactionEnvelope(event));
+        await this.fabricClient.submit(toFabricTransactionEnvelope(event));
       }
     }
   }

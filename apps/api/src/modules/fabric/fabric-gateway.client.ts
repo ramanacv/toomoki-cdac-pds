@@ -25,14 +25,35 @@ export class FabricGatewayClient implements FabricClient, ChainQueryPort {
     return this.connection;
   }
 
-  submit(envelope: FabricTransactionEnvelope): { txId: string } {
-    void this.submitAsync(envelope.operation, envelope.payload);
-    return { txId: envelope.txId };
+  private contractNameFor(operation: FabricOperationName): 'PdsControlContract' | 'PdsDataContract' {
+    const controlOperations = new Set<FabricOperationName>([
+      'RegisterStakeholder'
+    ]);
+    return controlOperations.has(operation) ? 'PdsControlContract' : 'PdsDataContract';
+  }
+
+  private async getContract(operation: FabricOperationName) {
+    const { gateway } = await this.getConnection();
+    return gateway.getNetwork(this.config.channel).getContract(this.config.chaincode, this.contractNameFor(operation));
+  }
+
+  /**
+   * Submit a transaction and await commit/ordering confirmation (T2.3). The
+   * previous implementation fired-and-forgot `submitAsync` and returned a fake
+   * txId, reporting success before the ordering service committed — masking
+   * commit failures. This now surfaces commit errors to the caller.
+   */
+  async submit(envelope: FabricTransactionEnvelope): Promise<{ txId: string; result?: unknown }> {
+    const result = await this.submitAsync(envelope.operation, envelope.payload);
+    return { txId: envelope.txId, result };
   }
 
   async submitAsync(operation: FabricOperationName, payload: Record<string, unknown>): Promise<unknown> {
-    const { contract } = await this.getConnection();
-    const resultBytes = await contract.submitTransaction(operation, JSON.stringify(payload));
+    const contract = await this.getContract(operation);
+    const resultBytes = await contract.submit(operation, {
+      arguments: [JSON.stringify(payload)],
+      endorsingOrganizations: [this.config.mspId]
+    });
     const resultJson = utf8Decoder.decode(resultBytes);
     return resultJson.length > 0 ? JSON.parse(resultJson) : null;
   }
@@ -42,13 +63,23 @@ export class FabricGatewayClient implements FabricClient, ChainQueryPort {
   }
 
   async evaluateAsync(operation: FabricOperationName, payload: Record<string, unknown>): Promise<unknown> {
-    const { contract } = await this.getConnection();
-    const resultBytes = await contract.evaluateTransaction(operation, JSON.stringify(payload));
+    const contract = await this.getContract(operation);
+    const resultBytes = await contract.evaluate(operation, {
+      arguments: [JSON.stringify(payload)],
+      endorsingOrganizations: [this.config.mspId]
+    });
     const resultJson = utf8Decoder.decode(resultBytes);
     return resultJson.length > 0 ? JSON.parse(resultJson) : null;
   }
 
   submitLedgerEvent(event: LedgerEvent): { txId: string } {
+    const envelope = toFabricTransactionEnvelope(event);
+    void this.submit(envelope);
+    return { txId: envelope.txId };
+  }
+
+  /** Awaited variant used by {@link FabricGatewayLedgerPort.appendEvents} (T2.3). */
+  async submitLedgerEventAsync(event: LedgerEvent): Promise<{ txId: string; result?: unknown }> {
     const envelope = toFabricTransactionEnvelope(event);
     return this.submit(envelope);
   }

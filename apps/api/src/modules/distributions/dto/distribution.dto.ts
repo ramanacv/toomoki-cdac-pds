@@ -1,4 +1,4 @@
-import { IsEnum, IsInt, IsString, Min } from 'class-validator';
+import { IsEnum, IsInt, IsOptional, IsString, Min } from 'class-validator';
 import { AuthMode, AuthResult } from '@pds/shared-types';
 
 export class DistributionDto {
@@ -32,4 +32,12 @@ export class DistributionDto {
 
   @IsString()
   dealerId!: string;
+
+  @IsOptional()
+  @IsString()
+  approvedBy?: string;
+
+  @IsOptional()
+  @IsString()
+  exceptionReason?: string;
 }

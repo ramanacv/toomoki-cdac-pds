@@ -6,5 +6,5 @@
     "declaration": true,
     "declarationMap": true
   },
-  "include": ["src/index.ts", "src/invoker.ts", "src/operations.ts", "test"]
+  "include": ["src/index.ts", "src/invoker.ts", "src/operations.ts", "src/contract.ts", "src/server.ts", "src/authorization.ts", "test"]
 }

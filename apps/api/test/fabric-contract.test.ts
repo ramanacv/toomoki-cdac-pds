@@ -6,11 +6,13 @@ describe('fabric contract router', () => {
   it('loads the manifest and exposes all declared operations', () => {
     const manifest = defaultFabricContractManifest();
     expect(manifest.network).toBe('pds-chain-fabric-network');
-    expect(manifest.operations).toHaveLength(17);
+    expect(manifest.operations).toHaveLength(18);
+    expect(manifest.operations.some((operation) => operation.name === 'TransformLot')).toBe(true);
   });
 
   it('maps api routes to fabric operations', () => {
     expect(getFabricOperationByApiRoute('/stakeholders')).toBe('RegisterStakeholder');
+    expect(getFabricOperationByApiRoute('/lots/transform')).toBe('TransformLot');
     expect(getFabricOperationByApiRoute('/distributions')).toBe('RecordDistribution');
     expect(getFabricOperationByApiRoute('/does-not-exist')).toBeNull();
   });

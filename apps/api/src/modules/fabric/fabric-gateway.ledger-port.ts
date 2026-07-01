@@ -16,28 +16,31 @@ export class FabricGatewayLedgerPort implements PdsLedgerPort, ChainQueryPort {
     this.postgresPort =
       adapter == null
         ? new FilePdsLedgerPort(config.statePath, config.journalPath)
-        : new PostgresPdsLedgerPort(adapter, new FilePdsLedgerPort(config.journalPath, config.journalPath));
+        : new PostgresPdsLedgerPort(adapter, new FilePdsLedgerPort(config.statePath, config.journalPath));
   }
 
-  loadState(): PdsLedgerState | null {
+  async loadState(): Promise<PdsLedgerState | null> {
     return this.postgresPort.loadState();
   }
 
-  loadStateAsync(): Promise<PdsLedgerState | null> {
-    if ('loadStateAsync' in this.postgresPort) {
-      return this.postgresPort.loadStateAsync();
-    }
-    return Promise.resolve(this.postgresPort.loadState());
+  async saveState(state: PdsLedgerState): Promise<void> {
+    await this.postgresPort.saveState(state);
   }
 
-  saveState(state: PdsLedgerState): void {
-    this.postgresPort.saveState(state);
-  }
-
-  appendEvents(events: LedgerEvent[]): void {
-    this.postgresPort.appendEvents(events);
+  /**
+   * Dual-write (T2.3): Postgres is the primary/Queryable store of record for the
+   * demo and API path; Fabric is the immutable append-only ledger. We await the
+   * Fabric submit so a commit/ordering failure is surfaced to the caller rather
+   * than reported as success. On partial failure (Postgres ok, Fabric fails) the
+   * Postgres write has already committed — callers must treat the thrown error as
+   * "Fabric not yet in sync" and reconcile via RecordLedgerProof replay. We write
+   * Postgres first so the Queryable state is never ahead of what callers see on
+   * success.
+   */
+  async appendEvents(events: LedgerEvent[]): Promise<void> {
+    await this.postgresPort.appendEvents(events);
     for (const event of events) {
-      this.gatewayClient.submitLedgerEvent(event);
+      await this.gatewayClient.submitLedgerEventAsync(event);
     }
   }
 

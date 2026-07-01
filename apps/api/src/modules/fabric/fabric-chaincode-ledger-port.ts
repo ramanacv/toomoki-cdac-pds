@@ -18,16 +18,16 @@ export class FabricChaincodeLedgerPort implements PdsLedgerPort, ChainQueryPort 
     this.chaincodeClient = new FabricChaincodeClient(chaincodeStatePath);
   }
 
-  loadState(): PdsLedgerState | null {
+  async loadState(): Promise<PdsLedgerState | null> {
     return this.filePort.loadState();
   }
 
-  saveState(state: PdsLedgerState): void {
-    this.filePort.saveState(state);
+  async saveState(state: PdsLedgerState): Promise<void> {
+    await this.filePort.saveState(state);
   }
 
-  appendEvents(events: LedgerEvent[]): void {
-    this.filePort.appendEvents(events);
+  async appendEvents(events: LedgerEvent[]): Promise<void> {
+    await this.filePort.appendEvents(events);
     for (const event of events) {
       this.chaincodeClient.submitLedgerEvent(event);
     }

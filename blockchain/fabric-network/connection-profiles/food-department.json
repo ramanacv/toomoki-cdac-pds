@@ -1,25 +1,30 @@
 {
-  "name": "food-department-connection-profile",
-  "version": "0.1.0",
+  "name": "FoodAndCivilSupplies",
+  "version": "1.0.0",
   "client": {
-    "organization": "FoodAndCivilSupplies"
-  },
-  "channels": {
-    "pdschannel": {
-      "peers": {
-        "peer0.food.example.com": {
-          "endorsingPeer": true,
-          "chaincodeQuery": true,
-          "ledgerQuery": true,
-          "eventSource": true
-        }
+    "organization": "FoodAndCivilSupplies",
+    "connection": {
+      "timeout": {
+        "peer": { "endorser": "300" }
       }
+    }
+  },
+  "organizations": {
+    "FoodAndCivilSupplies": {
+      "mspid": "FoodAndCivilSuppliesMSP",
+      "peers": ["peer0.food.example.com"]
     }
   },
   "peers": {
     "peer0.food.example.com": {
       "url": "grpcs://peer0.food.example.com:7051",
-      "mspid": "FoodAndCivilSuppliesMSP"
+      "tlsCACerts": {
+        "path": "../crypto/peerOrganizations/food.example.com/peers/peer0.food.example.com/tls/ca.crt"
+      },
+      "grpcOptions": {
+        "ssl-target-name-override": "peer0.food.example.com",
+        "hostnameOverride": "peer0.food.example.com"
+      }
     }
   }
 }

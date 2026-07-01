@@ -1,20 +1,21 @@
-import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import type { LedgerEvent } from '@pds/shared-types';
 import type { PdsLedgerState } from '@pds/pds-chaincode';
 
 export interface PdsLedgerPort {
-  loadState(): PdsLedgerState | null;
-  saveState(state: PdsLedgerState): void;
-  appendEvents(events: LedgerEvent[]): void;
+  loadState(): Promise<PdsLedgerState | null>;
+  saveState(state: PdsLedgerState): Promise<void>;
+  appendEvents(events: LedgerEvent[]): Promise<void>;
 }
 
-export interface AsyncPdsLedgerPort extends PdsLedgerPort {
-  loadStateAsync(): Promise<PdsLedgerState | null>;
-}
+/**
+ * Legacy alias retained while call sites migrate; equivalent to {@link PdsLedgerPort}.
+ * @deprecated use {@link PdsLedgerPort} directly.
+ */
+export type AsyncPdsLedgerPort = PdsLedgerPort;
 
-export const hasAsyncLedgerLoad = (port: PdsLedgerPort): port is AsyncPdsLedgerPort =>
-  typeof (port as AsyncPdsLedgerPort).loadStateAsync === 'function';
+export const hasAsyncLedgerLoad = (_port: PdsLedgerPort): _port is PdsLedgerPort => true;
 
 export class FilePdsLedgerPort implements PdsLedgerPort {
   readonly statePath: string;
@@ -28,9 +29,9 @@ export class FilePdsLedgerPort implements PdsLedgerPort {
     this.journalPath = journalPath;
   }
 
-  loadState(): PdsLedgerState | null {
+  async loadState(): Promise<PdsLedgerState | null> {
     try {
-      const raw = readFileSync(this.statePath, 'utf8');
+      const raw = await readFile(this.statePath, 'utf8');
       return JSON.parse(raw) as PdsLedgerState;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
@@ -40,16 +41,16 @@ export class FilePdsLedgerPort implements PdsLedgerPort {
     }
   }
 
-  saveState(state: PdsLedgerState): void {
-    mkdirSync(dirname(this.statePath), { recursive: true });
-    writeFileSync(this.statePath, `${JSON.stringify(state, null, 2)}\n`, 'utf8');
+  async saveState(state: PdsLedgerState): Promise<void> {
+    await mkdir(dirname(this.statePath), { recursive: true });
+    await writeFile(this.statePath, `${JSON.stringify(state, null, 2)}\n`, 'utf8');
   }
 
-  appendEvents(events: LedgerEvent[]): void {
+  async appendEvents(events: LedgerEvent[]): Promise<void> {
     if (events.length === 0) {
       return;
     }
-    mkdirSync(dirname(this.journalPath), { recursive: true });
-    appendFileSync(this.journalPath, `${events.map((event) => JSON.stringify(event)).join('\n')}\n`, 'utf8');
+    await mkdir(dirname(this.journalPath), { recursive: true });
+    await appendFile(this.journalPath, `${events.map((event) => JSON.stringify(event)).join('\n')}\n`, 'utf8');
   }
 }

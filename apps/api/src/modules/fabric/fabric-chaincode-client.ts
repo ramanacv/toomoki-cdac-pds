@@ -12,7 +12,7 @@ export class FabricChaincodeClient implements FabricClient, ChainQueryPort {
     this.invoker = new PdsChaincodeInvoker(statePath);
   }
 
-  submit(envelope: FabricTransactionEnvelope): { txId: string } {
+  async submit(envelope: FabricTransactionEnvelope): Promise<{ txId: string }> {
     const result = this.invoker.submit(envelope.operation as ChaincodeOperation, envelope.payload);
     return { txId: result.txId };
   }

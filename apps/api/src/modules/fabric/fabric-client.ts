@@ -6,6 +6,7 @@ import type { LedgerEvent } from '@pds/shared-types';
 export type FabricOperationName =
   | 'RegisterStakeholder'
   | 'CreateCommodityLot'
+  | 'TransformLot'
   | 'DispatchLot'
   | 'ReceiveLot'
   | 'AllocateToFPS'
@@ -13,6 +14,7 @@ export type FabricOperationName =
   | 'RegisterBeneficiaryHash'
   | 'CreateMonthlyEntitlement'
   | 'RecordDistribution'
+  | 'RecordLedgerProof'
   | 'CheckDuplicateClaim'
   | 'RaiseAuditFlag'
   | 'ResolveAuditFlag'
@@ -34,7 +36,7 @@ export type FabricTransactionEnvelope = {
 };
 
 export interface FabricClient {
-  submit(envelope: FabricTransactionEnvelope): { txId: string };
+  submit(envelope: FabricTransactionEnvelope): Promise<{ txId: string }>;
   evaluate(operation: FabricOperationName, payload: Record<string, unknown>): unknown;
 }
 
@@ -45,7 +47,7 @@ export class LocalFabricClient implements FabricClient {
     this.envelopePath = envelopePath;
   }
 
-  submit(envelope: FabricTransactionEnvelope): { txId: string } {
+  async submit(envelope: FabricTransactionEnvelope): Promise<{ txId: string }> {
     mkdirSync(dirname(this.envelopePath), { recursive: true });
     appendFileSync(this.envelopePath, `${JSON.stringify({ kind: 'submit', envelope })}\n`, 'utf8');
     return { txId: envelope.txId };
@@ -62,11 +64,14 @@ export const toFabricTransactionEnvelope = (event: LedgerEvent): FabricTransacti
   const operationByEventType: Record<LedgerEvent['eventType'], FabricOperationName> = {
     RegisterStakeholder: 'RegisterStakeholder',
     CreateCommodityLot: 'CreateCommodityLot',
+    TransformLot: 'TransformLot',
+    AuthorizeMovement: 'RecordLedgerProof',
     DispatchLot: 'DispatchLot',
     ReceiveLot: 'ReceiveLot',
     AllocateToFPS: 'AllocateToFPS',
     RecordFPSReceipt: 'RecordFPSReceipt',
     AuthTransaction: 'RegisterBeneficiaryHash',
+    CreateMonthlyEntitlement: 'CreateMonthlyEntitlement',
     RecordDistribution: 'RecordDistribution',
     RaiseAuditFlag: 'RaiseAuditFlag',
     ResolveAuditFlag: 'ResolveAuditFlag'

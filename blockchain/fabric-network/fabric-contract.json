@@ -5,6 +5,7 @@
   "operations": [
     { "name": "RegisterStakeholder", "category": "registry" },
     { "name": "CreateCommodityLot", "category": "supply-chain" },
+    { "name": "TransformLot", "category": "supply-chain" },
     { "name": "DispatchLot", "category": "supply-chain" },
     { "name": "ReceiveLot", "category": "supply-chain" },
     { "name": "AllocateToFPS", "category": "allocation" },

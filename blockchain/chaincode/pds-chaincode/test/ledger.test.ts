@@ -18,6 +18,32 @@ describe('PdsLedgerEngine', () => {
     expect(distributions).toHaveLength(0);
   });
 
+  it('transforms a parent lot into a child lot and traces both directions', () => {
+    const engine = new PdsLedgerEngine(true);
+    engine.dispatchLot({
+      transferId: 'TR-TRANSFORM-SETUP',
+      lotId: 'LOT-RICE-2026-001',
+      fromOrg: 'PROC-001',
+      toOrg: 'MLL-001',
+      dispatchedQtyKg: 1000,
+      vehicleNo: 'KA01AB0101'
+    });
+    engine.receiveLot({ transferId: 'TR-TRANSFORM-SETUP', receivedQtyKg: 1000 });
+
+    const child = engine.transformLot({
+      parentLotId: 'LOT-RICE-2026-001',
+      childLotId: 'LOT-RICE-2026-CHILD',
+      transformedBy: 'MLL-001',
+      commodity: 'Rice',
+      quantityKg: 850,
+      qualityGrade: 'A'
+    });
+
+    expect(child.transformedFromLotId).toBe('LOT-RICE-2026-001');
+    expect(engine.getLotHistory('LOT-RICE-2026-CHILD').some((event) => event.eventType === 'TransformLot')).toBe(true);
+    expect(engine.getLotHistory('LOT-RICE-2026-001').some((event) => event.entityId === 'LOT-RICE-2026-CHILD')).toBe(true);
+  });
+
   it('returns direct lot, transfer, and allocation lookups', () => {
     const engine = new PdsLedgerEngine(true);
     engine.dispatchLot({
@@ -809,4 +835,3 @@ describe('Quota rollover', () => {
     expect(() => engine.rolloverUnclaimedQuota({ fromMonth: '2026-06', toMonth: '2026-07', commodity: 'Rice', rolloverPct: 150 })).toThrow(/between 0 and 100/);
   });
 });
-

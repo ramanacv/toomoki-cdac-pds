@@ -9,8 +9,22 @@ import {
 
 describe('@pds/fixtures', () => {
   it('loads stakeholders from mock entities', () => {
-    expect(stakeholders).toHaveLength(7);
-    expect(stakeholders.some((entry) => entry.stakeholderId === 'FPS-101')).toBe(true);
+    expect(stakeholders).toHaveLength(17);
+    expect(stakeholders.map((entry) => entry.stakeholderId)).toEqual(
+      expect.arrayContaining([
+        'DFPD-001',
+        'FCI-001',
+        'FCI-BUF-001',
+        'ISSUE-001',
+        'TRANS-001',
+        'FPS-101',
+        'WI-101',
+        'SBE-101',
+        'DSO-001',
+        'FDO-001',
+        'TSO-001'
+      ])
+    );
   });
 
   it('defines backend seed lot and entitlement', () => {

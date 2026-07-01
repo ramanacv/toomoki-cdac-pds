@@ -3,13 +3,12 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CRYPTO_DIR="${ROOT}/crypto"
-FABRIC_BIN="${FABRIC_BIN:-fabric-ca-client}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 echo "Generating dev crypto material under ${CRYPTO_DIR}"
 mkdir -p "${CRYPTO_DIR}"
 
-if command -v cryptogen >/dev/null 2>&1; then
-  cat > "${ROOT}/crypto-config.yaml" <<'EOF'
+cat > "${ROOT}/crypto-config.yaml" <<'EOF'
 OrdererOrgs:
   - Name: Orderer
     Domain: pds.example.com
@@ -31,12 +30,21 @@ PeerOrgs:
     Users:
       Count: 1
 EOF
+
+if command -v cryptogen >/dev/null 2>&1; then
   cryptogen generate --config="${ROOT}/crypto-config.yaml" --output="${CRYPTO_DIR}"
+elif docker info >/dev/null 2>&1; then
+  echo "Using fabric-tools Docker image for cryptogen"
+  # cryptogen does not need fabric network
+  docker run --rm \
+    --user "$(id -u):$(id -g)" \
+    -v "${ROOT}:/work" \
+    -w /work \
+    "${FABRIC_TOOLS_IMAGE:-hyperledger/fabric-tools:2.5.13}" \
+    cryptogen generate --config=/work/crypto-config.yaml --output=/work/crypto
 else
-  echo "cryptogen not found; create ${CRYPTO_DIR} manually or install Fabric binaries"
-  mkdir -p "${CRYPTO_DIR}/peerOrganizations/food.example.com/peers/peer0.food.example.com/tls"
-  mkdir -p "${CRYPTO_DIR}/peerOrganizations/food.example.com/users/User1@food.example.com/msp/signcerts"
-  mkdir -p "${CRYPTO_DIR}/peerOrganizations/food.example.com/users/User1@food.example.com/msp/keystore"
+  echo "ERROR: cryptogen not found and Docker is unavailable"
+  exit 1
 fi
 
 echo "Crypto generation complete"

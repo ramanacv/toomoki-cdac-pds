@@ -250,7 +250,7 @@ docker compose build
 
 Images are built from the **repository root** context so workspaces resolve correctly.
 
-API image CMD: `npm run start --workspace=@pds/api`  
+API image CMD: `node apps/api/dist/src/main.js` (multi-stage, non-root `node` user, `NODE_ENV=production`, built-in `HEALTHCHECK` against `/health` — T3.1)
 Web image CMD: `npm run start --workspace=@pds/web` (Vite preview on `0.0.0.0:4173`)
 
 ## Hyperledger Fabric (Live 2-Org Demo)
@@ -367,12 +367,77 @@ npm run smoke
 | `GET /trace/lots/:lotId` | Lot custody trace |
 | `POST /trace/verify` | Verify ledger digest |
 
+### Admin console (operator)
+
+Read-only operator endpoints under `/admin/*`. When `PDS_ADMIN_TOKEN` is set, every admin route requires header `X-Admin-Token` with the same value. In **demo mode** with no token configured, admin routes are open for local convenience. In **fabric mode**, a token is required unless explicitly set.
+
+**Hardening (T2.4):** token comparison is constant-time (`crypto.timingSafeEqual`); empty/missing tokens are rejected before any comparison; and an in-memory token-bucket rate limiter blocks an IP for 60s after 10 failed attempts. Misconfiguration (required but no token) fails closed.
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /admin/overview` | Unified dashboard payload (metrics, network, activity, alerts, health) |
+| `GET /admin/network` | Ledger mode and Fabric channel/chaincode/org status |
+| `GET /admin/activity` | Recent ledger events and event count |
+| `GET /admin/stakeholders/summary` | Stakeholder type/status breakdown and Fabric org mapping |
+
+Web UI: open http://localhost:4173/admin (Vite dev/preview serves the SPA for `/admin`).
+
+Optional env vars:
+
+| Variable | Purpose |
+|----------|---------|
+| `PDS_ADMIN_TOKEN` | API-side admin auth secret |
+| `VITE_ADMIN_TOKEN` | Pre-fill admin token in the web UI (also storable in `localStorage` as `pds_admin_token`) |
+
+Example:
+
+```bash
+export PDS_ADMIN_TOKEN=change-me-in-pilot
+curl -H "X-Admin-Token: change-me-in-pilot" http://localhost:3000/admin/overview
+```
+
 ## Security Notes (MVP)
+
+### Admin guard (T2.4)
+
+See [Admin console](#admin-console-operator). Constant-time token comparison, empty-token rejection, and per-IP rate limiting (10 failures / 60s window → 60s lockout). Demo mode is open; fabric mode fails closed without a configured token.
+
+### Business endpoint auth (T2.5)
+
+A global `BusinessAuthGuard` gates non-health, non-openapi, non-admin endpoints:
+
+- **`PDS_LEDGER_MODE=demo`** — open access for dev/demo convenience. A warning is logged once on first request: *"business endpoints are open (no auth) … set PDS_LEDGER_MODE=fabric and configure an IdentityProvider for production."*
+- **`PDS_LEDGER_MODE=fabric`** — requires `Authorization: Bearer <token>`. The token is verified by a pluggable `IdentityProvider` (DI token `IDENTITY_PROVIDER`). The default `StubIdentityProvider` accepts a single configured static dev token (`PDS_DEV_AUTH_TOKEN`) and maps it to a role from `PDS_DEV_AUTH_ROLE` (`procurement` / `godown` / `fps` / `department` / `auditor`, aligned with the chaincode MSP mapping in T1.5). Per-controller role requirements can be added by overriding `BusinessAuthGuard.optionsFor`.
+
+JWT **issuance** is out of MVP scope — only the **enforcement** layer ships. For production, replace `StubIdentityProvider` with a real JWT verifier (Keycloak / enterprise IAM) and set `PDS_DEV_AUTH_*` vars only in dev.
+
+| Variable | Purpose |
+|----------|---------|
+| `PDS_DEV_AUTH_TOKEN` | Static dev token accepted by `StubIdentityProvider` (fabric mode) |
+| `PDS_DEV_AUTH_ROLE` | Role claim for the dev token (`procurement`/`godown`/`fps`/`department`/`auditor`) |
+| `PDS_DEV_AUTH_SUBJECT` | Subject claim for the dev token (default `dev-user`) |
+
+### Fabric gateway dual-write & commit errors (T2.3)
+
+In fabric mode the API writes ledger events both to the operational Postgres snapshot **and** to the Fabric gateway. `FabricGatewayClient.submit` is fully awaited — the API does **not** report success before the transaction commits. If the gateway commit fails, the error surfaces to the caller (no false success). This is an intentional dual-write: Postgres holds the queryable operational snapshot, Fabric holds the immutable proof. Treat Fabric commit failures as authoritative for the ledger proof even though the Postgres snapshot may already reflect the write.
+
+### Global exception filter (T5.2)
+
+A global `GlobalExceptionFilter` maps domain errors to correct HTTP statuses so callers get 4xx instead of a blanket 500:
+
+| Domain message pattern | Status |
+|------------------------|--------|
+| `not found` | 404 |
+| `already exists` / `already received` / `already in transit` / `duplicate` | 409 |
+| `must be` / `exceeds` / `invalid` / `insufficient` / `cannot proceed` / `prohibited` / `not authorized` | 400 |
+| `HttpException` (Nest) | pass-through (401/403/400/…) |
+| everything else | 500 with a generated `requestId` (stack logged server-side, never returned) |
+
+### General
 
 - Default PostgreSQL credentials (`pds`/`pds`) are for **local/demo only**.
 - No TLS termination in the default compose stack.
 - Beneficiary authentication is **mock only** (OTP/biometric simulation).
-- JWT/auth for application users is planned; not required for the current demo UI.
 - Do not commit `.env` with production secrets.
 
 ## Production Considerations (Post-MVP)
@@ -395,7 +460,8 @@ Recommended production hardening path:
 3. Managed PostgreSQL with backups and replication.
 4. Full Fabric consortium with MSP, endorsement policies, and monitoring.
 5. Replace mock auth with approved government identity adapters.
-6. Add observability (structured logs, metrics, request IDs — API supports request-ID logging foundation).
+6. Replace the stub `IdentityProvider` with a real JWT verifier (Keycloak / enterprise IAM) wiring into the existing `BusinessAuthGuard` enforcement layer.
+7. Add observability (structured logs, metrics, request IDs — API supports request-ID logging foundation).
 
 ## Troubleshooting
 

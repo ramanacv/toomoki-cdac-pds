@@ -17,6 +17,7 @@ export const OPENAPI_SPEC = {
       get: { summary: 'List commodity lots' },
       post: { summary: 'Create commodity lot' }
     },
+    '/lots/transform': { post: { summary: 'Transform parent lot into child lot' } },
     '/lots/{lotId}': { get: { summary: 'Get commodity lot' } },
     '/lots/{lotId}/history': { get: { summary: 'Get lot history' } },
     '/transfers': {
@@ -24,7 +25,9 @@ export const OPENAPI_SPEC = {
       post: { summary: 'Dispatch stock' }
     },
     '/transfers/{transferId}': { get: { summary: 'Get transfer order' } },
+    '/transfers/{transferId}/authorize': { post: { summary: 'Authorize RO-lite movement' } },
     '/transfers/{transferId}/receive': { post: { summary: 'Receive stock' } },
+    '/ledger-events': { get: { summary: 'List ledger evidence events' } },
     '/fps-allocations': {
       get: { summary: 'List allocations' },
       post: { summary: 'Allocate stock to FPS' }

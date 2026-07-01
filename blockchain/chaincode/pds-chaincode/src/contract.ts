@@ -49,6 +49,8 @@ import {
   saveCollection
 } from './contract-base.js';
 
+type StockKey = `${string}:${string}`;
+
 // ── Control Plane Contract ────────────────────────────────────────────────────
 
 export class PdsControlContract extends Contract {
@@ -259,7 +261,7 @@ export class PdsDataContract extends Contract {
     const [stakeholders, lots, stock, events] = await Promise.all([
       loadCollection<Stakeholder>(ctx, 'stakeholders'),
       loadCollection<CommodityLot>(ctx, 'lots'),
-      loadCollection<[string, number]>(ctx, 'stock'),
+      loadCollection<[StockKey, number]>(ctx, 'stock'),
       loadCollection<LedgerEvent>(ctx, 'events')
     ]);
     const engine = buildEngine({ stakeholders, lots, stock, events });
@@ -286,7 +288,7 @@ export class PdsDataContract extends Contract {
       loadCollection<Stakeholder>(ctx, 'stakeholders'),
       loadCollection<CommodityLot>(ctx, 'lots'),
       loadCollection<TransferOrder>(ctx, 'transfers'),
-      loadCollection<[string, number]>(ctx, 'stock'),
+      loadCollection<[StockKey, number]>(ctx, 'stock'),
       loadCollection<AuditAlert>(ctx, 'alerts'),
       loadCollection<LedgerEvent>(ctx, 'events')
     ]);
@@ -307,6 +309,32 @@ export class PdsDataContract extends Contract {
     return JSON.stringify(out);
   }
 
+  async TransformLot(ctx: Context, payloadJson: string): Promise<string> {
+    assertAuthorized('TransformLot', identityFromContext(ctx));
+    const txId = ctx.stub.getTxID();
+    const isoTimestamp = getTxTimestamp(ctx);
+    const payload = { ...JSON.parse(payloadJson), transformedAt: isoTimestamp };
+    const [stakeholders, lots, stock, events] = await Promise.all([
+      loadCollection<Stakeholder>(ctx, 'stakeholders'),
+      loadCollection<CommodityLot>(ctx, 'lots'),
+      loadCollection<[StockKey, number]>(ctx, 'stock'),
+      loadCollection<LedgerEvent>(ctx, 'events')
+    ]);
+    const engine = buildEngine({ stakeholders, lots, stock, events });
+    const result = engine.transformLot(payload);
+    const state = engine.exportState();
+    const lotKey = ctx.stub.createCompositeKey('lot', [result.lotId]);
+    await Promise.all([
+      saveCollection(ctx, 'lots', state.lots),
+      saveCollection(ctx, 'stock', state.stock),
+      saveCollection(ctx, 'events', state.events),
+      ctx.stub.putState(lotKey, Buffer.from(JSON.stringify({ ...result, fabricTxId: txId, fabricTimestamp: isoTimestamp })))
+    ]);
+    const out = { ...result, ledgerTxId: txId };
+    emitAndLog(ctx, 'data', 'TransformLot', txId, out);
+    return JSON.stringify(out);
+  }
+
   async ReceiveLot(ctx: Context, payloadJson: string): Promise<string> {
     assertAuthorized('ReceiveLot', identityFromContext(ctx));
     const txId = ctx.stub.getTxID();
@@ -315,7 +343,7 @@ export class PdsDataContract extends Contract {
     const [lots, transfers, stock, alerts, events] = await Promise.all([
       loadCollection<CommodityLot>(ctx, 'lots'),
       loadCollection<TransferOrder>(ctx, 'transfers'),
-      loadCollection<[string, number]>(ctx, 'stock'),
+      loadCollection<[StockKey, number]>(ctx, 'stock'),
       loadCollection<AuditAlert>(ctx, 'alerts'),
       loadCollection<LedgerEvent>(ctx, 'events')
     ]);
@@ -342,7 +370,7 @@ export class PdsDataContract extends Contract {
     const [stakeholders, allocations, stock, events] = await Promise.all([
       loadCollection<Stakeholder>(ctx, 'stakeholders'),
       loadCollection<FPSAllocation>(ctx, 'allocations'),
-      loadCollection<[string, number]>(ctx, 'stock'),
+      loadCollection<[StockKey, number]>(ctx, 'stock'),
       loadCollection<LedgerEvent>(ctx, 'events')
     ]);
     const engine = buildEngine({ stakeholders, allocations, stock, events });
@@ -365,7 +393,7 @@ export class PdsDataContract extends Contract {
     const payload = { ...JSON.parse(payloadJson), receiveTimestamp: isoTimestamp };
     const [allocations, stock, events] = await Promise.all([
       loadCollection<FPSAllocation>(ctx, 'allocations'),
-      loadCollection<[string, number]>(ctx, 'stock'),
+      loadCollection<[StockKey, number]>(ctx, 'stock'),
       loadCollection<LedgerEvent>(ctx, 'events')
     ]);
     const engine = buildEngine({ allocations, stock, events });
@@ -432,7 +460,7 @@ export class PdsDataContract extends Contract {
     const [entitlements, distributions, stock, alerts, rationCards, events] = await Promise.all([
       loadCollection<MonthlyEntitlement>(ctx, 'entitlements'),
       loadCollection<{ distributionId: string }>(ctx, 'distributions'),
-      loadCollection<[string, number]>(ctx, 'stock'),
+      loadCollection<[StockKey, number]>(ctx, 'stock'),
       loadCollection<AuditAlert>(ctx, 'alerts'),
       loadCollection<RationCard>(ctx, 'rationCards'),
       loadCollection<LedgerEvent>(ctx, 'events')
@@ -614,7 +642,7 @@ export class PdsDataContract extends Contract {
   }
 
   async GetCurrentStock(ctx: Context): Promise<string> {
-    const stock = await loadCollection<[string, number]>(ctx, 'stock');
+    const stock = await loadCollection<[StockKey, number]>(ctx, 'stock');
     return JSON.stringify(stock);
   }
 
@@ -645,13 +673,22 @@ export class PdsDataContract extends Contract {
     const { key } = JSON.parse(payloadJson) as { key: string };
     const iterator = await ctx.stub.getHistoryForKey(key);
     const history: Array<{ txId: string; timestamp: string; isDelete: boolean; value: unknown }> = [];
-    for await (const result of iterator) {
-      history.push({
-        txId: result.txId,
-        timestamp: new Date(Number(result.timestamp?.seconds ?? 0) * 1000).toISOString(),
-        isDelete: result.isDelete,
-        value: result.value?.length ? JSON.parse(Buffer.from(result.value).toString()) : null
-      });
+    try {
+      while (true) {
+        const next = await iterator.next();
+        if (next.done) {
+          break;
+        }
+        const result = next.value;
+        history.push({
+          txId: result.txId,
+          timestamp: new Date(Number(result.timestamp?.seconds ?? 0) * 1000).toISOString(),
+          isDelete: result.isDelete,
+          value: result.value?.length ? JSON.parse(Buffer.from(result.value).toString()) : null
+        });
+      }
+    } finally {
+      iterator.close();
     }
     return JSON.stringify(history);
   }

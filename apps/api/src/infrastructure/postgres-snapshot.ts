@@ -25,7 +25,6 @@ export type SqlStatement = {
 
 const asString = (value: unknown): string => String(value);
 const asNumber = (value: unknown): number => Number(value);
-const asOptionalString = (value: unknown): string | undefined => (value == null ? undefined : String(value));
 
 export const mapStakeholderRow = (row: Record<string, unknown>): Stakeholder => ({
   stakeholderId: asString(row.stakeholder_id),
@@ -313,5 +312,8 @@ export const hydratePdsState = (tables: PostgresTableRows): PdsLedgerState => ({
   distributions: tables.distributions ?? [],
   alerts: tables.alerts ?? [],
   events: tables.events ?? [],
-  stock: (tables.stock ?? []) as PdsLedgerState['stock']
+  stock: (tables.stock ?? []) as PdsLedgerState['stock'],
+  rationCards: [],
+  grievances: [],
+  entitlementRules: []
 });

@@ -1,11 +1,67 @@
 [
   {
+    "stakeholderId": "DFPD-001",
+    "stakeholderType": "DFPD",
+    "name": "Department of Food and Public Distribution",
+    "district": "Central",
+    "licenseNo": "DFPD-POC-001",
+    "status": "ACTIVE",
+    "jurisdiction": "CENTRAL"
+  },
+  {
+    "stakeholderId": "FCI-001",
+    "stakeholderType": "FCI",
+    "name": "Food Corporation of India",
+    "district": "Central",
+    "licenseNo": "FCI-POC-001",
+    "status": "ACTIVE",
+    "jurisdiction": "CENTRAL"
+  },
+  {
+    "stakeholderId": "FCI-BUF-001",
+    "stakeholderType": "FCI_BUFFER_GODOWN",
+    "name": "FCI Buffer Godown 01",
+    "district": "Demo District",
+    "licenseNo": "FCI-BUF-LIC-001",
+    "status": "ACTIVE",
+    "jurisdiction": "CENTRAL",
+    "capacityKg": 50000
+  },
+  {
     "stakeholderId": "FOOD-001",
     "stakeholderType": "DEPARTMENT",
-    "name": "Food Department",
+    "name": "State Food Department",
     "district": "Demo District",
     "licenseNo": "FD-LIC-001",
-    "status": "ACTIVE"
+    "status": "ACTIVE",
+    "jurisdiction": "STATE"
+  },
+  {
+    "stakeholderId": "FDO-001",
+    "stakeholderType": "DIVISIONAL_OFFICE",
+    "name": "Divisional Food Office",
+    "district": "Demo Division",
+    "licenseNo": "FDO-LIC-001",
+    "status": "ACTIVE",
+    "jurisdiction": "STATE"
+  },
+  {
+    "stakeholderId": "DSO-001",
+    "stakeholderType": "DISTRICT_SUPPLY_OFFICE",
+    "name": "District Supply Office",
+    "district": "Demo District",
+    "licenseNo": "DSO-LIC-001",
+    "status": "ACTIVE",
+    "jurisdiction": "STATE"
+  },
+  {
+    "stakeholderId": "TSO-001",
+    "stakeholderType": "TALUKA_SUPPLY_OFFICE",
+    "name": "Taluka Supply Office",
+    "district": "Demo Taluka",
+    "licenseNo": "TSO-LIC-001",
+    "status": "ACTIVE",
+    "jurisdiction": "STATE"
   },
   {
     "stakeholderId": "PROC-001",
@@ -13,7 +69,8 @@
     "name": "Procurement Centre 01",
     "district": "Demo District",
     "licenseNo": "PROC-LIC-001",
-    "status": "ACTIVE"
+    "status": "ACTIVE",
+    "jurisdiction": "STATE"
   },
   {
     "stakeholderId": "MLL-001",
@@ -21,15 +78,18 @@
     "name": "Miller 01",
     "district": "Demo District",
     "licenseNo": "MLL-LIC-001",
-    "status": "ACTIVE"
+    "status": "ACTIVE",
+    "jurisdiction": "STATE"
   },
   {
     "stakeholderId": "GODOWN-S-001",
     "stakeholderType": "STATE_GODOWN",
-    "name": "State Godown 01",
+    "name": "State Government Depot 01",
     "district": "Demo District",
     "licenseNo": "SG-LIC-001",
-    "status": "ACTIVE"
+    "status": "ACTIVE",
+    "jurisdiction": "STATE",
+    "capacityKg": 25000
   },
   {
     "stakeholderId": "GODOWN-B-001",
@@ -37,7 +97,28 @@
     "name": "Block Godown 01",
     "district": "Demo District",
     "licenseNo": "BG-LIC-001",
-    "status": "ACTIVE"
+    "status": "ACTIVE",
+    "jurisdiction": "STATE",
+    "capacityKg": 8000
+  },
+  {
+    "stakeholderId": "ISSUE-001",
+    "stakeholderType": "ISSUE_POINT",
+    "name": "Issue Point 01",
+    "district": "Demo District",
+    "licenseNo": "ISSUE-LIC-001",
+    "status": "ACTIVE",
+    "jurisdiction": "STATE",
+    "capacityKg": 5000
+  },
+  {
+    "stakeholderId": "TRANS-001",
+    "stakeholderType": "TRANSPORTER",
+    "name": "Transport Contractor 01",
+    "district": "Demo District",
+    "licenseNo": "TRANS-LIC-001",
+    "status": "ACTIVE",
+    "jurisdiction": "STATE"
   },
   {
     "stakeholderId": "FPS-101",
@@ -45,7 +126,26 @@
     "name": "FPS 101",
     "district": "Demo District",
     "licenseNo": "FPS-LIC-101",
-    "status": "ACTIVE"
+    "status": "ACTIVE",
+    "jurisdiction": "STATE"
+  },
+  {
+    "stakeholderId": "WI-101",
+    "stakeholderType": "WELFARE_INSTITUTE",
+    "name": "Welfare Hostel 101",
+    "district": "Demo District",
+    "licenseNo": "WI-LIC-101",
+    "status": "ACTIVE",
+    "jurisdiction": "STATE"
+  },
+  {
+    "stakeholderId": "SBE-101",
+    "stakeholderType": "SHIV_BHOJAN_EATERY",
+    "name": "Shiv Bhojan Eatery 101",
+    "district": "Demo District",
+    "licenseNo": "SBE-LIC-101",
+    "status": "ACTIVE",
+    "jurisdiction": "STATE"
   },
   {
     "stakeholderId": "AUD-001",
@@ -53,6 +153,7 @@
     "name": "Auditor 01",
     "district": "Demo District",
     "licenseNo": "AUD-LIC-001",
-    "status": "ACTIVE"
+    "status": "ACTIVE",
+    "jurisdiction": "STATE"
   }
 ]

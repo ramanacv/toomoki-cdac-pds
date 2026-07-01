@@ -1,34 +1,30 @@
 import type { LedgerEvent } from '@pds/shared-types';
 import type { PdsLedgerState } from '@pds/pds-chaincode';
+import type { ChaincodeEventSink } from './chain-query-port.js';
 import type { ChainQueryPort } from './chain-query-port.js';
-import { FabricChaincodeClient } from '../modules/fabric/fabric-chaincode-client.js';
 import { FilePdsLedgerPort, type PdsLedgerPort } from './ledger-port.js';
 import { PostgresPdsLedgerPort } from './postgres-ledger-port.js';
 import type { PgPoolSnapshotAdapter } from './postgres-adapter.js';
 
 export class PostgresChaincodeLedgerPort implements PdsLedgerPort, ChainQueryPort {
   private readonly postgresPort: PostgresPdsLedgerPort;
-  private readonly chaincodeClient: FabricChaincodeClient;
+  private readonly chaincodeClient: ChaincodeEventSink;
 
-  constructor(adapter: PgPoolSnapshotAdapter, journalPath: string, chaincodeStatePath: string) {
-    this.postgresPort = new PostgresPdsLedgerPort(adapter, new FilePdsLedgerPort(journalPath, journalPath));
-    this.chaincodeClient = new FabricChaincodeClient(chaincodeStatePath);
+  constructor(adapter: PgPoolSnapshotAdapter, journalPath: string, chaincodeStatePath: string, chaincodeClient: ChaincodeEventSink) {
+    this.postgresPort = new PostgresPdsLedgerPort(adapter, new FilePdsLedgerPort(chaincodeStatePath, journalPath));
+    this.chaincodeClient = chaincodeClient;
   }
 
-  loadState(): PdsLedgerState | null {
+  async loadState(): Promise<PdsLedgerState | null> {
     return this.postgresPort.loadState();
   }
 
-  loadStateAsync(): Promise<PdsLedgerState | null> {
-    return this.postgresPort.loadStateAsync();
+  async saveState(state: PdsLedgerState): Promise<void> {
+    await this.postgresPort.saveState(state);
   }
 
-  saveState(state: PdsLedgerState): void {
-    this.postgresPort.saveState(state);
-  }
-
-  appendEvents(events: LedgerEvent[]): void {
-    this.postgresPort.appendEvents(events);
+  async appendEvents(events: LedgerEvent[]): Promise<void> {
+    await this.postgresPort.appendEvents(events);
     for (const event of events) {
       this.chaincodeClient.submitLedgerEvent(event);
     }

@@ -5,6 +5,7 @@ import type {
   DashboardSummary,
   DistributionTransaction,
   FPSAllocation,
+  LedgerEvent,
   MonthlyEntitlement,
   Stakeholder,
   TransferOrder
@@ -27,9 +28,13 @@ export type WorkspaceData = {
   entitlements: MonthlyEntitlement[];
   distributions: DistributionTransaction[];
   alerts: AuditAlert[];
+  ledgerEvents: LedgerEvent[];
 };
 
-const mockWorkspace = (scenario: DemoScenario): WorkspaceData => getWorkspaceSnapshot(scenario);
+const mockWorkspace = (scenario: DemoScenario): WorkspaceData => ({
+  ...getWorkspaceSnapshot(scenario),
+  ledgerEvents: []
+});
 
 async function fetchJson<T>(path: string): Promise<T> {
   const response = await fetch(`${apiBaseUrl}${path}`);
@@ -102,6 +107,10 @@ export async function loadAlerts(scenario: DemoScenario, apiOnline = true): Prom
   return loadFromApiOrMock('/audit-alerts', getScenarioAlerts(scenario), apiOnline);
 }
 
+export async function loadLedgerEvents(apiOnline = true): Promise<LedgerEvent[]> {
+  return loadFromApiOrMock('/ledger-events', [], apiOnline);
+}
+
 export async function probeApi(): Promise<boolean> {
   if (getDataSourceMode() === 'mock') {
     return false;
@@ -122,7 +131,7 @@ export async function loadWorkspaceData(scenario: DemoScenario): Promise<Workspa
     return mockWorkspace(scenario);
   }
 
-  const [summary, stakeholders, lots, transfers, allocations, authTransactions, entitlements, distributions, alerts] =
+  const [summary, stakeholders, lots, transfers, allocations, authTransactions, entitlements, distributions, alerts, ledgerEvents] =
     await Promise.all([
       loadDashboardSummary(apiOnline),
       loadStakeholders(apiOnline),
@@ -132,7 +141,8 @@ export async function loadWorkspaceData(scenario: DemoScenario): Promise<Workspa
       loadAuthTransactions(apiOnline),
       loadEntitlements(apiOnline),
       loadDistributions(apiOnline),
-      loadAlerts(scenario, apiOnline)
+      loadAlerts(scenario, apiOnline),
+      loadLedgerEvents(apiOnline)
     ]);
 
   return {
@@ -144,14 +154,24 @@ export async function loadWorkspaceData(scenario: DemoScenario): Promise<Workspa
     authTransactions,
     entitlements,
     distributions,
-    alerts
+    alerts,
+    ledgerEvents
   };
 }
 
 export async function executeWorkflowAction(request: WorkflowActionRequest): Promise<unknown> {
   switch (request.kind) {
+    case 'authorize-movement':
+      return postJson(`/transfers/${request.transferId}/authorize`, {
+        authorizedBy: request.authorizedBy,
+        authorizedAt: request.authorizedAt,
+        roRef: request.roRef,
+        remarks: request.remarks
+      });
     case 'dispatch':
       return postJson('/transfers', request.payload);
+    case 'transform-lot':
+      return postJson('/lots/transform', request.payload);
     case 'receive':
       return postJson(`/transfers/${request.transferId}/receive`, { receivedQtyKg: request.receivedQtyKg });
     case 'allocate':
@@ -163,6 +183,8 @@ export async function executeWorkflowAction(request: WorkflowActionRequest): Pro
     case 'distribute':
       return postJson('/distributions', request.payload);
     case 'duplicate-distribute':
+      return postJson('/distributions', request.payload);
+    case 'supervisor-exception-distribute':
       return postJson('/distributions', request.payload);
     default:
       throw new Error('Unsupported workflow action');

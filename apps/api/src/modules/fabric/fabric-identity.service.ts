@@ -40,7 +40,8 @@ export class FabricIdentityService {
     try {
       return await readFile(keyPath);
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code !== 'ENOENT' && code !== 'EISDIR') {
         throw error;
       }
     }

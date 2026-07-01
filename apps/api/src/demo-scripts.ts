@@ -38,9 +38,15 @@ export type DemoSmokeResult = {
 
 const createStatePath = (prefix: string): string => join(mkdtempSync(join(tmpdir(), prefix)), 'state.json');
 
-export const runHappyPathDemo = (): DemoFlowResult => {
+const createRuntime = async (seed: boolean, statePath: string): Promise<PdsRuntime> => {
+  const service = new PdsRuntime(seed, statePath, { deferBootstrap: true });
+  await service.bootstrapFromPersistenceAsync();
+  return service;
+};
+
+export const runHappyPathDemo = async (): Promise<DemoFlowResult> => {
   const statePath = createStatePath('pds-demo-happy-');
-  const service = new PdsRuntime(true, statePath);
+  const service = await createRuntime(true, statePath);
 
   try {
     service.dispatchLot({
@@ -93,7 +99,7 @@ export const runHappyPathDemo = (): DemoFlowResult => {
     });
     const auth = service.simulateAuthentication({
       authTxnId: 'AUTH-DEMO-001',
-      beneficiaryRefHash: 'demo-beneficiary-ref-hash',
+      beneficiaryRefHash: 'beneficiary-hash',
       rationCardHash: 'demo-ration-card-hash',
       authMode: AuthMode.MOCK_OTP,
       authResult: AuthResult.SUCCESS
@@ -102,7 +108,7 @@ export const runHappyPathDemo = (): DemoFlowResult => {
       distributionId: 'DIST-DEMO-001',
       fpsId: 'FPS-101',
       rationCardHash: 'demo-ration-card-hash',
-      beneficiaryRefHash: 'demo-beneficiary-ref-hash',
+      beneficiaryRefHash: 'beneficiary-hash',
       commodity: 'Rice',
       deliveredKg: 25,
       authMode: auth.authMode,
@@ -110,6 +116,7 @@ export const runHappyPathDemo = (): DemoFlowResult => {
       authTxnRefHash: auth.authTxnRefHash,
       dealerId: 'FPS-DEALER-101'
     });
+    await service.flushPersist();
 
     return {
       summary: service.getDashboardSummary(),
@@ -125,9 +132,9 @@ export const runHappyPathDemo = (): DemoFlowResult => {
   }
 };
 
-export const runExceptionDemo = (): DemoExceptionResult => {
+export const runExceptionDemo = async (): Promise<DemoExceptionResult> => {
   const statePath = createStatePath('pds-demo-exception-');
-  const service = new PdsRuntime(true, statePath);
+  const service = await createRuntime(true, statePath);
 
   try {
     service.dispatchLot({
@@ -148,6 +155,7 @@ export const runExceptionDemo = (): DemoExceptionResult => {
       message: 'Fallback shortage alert',
       evidence: { dispatchedQtyKg: 1000, receivedQtyKg: 800, shortageQtyKg: 200 }
     });
+    await service.flushPersist();
 
     return {
       summary: service.getDashboardSummary(),
@@ -159,9 +167,9 @@ export const runExceptionDemo = (): DemoExceptionResult => {
   }
 };
 
-export const runDemoSmoke = (): DemoSmokeResult => ({
-  happy: runHappyPathDemo(),
-  exception: runExceptionDemo()
+export const runDemoSmoke = async (): Promise<DemoSmokeResult> => ({
+  happy: await runHappyPathDemo(),
+  exception: await runExceptionDemo()
 });
 
 export const toPrettyJson = (value: unknown): string => `${JSON.stringify(value, null, 2)}\n`;

@@ -1,0 +1,20 @@
+Specifically, your proposed changes map well to these gaps:
+
+   Gap                                        POC Response
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Last-mile diversion                        RO-lite authorization, transporter evidence, dispatch/receipt ledger trail
+  ─────────────────────────────────────────  ────────────────────────────────────────────────────────────────────────────
+   Weight/short receipt slippage              ReceiveAtRetail, shortage detection, immutable audit alert
+  ─────────────────────────────────────────  ────────────────────────────────────────────────────────────────────────────
+   Weak custody provenance                    GetProvenanceTrace, linked lot/transfer/receipt/distribution events
+  ─────────────────────────────────────────  ────────────────────────────────────────────────────────────────────────────
+   Manual auth exception misuse               supervisor exception recorded with approvedBy and reason
+  ─────────────────────────────────────────  ────────────────────────────────────────────────────────────────────────────
+   Miller/commodity transformation opacity    TransformLot parent-child lot lineage
+  ─────────────────────────────────────────  ────────────────────────────────────────────────────────────────────────────
+   Endpoint accountability                    FPS, Welfare Institution, and Shiv Bhojan receipt events
+
+  Recommended claim:
+
+  > The POC does not replace AePDS, IAeSCM, SMART-PDS, or SARTHAK-PDS. It complements them by demonstrating a blockchain-based accountability layer for the highest-risk
+  > SCM workflows: movement authorization, custody transfer, endpoint receipt, shortage evidence, and beneficiary issue auditability.

@@ -243,7 +243,7 @@ Canonical records are defined in `mock/` and loaded through `@pds/fixtures`. Key
 
 - One district demo set with seven stakeholders (procurement through auditor).
 - One ration card hash: `demo-ration-card-hash`.
-- One beneficiary ref hash: `beneficiary-hash` (backend seed) / `demo-beneficiary-ref-hash` (workspace entities).
+- One beneficiary ref hash: `beneficiary-hash` (canonical across backend seed and workspace entities).
 - One rice lot: `LOT-RICE-2026-001`.
 - Workspace allocations: `ALLOC-2026-001`, `ALLOC-2026-002`.
 - One successful distribution: `DIST-2026-001`.

@@ -11,11 +11,17 @@ const createPort = (): FilePdsLedgerPort => {
   return new FilePdsLedgerPort(join(tempDir, 'state.json'), join(tempDir, 'journal.ndjson'));
 };
 
+const bootRuntime = async (seed: boolean, port: FilePdsLedgerPort): Promise<PdsRuntime> => {
+  const runtime = new PdsRuntime(seed, port, { deferBootstrap: true });
+  await runtime.bootstrapFromPersistenceAsync();
+  return runtime;
+};
+
 describe('PdsRuntime', () => {
-  it('persists event journal entries alongside state', () => {
+  it('persists event journal entries alongside state', async () => {
     const port = createPort();
     try {
-      const runtime = new PdsRuntime(true, port);
+      const runtime = await bootRuntime(true, port);
       runtime.registerStakeholder({
         stakeholderId: 'RUNTIME-001',
         stakeholderType: StakeholderType.DEPARTMENT,
@@ -24,6 +30,7 @@ describe('PdsRuntime', () => {
         licenseNo: 'RUNTIME-LIC-001',
         status: StakeholderStatus.ACTIVE
       });
+      await runtime.flushPersist();
 
       const journal = readFileSync(port.journalPath, 'utf8');
       expect(journal).toContain('RegisterStakeholder');
@@ -32,10 +39,10 @@ describe('PdsRuntime', () => {
     }
   });
 
-  it('reloads persisted state into a fresh runtime instance', () => {
+  it('reloads persisted state into a fresh runtime instance', async () => {
     const port = createPort();
     try {
-      const first = new PdsRuntime(true, port);
+      const first = await bootRuntime(true, port);
       first.registerStakeholder({
         stakeholderId: 'RUNTIME-002',
         stakeholderType: StakeholderType.AUDITOR,
@@ -44,8 +51,9 @@ describe('PdsRuntime', () => {
         licenseNo: 'RUNTIME-LIC-002',
         status: StakeholderStatus.ACTIVE
       });
+      await first.flushPersist();
 
-      const second = new PdsRuntime(false, port);
+      const second = await bootRuntime(false, port);
       expect(second.listStakeholders().some((stakeholder) => stakeholder.stakeholderId === 'RUNTIME-002')).toBe(true);
     } finally {
       rmSync(dirname(port.statePath), { recursive: true, force: true });

@@ -7,7 +7,9 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const statePath = resolve(root, 'tmp/pds-state.json');
 
 rmSync(resolve(root, 'tmp'), { recursive: true, force: true });
-const service = new PdsRuntime(true, statePath);
+const service = new PdsRuntime(true, statePath, { deferBootstrap: true });
+await service.bootstrapFromPersistenceAsync();
+await service.flushPersist();
 
 console.log(
   JSON.stringify(
@@ -20,6 +22,5 @@ console.log(
       alerts: service.getAlerts().length
     },
     null,
-    2
-  )
+  2)
 );

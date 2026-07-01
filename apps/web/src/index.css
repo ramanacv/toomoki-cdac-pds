@@ -1,0 +1,145 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* PDS-Chain warm/teal/amber palette expressed as HSL channels. */
+    --background: 38 38% 93%; /* warm cream */
+    --background-2: 150 25% 92%; /* mint wash */
+    --foreground: 205 32% 12%; /* near-ink slate */
+
+    --card: 0 0% 100%;
+    --card-foreground: 205 32% 12%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 205 32% 12%;
+
+    --primary: 175 78% 26%; /* teal #0f766e */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 215 25% 27%; /* slate #334155 */
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 215 16% 47%; /* muted slate */
+    --muted-foreground: 215 16% 47%;
+
+    --accent: 33 91% 36%; /* amber #b45309 */
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 5 78% 41%; /* #b42318 */
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 147 59% 30%; /* #1f7a4f */
+    --success-foreground: 0 0% 100%;
+
+    --warning: 33 91% 36%;
+    --warning-foreground: 0 0% 100%;
+
+    --border: 205 32% 12% / 0.12;
+    --input: 205 32% 12% / 0.12;
+    --ring: 175 78% 26%;
+
+    --radius: 0.85rem;
+
+    color-scheme: light;
+  }
+
+  .dark {
+    --background: 205 32% 8%;
+    --background-2: 175 30% 10%;
+    --foreground: 38 30% 92%;
+    --card: 205 32% 11%;
+    --card-foreground: 38 30% 92%;
+    --popover: 205 32% 11%;
+    --popover-foreground: 38 30% 92%;
+    --primary: 175 60% 42%;
+    --primary-foreground: 205 32% 8%;
+    --secondary: 215 20% 30%;
+    --secondary-foreground: 38 30% 92%;
+    --muted: 215 16% 60%;
+    --muted-foreground: 215 16% 60%;
+    --accent: 33 80% 55%;
+    --accent-foreground: 205 32% 8%;
+    --destructive: 5 70% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 147 50% 50%;
+    --success-foreground: 205 32% 8%;
+    --warning: 33 80% 55%;
+    --warning-foreground: 205 32% 8%;
+    --border: 38 20% 90% / 0.14;
+    --input: 38 20% 90% / 0.14;
+    --ring: 175 60% 42%;
+    color-scheme: dark;
+  }
+
+  * {
+    @apply border-border;
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply text-foreground;
+    margin: 0;
+    min-width: 320px;
+    min-height: 100vh;
+    font-family: theme('fontFamily.sans');
+    background:
+      radial-gradient(circle at top left, hsl(175 78% 26% / 0.18), transparent 28%),
+      radial-gradient(circle at top right, hsl(33 91% 36% / 0.15), transparent 30%),
+      linear-gradient(180deg, hsl(40 50% 97%) 0%, hsl(var(--background)) 58%, hsl(var(--background-2)) 100%);
+  }
+
+  .dark body {
+    background:
+      radial-gradient(circle at top left, hsl(175 60% 42% / 0.18), transparent 28%),
+      radial-gradient(circle at top right, hsl(33 80% 55% / 0.12), transparent 30%),
+      linear-gradient(180deg, hsl(205 32% 9%) 0%, hsl(var(--background)) 60%, hsl(var(--background-2)) 100%);
+  }
+}
+
+@layer components {
+  .surface-blur {
+    @apply border bg-card/70 backdrop-blur-xl shadow-[0_22px_70px_rgba(23,32,38,0.11)];
+  }
+
+  .eyebrow {
+    @apply m-0 mb-2 text-[11px] font-extrabold uppercase tracking-[0.16em] text-primary;
+  }
+
+  .pill {
+    @apply inline-flex items-center rounded-full bg-primary/[0.12] px-3 py-2 text-[0.82rem] font-bold text-primary;
+  }
+
+  .pill-soft {
+    @apply bg-secondary/[0.10] text-secondary;
+  }
+
+  .status-dot {
+    @apply mt-1 h-3.5 w-3.5 flex-none rounded-full;
+  }
+
+  .status-dot-live {
+    @apply bg-gradient-to-br from-emerald-500 to-green-500 shadow-[0_0_0_7px_rgba(34,197,94,0.12)];
+  }
+
+  .status-dot-demo {
+    @apply bg-gradient-to-br from-amber-600 to-amber-500 shadow-[0_0_0_7px_rgba(245,158,11,0.12)];
+  }
+
+  .status-dot-offline {
+    @apply bg-destructive;
+  }
+
+  .skip-link {
+    @apply sr-only z-[100] rounded-md bg-primary px-4 py-2 text-primary-foreground focus:not-sr-only focus:absolute focus:left-4 focus:top-4;
+  }
+
+  .surface-card-blur {
+    @apply border border-border bg-card/75 backdrop-blur-xl;
+  }
+}

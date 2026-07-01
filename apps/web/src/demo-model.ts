@@ -1,4 +1,4 @@
-import type { AuditAlert, DashboardSummary } from '@pds/shared-types';
+import type { DashboardSummary } from '@pds/shared-types';
 import {
   allocations as demoAllocations,
   authTransactions as demoAuthTransactions,
@@ -16,9 +16,21 @@ import {
 
 export type { DemoScenario } from '@pds/fixtures';
 
-export type DemoRole = 'DEPARTMENT' | 'PROCUREMENT' | 'GODOWN' | 'FPS' | 'AUDITOR';
+export type DemoRole =
+  | 'MANAGEMENT'
+  | 'CONTROL_OFFICE'
+  | 'FCI_DEPOT'
+  | 'DEPOT'
+  | 'FPS'
+  | 'WELFARE_INSTITUTE'
+  | 'SHIV_BHOJAN_OPERATOR'
+  | 'AUDITOR'
+  | 'DEPARTMENT'
+  | 'PROCUREMENT'
+  | 'GODOWN';
 export type DemoScreen =
   | 'dashboard'
+  | 'workbench'
   | 'stakeholders'
   | 'lots'
   | 'transfers'
@@ -67,6 +79,36 @@ export {
 };
 
 export const roleProfiles: Record<DemoRole, RoleProfile> = {
+  MANAGEMENT: {
+    title: 'Management',
+    summary: 'Inspect aggregate workflow status and custody exceptions.',
+    modules: ['Workflow status', 'Endpoint receipts', 'Audit evidence']
+  },
+  CONTROL_OFFICE: {
+    title: 'DSO / FDO / TSO',
+    summary: 'Authorize RO-lite Stage-II movement and review blocked dispatches.',
+    modules: ['Pending approvals', 'RO-lite stamping', 'Movement blocks']
+  },
+  FCI_DEPOT: {
+    title: 'FCI / Central Depot',
+    summary: 'Move central stock into the state lifting chain.',
+    modules: ['Central dispatch', 'Buffer receipt', 'Transport proof']
+  },
+  DEPOT: {
+    title: 'Depot / Issue Point',
+    summary: 'Dispatch approved stock to issue points and retail endpoints.',
+    modules: ['Stage-I/II dispatch', 'Transporter evidence', 'Retail receipts']
+  },
+  WELFARE_INSTITUTE: {
+    title: 'Welfare Institute',
+    summary: 'Confirm hostel or institution stock receipts and shortages.',
+    modules: ['Pending receipts', 'Shortage remarks', 'Endpoint stock']
+  },
+  SHIV_BHOJAN_OPERATOR: {
+    title: 'Shiv Bhojan Operator',
+    summary: 'Confirm meal-scheme stock receipts at the eatery endpoint.',
+    modules: ['Pending receipts', 'Endpoint stock', 'Receipt proof']
+  },
   DEPARTMENT: {
     title: 'Food Department',
     summary: 'Allocation, policy controls, and stock visibility.',
@@ -96,6 +138,7 @@ export const roleProfiles: Record<DemoRole, RoleProfile> = {
 
 export const screenDefinitions: ScreenDefinition[] = [
   { id: 'dashboard', label: 'Dashboard', description: 'Summary, live state, and scenario control.' },
+  { id: 'workbench', label: 'Workbench', description: 'Role-specific workflow queue and actions.' },
   { id: 'stakeholders', label: 'Stakeholders', description: 'Registered PDS actors and identities.' },
   { id: 'lots', label: 'Lots', description: 'Commodity lots and custody history.' },
   { id: 'transfers', label: 'Transfers', description: 'Movement log across the supply chain.' },
@@ -106,6 +149,12 @@ export const screenDefinitions: ScreenDefinition[] = [
 ];
 
 export const roleScreens: Record<DemoRole, DemoScreen[]> = {
+  MANAGEMENT: ['dashboard', 'workbench', 'stakeholders', 'transfers', 'distribution', 'audit-alerts', 'verify'],
+  CONTROL_OFFICE: ['workbench', 'transfers', 'audit-alerts', 'verify'],
+  FCI_DEPOT: ['workbench', 'lots', 'transfers', 'verify'],
+  DEPOT: ['workbench', 'lots', 'transfers', 'allocations', 'verify'],
+  WELFARE_INSTITUTE: ['workbench', 'transfers', 'audit-alerts', 'verify'],
+  SHIV_BHOJAN_OPERATOR: ['workbench', 'transfers', 'verify'],
   DEPARTMENT: ['dashboard', 'stakeholders', 'allocations', 'audit-alerts', 'verify'],
   PROCUREMENT: ['dashboard', 'stakeholders', 'lots', 'transfers', 'verify'],
   GODOWN: ['dashboard', 'lots', 'transfers', 'allocations', 'audit-alerts', 'verify'],
@@ -118,26 +167,38 @@ export const getRoleScreens = (role: DemoRole): DemoScreen[] => roleScreens[role
 export const getDefaultScreen = (role: DemoRole): DemoScreen => {
   const screens = getRoleScreens(role);
   const fallbackScreen = screens[0] ?? 'dashboard';
-  return screens.includes('dashboard') ? 'dashboard' : fallbackScreen;
+  return role === 'MANAGEMENT' || role === 'DEPARTMENT' || role === 'AUDITOR'
+    ? screens.includes('dashboard')
+      ? 'dashboard'
+      : fallbackScreen
+    : screens.includes('workbench')
+      ? 'workbench'
+      : fallbackScreen;
 };
 
 const baseWorkflow: WorkflowStep[] = [
   {
-    id: 'procurement',
-    title: 'Procurement & milling',
-    detail: 'Rice lot created and moved from procurement to the miller.',
+    id: 'central-tier',
+    title: 'DFPD / FCI origin',
+    detail: 'Central allocation and FCI buffer custody are represented before state lifting.',
     state: 'complete'
   },
   {
-    id: 'state-godown',
-    title: 'State godown receipt',
-    detail: 'Bulk stock is received and custody is recorded on-ledger.',
+    id: 'milling',
+    title: 'Milling transformation',
+    detail: 'Parent paddy lot is transformed into a child rice lot at the miller.',
     state: 'complete'
   },
   {
-    id: 'block-godown',
-    title: 'Block godown transfer',
-    detail: 'Stock is pushed toward the local distribution buffer.',
+    id: 'ro-lite',
+    title: 'RO-lite authorization',
+    detail: 'Control office stamps the Stage-II movement before issue-point dispatch.',
+    state: 'complete'
+  },
+  {
+    id: 'retail-endpoints',
+    title: 'Retail endpoint receipts',
+    detail: 'FPS, Welfare Institute, and Shiv Bhojan endpoints each record receipt.',
     state: 'complete'
   },
   {
@@ -163,11 +224,11 @@ const baseWorkflow: WorkflowStep[] = [
 export function buildWorkflowSteps(scenario: DemoScenario): WorkflowStep[] {
   if (scenario === 'short-receipt') {
     return baseWorkflow.map((step) =>
-      step.id === 'state-godown'
+      step.id === 'retail-endpoints'
         ? {
             ...step,
             state: 'blocked',
-            detail: 'Receipt was short by 300 kg, which triggers an audit alert.'
+            detail: 'Endpoint receipt was short, which triggers an audit alert.'
           }
         : step
     );

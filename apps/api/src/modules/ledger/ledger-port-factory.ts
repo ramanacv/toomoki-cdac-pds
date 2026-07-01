@@ -1,4 +1,5 @@
 import { FabricChaincodeLedgerPort } from '../fabric/fabric-chaincode-ledger-port.js';
+import { FabricChaincodeClient } from '../fabric/fabric-chaincode-client.js';
 import { FabricEnvelopeLedgerPort } from '../fabric/fabric-envelope-ledger-port.js';
 import { FabricGatewayLedgerPort } from '../fabric/fabric-gateway.ledger-port.js';
 import { loadFabricRuntimeConfig } from '../config/fabric.config.js';
@@ -7,7 +8,8 @@ import { loadPersistenceRuntimeConfig } from '../config/persistence.config.js';
 import { FilePdsLedgerPort, type PdsLedgerPort } from '../../infrastructure/ledger-port.js';
 import { createPgPool, PgPoolSnapshotAdapter } from '../../infrastructure/postgres-adapter.js';
 import { PostgresChaincodeLedgerPort } from '../../infrastructure/postgres-chaincode-ledger-port.js';
-import { createPostgresLedgerPort } from '../../infrastructure/postgres-ledger-port.js';
+import { PostgresPdsLedgerPort } from '../../infrastructure/postgres-ledger-port.js';
+import type { ChainQueryPort } from '../../infrastructure/chain-query-port.js';
 
 export const createLedgerPortFromEnv = (): PdsLedgerPort => {
   const persistence = loadPersistenceRuntimeConfig();
@@ -27,11 +29,23 @@ export const createLedgerPortFromEnv = (): PdsLedgerPort => {
     const adapter = new PgPoolSnapshotAdapter(pool);
 
     if (usesDemoChaincodeRuntime(config.ledgerMode, config.mode)) {
-      return new PostgresChaincodeLedgerPort(adapter, config.journalPath, config.chaincodeStatePath);
+      // Inject the chaincode client here so infrastructure has no fabric import (T5.1).
+      const chaincodeClient = new FabricChaincodeClient(config.chaincodeStatePath);
+      return new PostgresChaincodeLedgerPort(
+        adapter,
+        config.journalPath,
+        config.chaincodeStatePath,
+        chaincodeClient
+      );
     }
 
-    const envelopePath = config.mode === 'fabric-envelope' ? config.envelopePath : null;
-    return createPostgresLedgerPort(adapter, config.journalPath, envelopePath);
+    // Compose the event port here (composition root) so infrastructure stays
+    // free of any modules/fabric dependency (T5.1).
+    const eventPort: PdsLedgerPort =
+      config.mode === 'fabric-envelope'
+        ? new FabricEnvelopeLedgerPort(config.statePath, config.journalPath, config.envelopePath)
+        : new FilePdsLedgerPort(config.statePath, config.journalPath);
+    return new PostgresPdsLedgerPort(adapter, eventPort);
   }
 
   if (usesDemoChaincodeRuntime(config.ledgerMode, config.mode)) {
@@ -44,3 +58,6 @@ export const createLedgerPortFromEnv = (): PdsLedgerPort => {
 
   return new FilePdsLedgerPort(config.statePath, config.journalPath);
 };
+
+/** Narrowed type retained for callers that also need chain query access. */
+export type { ChainQueryPort };

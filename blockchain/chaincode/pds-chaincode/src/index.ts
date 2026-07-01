@@ -65,6 +65,8 @@ const sortByTime = <T>(entries: T[]): T[] =>
 const ALLOWED_LEDGER_EVENT_TYPES = new Set([
   'RegisterStakeholder',
   'CreateCommodityLot',
+  'TransformLot',
+  'AuthorizeMovement',
   'DispatchLot',
   'ReceiveLot',
   'AllocateToFPS',
@@ -258,6 +260,52 @@ export class PdsLedgerEngine {
     return lot;
   }
 
+  transformLot(input: {
+    parentLotId: string;
+    childLotId: string;
+    transformedBy: string;
+    commodity: string;
+    season?: string;
+    quantityKg: number;
+    qualityGrade: string;
+    source?: string;
+    transformedAt?: string;
+  }): CommodityLot {
+    if (this.lots.has(input.childLotId)) {
+      throw new Error(`Lot ${input.childLotId} already exists`);
+    }
+    if (input.quantityKg <= 0) {
+      throw new Error('quantityKg must be positive');
+    }
+    const parent = this.mustGetLot(input.parentLotId);
+    this.assertActiveStakeholder(input.transformedBy);
+    if (parent.currentOwner !== input.transformedBy) {
+      throw new Error(`Lot ${parent.lotId} is owned by ${parent.currentOwner}, not ${input.transformedBy}`);
+    }
+    this.consumeStock(input.transformedBy, parent.commodity, input.quantityKg);
+    const child: CommodityLot = {
+      lotId: input.childLotId,
+      commodity: input.commodity,
+      season: input.season ?? parent.season,
+      quantityKg: input.quantityKg,
+      qualityGrade: input.qualityGrade,
+      source: input.source ?? parent.lotId,
+      currentOwner: input.transformedBy,
+      currentLocation: input.transformedBy,
+      status: LotStatus.CREATED,
+      transformedFromLotId: parent.lotId
+    };
+    this.lots.set(child.lotId, child);
+    this.addStock(child.currentOwner, child.commodity, child.quantityKg);
+    this.recordEvent('lot', child.lotId, 'TransformLot', {
+      ...child,
+      parentLotId: parent.lotId,
+      transformedBy: input.transformedBy,
+      transformedAt: input.transformedAt ?? makeTimestamp()
+    });
+    return child;
+  }
+
   dispatchLot(input: {
     transferId: string;
     lotId: string;
@@ -266,6 +314,11 @@ export class PdsLedgerEngine {
     dispatchedQtyKg: number;
     vehicleNo: string;
     dispatchTimestamp?: string;
+    stage?: 'I' | 'II';
+    roRef?: string;
+    authorizedBy?: string;
+    transporterId?: string;
+    transformedFromLotId?: string;
   }): TransferOrder {
     if (this.transfers.has(input.transferId)) {
       throw new Error(`Transfer ${input.transferId} already exists`);
@@ -282,6 +335,26 @@ export class PdsLedgerEngine {
     if (input.dispatchedQtyKg <= 0) {
       throw new Error('dispatchedQtyKg must be positive');
     }
+    const priorAuthorization = this.events.find(
+      (event) =>
+        event.eventType === 'AuthorizeMovement' &&
+        event.entityId === input.transferId &&
+        event.payload?.authorizedBy
+    );
+    if (input.stage === 'II' && (!input.roRef || (!input.authorizedBy && !priorAuthorization))) {
+      this.raiseAuditFlag({
+        alertType: AlertType.UNAUTHORIZED_TRANSACTION,
+        entityId: input.transferId,
+        message: 'Stage-II dispatch requires RO-lite authorization',
+        evidence: {
+          transferId: input.transferId,
+          lotId: input.lotId,
+          roRef: input.roRef ?? '',
+          authorized: false
+        }
+      });
+      throw new Error('Stage-II dispatch requires roRef and authorizedBy');
+    }
     // Validate against the stock currently held by the sender for this lot's commodity.
     this.consumeStock(input.fromOrg, lot.commodity, input.dispatchedQtyKg);
 
@@ -293,7 +366,20 @@ export class PdsLedgerEngine {
       dispatchedQtyKg: input.dispatchedQtyKg,
       vehicleNo: input.vehicleNo,
       status: TransferStatus.DISPATCHED,
-      dispatchTimestamp: input.dispatchTimestamp ?? makeTimestamp()
+      dispatchTimestamp: input.dispatchTimestamp ?? makeTimestamp(),
+      ...(input.stage ? { stage: input.stage } : {}),
+      ...(input.roRef ? { roRef: input.roRef } : {}),
+      ...(input.authorizedBy || priorAuthorization?.payload?.authorizedBy
+        ? {
+            authorizedBy: String(input.authorizedBy ?? priorAuthorization?.payload?.authorizedBy),
+            approvalStatus: 'APPROVED' as const,
+            ...(priorAuthorization?.payload?.authorizedAt || input.dispatchTimestamp
+              ? { authorizedAt: String(priorAuthorization?.payload?.authorizedAt ?? input.dispatchTimestamp) }
+              : {})
+          }
+        : {}),
+      ...(input.transporterId ? { transporterId: input.transporterId } : {}),
+      ...(input.transformedFromLotId ? { transformedFromLotId: input.transformedFromLotId } : {})
     };
 
     this.transfers.set(transfer.transferId, transfer);
@@ -303,6 +389,36 @@ export class PdsLedgerEngine {
     this.lots.set(lot.lotId, { ...lot, status: LotStatus.DISPATCHED, currentLocation: input.toOrg });
     this.recordEvent('transfer', transfer.transferId, 'DispatchLot', transfer);
     return transfer;
+  }
+
+  authorizeMovement(input: {
+    transferId: string;
+    authorizedBy: string;
+    authorizedAt?: string;
+    roRef?: string;
+    remarks?: string;
+  }): { transferId: string; authorizedBy: string; authorizedAt: string; roRef?: string; remarks?: string; ledgerTxId: string } {
+    this.assertActiveStakeholder(input.authorizedBy);
+    const authorizedAt = input.authorizedAt ?? makeTimestamp();
+    const approval = {
+      transferId: input.transferId,
+      authorizedBy: input.authorizedBy,
+      authorizedAt,
+      ...(input.roRef ? { roRef: input.roRef } : {}),
+      ...(input.remarks ? { remarks: input.remarks } : {})
+    };
+    const existing = this.transfers.get(input.transferId);
+    if (existing) {
+      this.transfers.set(input.transferId, {
+        ...existing,
+        authorizedBy: input.authorizedBy,
+        authorizedAt,
+        approvalStatus: 'APPROVED',
+        ...(input.roRef ? { roRef: input.roRef } : {})
+      });
+    }
+    const { ledgerTxId } = this.recordEvent('workflow', input.transferId, 'AuthorizeMovement', approval);
+    return { ...approval, ledgerTxId };
   }
 
   receiveLot(input: {
@@ -485,6 +601,21 @@ export class PdsLedgerEngine {
     const effectiveTimestamp = input.timestamp ?? makeTimestamp();
     const month = monthFromTimestamp(effectiveTimestamp);
     const entitlement = this.mustGetEntitlement(input.rationCardHash, input.commodity, month);
+    if (entitlement.availableBalanceKg < input.deliveredKg) {
+      this.raiseAuditFlag({
+        alertType: AlertType.DUPLICATE_CLAIM,
+        entityId: input.rationCardHash,
+        message: 'Duplicate or over-entitlement claim blocked before distribution',
+        evidence: {
+          rationCardHash: input.rationCardHash,
+          commodity: input.commodity,
+          month,
+          requestedQtyKg: input.deliveredKg,
+          availableBalanceKg: entitlement.availableBalanceKg
+        }
+      });
+      throw new Error(`Requested quantity exceeds balance for ${input.rationCardHash}`);
+    }
     this.validateEntitlement({
       rationCardHash: input.rationCardHash,
       commodity: input.commodity,
@@ -503,6 +634,18 @@ export class PdsLedgerEngine {
     const { ledgerTxId } = this.recordEvent('distribution', distribution.distributionId, 'RecordDistribution', distribution);
     distribution.ledgerTxId = ledgerTxId;
     this.distributions.set(distribution.distributionId, distribution);
+    if (input.authMode === AuthMode.SUPERVISOR_EXCEPTION || input.authResult === AuthResult.EXCEPTION_APPROVED) {
+      this.raiseAuditFlag({
+        alertType: AlertType.UNAUTHORIZED_TRANSACTION,
+        entityId: distribution.distributionId,
+        message: 'Supervisor exception distribution requires auditor review',
+        evidence: {
+          distributionId: distribution.distributionId,
+          rationCardHash: distribution.rationCardHash,
+          deliveredKg: distribution.deliveredKg
+        }
+      });
+    }
     return distribution;
   }
 
@@ -772,7 +915,7 @@ export class PdsLedgerEngine {
           alreadyLiftedKg: 0,
           availableBalanceKg: carryKg,
           active: true,
-          category: entitlement.category
+          ...(entitlement.category ? { category: entitlement.category } : {})
         };
         this.entitlements.set(toKey, newEnt);
       }
@@ -824,7 +967,32 @@ export class PdsLedgerEngine {
   }
 
   getLotHistory(lotId: string): LedgerEvent[] {
-    return this.events.filter((event) => (event.entityType === 'lot' && event.entityId === lotId) || event.payload?.lotId === lotId);
+    const visited = new Set<string>();
+    const collect = (id: string): LedgerEvent[] => {
+      if (visited.has(id)) {
+        return [];
+      }
+      visited.add(id);
+      const lot = this.lots.get(id);
+      const direct = this.events.filter(
+        (event) =>
+          (event.entityType === 'lot' && event.entityId === id) ||
+          event.payload?.lotId === id ||
+          event.payload?.parentLotId === id ||
+          event.payload?.transformedFromLotId === id
+      );
+      const parentEvents = lot?.transformedFromLotId ? collect(lot.transformedFromLotId) : [];
+      const childEvents = [...this.lots.values()]
+        .filter((candidate) => candidate.transformedFromLotId === id)
+        .flatMap((candidate) => collect(candidate.lotId));
+      return [...parentEvents, ...direct, ...childEvents];
+    };
+
+    const unique = new Map<string, LedgerEvent>();
+    for (const event of collect(lotId)) {
+      unique.set(event.ledgerTxId, event);
+    }
+    return [...unique.values()].sort((left, right) => left.timestamp.localeCompare(right.timestamp));
   }
 
   getLot(lotId: string): CommodityLot {
@@ -833,6 +1001,10 @@ export class PdsLedgerEngine {
 
   getDistributionHistory(distributionId: string): LedgerEvent[] {
     return this.events.filter((event) => event.entityId === distributionId || event.payload?.distributionId === distributionId);
+  }
+
+  listLedgerEvents(): LedgerEvent[] {
+    return [...this.events].sort((left, right) => left.timestamp.localeCompare(right.timestamp));
   }
 
   getTransfer(transferId: string): TransferOrder {
@@ -1074,6 +1246,27 @@ export class PdsLedgerEngine {
         this.stock.set(keyFor(lot.currentOwner, lot.commodity), lot.quantityKg);
         break;
       }
+      case 'TransformLot': {
+        const lot = payload as unknown as CommodityLot;
+        this.lots.set(lot.lotId, lot);
+        this.stock.set(keyFor(lot.currentOwner, lot.commodity), lot.quantityKg);
+        break;
+      }
+      case 'AuthorizeMovement':
+        // Authorization events are control-plane evidence. If the transfer
+        // already exists, stamp it; otherwise dispatch validation can still
+        // read the event by transferId later.
+        if (payload.transferId && this.transfers.has(String(payload.transferId))) {
+          const transfer = this.transfers.get(String(payload.transferId))!;
+          this.transfers.set(transfer.transferId, {
+            ...transfer,
+            authorizedBy: String(payload.authorizedBy),
+            authorizedAt: String(payload.authorizedAt),
+            approvalStatus: 'APPROVED',
+            ...(payload.roRef ? { roRef: String(payload.roRef) } : {})
+          });
+        }
+        break;
       case 'DispatchLot': {
         const transfer = payload as unknown as TransferOrder;
         this.transfers.set(transfer.transferId, transfer);

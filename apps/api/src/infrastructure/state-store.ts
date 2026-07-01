@@ -1,10 +1,10 @@
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import type { PdsLedgerState } from '@pds/pds-chaincode';
 
 export interface PdsStateStore {
-  load(): PdsLedgerState | null;
-  save(state: PdsLedgerState): void;
+  load(): Promise<PdsLedgerState | null>;
+  save(state: PdsLedgerState): Promise<void>;
 }
 
 export class FilePdsStateStore implements PdsStateStore {
@@ -14,9 +14,9 @@ export class FilePdsStateStore implements PdsStateStore {
     this.path = path;
   }
 
-  load(): PdsLedgerState | null {
+  async load(): Promise<PdsLedgerState | null> {
     try {
-      const raw = readFileSync(this.path, 'utf8');
+      const raw = await readFile(this.path, 'utf8');
       return JSON.parse(raw) as PdsLedgerState;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
@@ -26,8 +26,8 @@ export class FilePdsStateStore implements PdsStateStore {
     }
   }
 
-  save(state: PdsLedgerState): void {
-    mkdirSync(dirname(this.path), { recursive: true });
-    writeFileSync(this.path, `${JSON.stringify(state, null, 2)}\n`, 'utf8');
+  async save(state: PdsLedgerState): Promise<void> {
+    await mkdir(dirname(this.path), { recursive: true });
+    await writeFile(this.path, `${JSON.stringify(state, null, 2)}\n`, 'utf8');
   }
 }

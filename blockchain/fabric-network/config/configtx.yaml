@@ -1,0 +1,156 @@
+# Channel configuration for PDS 2-org demo (Fabric 3.x channel participation).
+# Paths are relative to this config directory (FABRIC_CFG_PATH).
+
+Organizations:
+  - &OrdererOrg
+    Name: OrdererMSP
+    ID: OrdererMSP
+    MSPDir: ../crypto/ordererOrganizations/pds.example.com/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('OrdererMSP.member')"
+      Writers:
+        Type: Signature
+        Rule: "OR('OrdererMSP.member')"
+      Admins:
+        Type: Signature
+        Rule: "OR('OrdererMSP.admin')"
+    OrdererEndpoints:
+      - orderer.pds.example.com:7050
+
+  - &FoodOrg
+    Name: FoodAndCivilSuppliesMSP
+    ID: FoodAndCivilSuppliesMSP
+    MSPDir: ../crypto/peerOrganizations/food.example.com/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('FoodAndCivilSuppliesMSP.admin', 'FoodAndCivilSuppliesMSP.peer', 'FoodAndCivilSuppliesMSP.client')"
+      Writers:
+        Type: Signature
+        Rule: "OR('FoodAndCivilSuppliesMSP.admin', 'FoodAndCivilSuppliesMSP.client')"
+      Admins:
+        Type: Signature
+        Rule: "OR('FoodAndCivilSuppliesMSP.admin')"
+      Endorsement:
+        Type: Signature
+        Rule: "OR('FoodAndCivilSuppliesMSP.peer')"
+    AnchorPeers:
+      - Host: peer0.food.example.com
+        Port: 7051
+
+  - &GodownOrg
+    Name: GodownWarehouseMSP
+    ID: GodownWarehouseMSP
+    MSPDir: ../crypto/peerOrganizations/godown.example.com/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('GodownWarehouseMSP.admin', 'GodownWarehouseMSP.peer', 'GodownWarehouseMSP.client')"
+      Writers:
+        Type: Signature
+        Rule: "OR('GodownWarehouseMSP.admin', 'GodownWarehouseMSP.client')"
+      Admins:
+        Type: Signature
+        Rule: "OR('GodownWarehouseMSP.admin')"
+      Endorsement:
+        Type: Signature
+        Rule: "OR('GodownWarehouseMSP.peer')"
+    AnchorPeers:
+      - Host: peer0.godown.example.com
+        Port: 9051
+
+Capabilities:
+  Channel: &ChannelCapabilities
+    V2_0: true
+  Orderer: &OrdererCapabilities
+    V2_0: true
+  Application: &ApplicationCapabilities
+    V2_5: true
+
+Application: &ApplicationDefaults
+  Organizations:
+  Policies:
+    Readers:
+      Type: ImplicitMeta
+      Rule: "ANY Readers"
+    Writers:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+    Admins:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Admins"
+    LifecycleEndorsement:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Endorsement"
+    Endorsement:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Endorsement"
+
+Orderer: &OrdererDefaults
+  OrdererType: etcdraft
+  Addresses:
+    - orderer.pds.example.com:7050
+  EtcdRaft:
+    Consenters:
+      - Host: orderer.pds.example.com
+        Port: 7050
+        ClientTLSCert: ../crypto/ordererOrganizations/pds.example.com/orderers/orderer.pds.example.com/tls/server.crt
+        ServerTLSCert: ../crypto/ordererOrganizations/pds.example.com/orderers/orderer.pds.example.com/tls/server.crt
+  BatchTimeout: 2s
+  BatchSize:
+    MaxMessageCount: 10
+    AbsoluteMaxBytes: 99 MB
+    PreferredMaxBytes: 512 KB
+  Organizations:
+  Policies:
+    Readers:
+      Type: ImplicitMeta
+      Rule: "ANY Readers"
+    Writers:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+    Admins:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Admins"
+    BlockValidation:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+
+Channel: &ChannelDefaults
+  Policies:
+    Readers:
+      Type: ImplicitMeta
+      Rule: "ANY Readers"
+    Writers:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+    Admins:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Admins"
+    LifecycleEndorsement:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Endorsement"
+    Endorsement:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Endorsement"
+
+Profiles:
+  PdsChannel:
+    <<: *ChannelDefaults
+    Capabilities:
+      <<: *ChannelCapabilities
+    Orderer:
+      <<: *OrdererDefaults
+      Organizations:
+        - *OrdererOrg
+      Capabilities:
+        <<: *OrdererCapabilities
+    Application:
+      <<: *ApplicationDefaults
+      Organizations:
+        - *FoodOrg
+        - *GodownOrg
+      Capabilities:
+        <<: *ApplicationCapabilities

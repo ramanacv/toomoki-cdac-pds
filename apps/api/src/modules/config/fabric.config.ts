@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { defaultFabricContractManifest } from '../fabric/fabric-contract.js';
+import { defaultFabricContractManifest, resolveFabricNetworkPath } from '../fabric/fabric-contract.js';
 import { resolveLegacyBackendMode, resolveLedgerMode, type FabricBackendMode } from './ledger-mode.config.js';
 
 export type FabricRuntimeConfig = {
@@ -62,8 +62,8 @@ export const loadFabricRuntimeConfig = (): FabricRuntimeConfig => {
   const journalPath = process.env.PDS_LEDGER_JOURNAL_PATH ?? resolve(process.cwd(), '../../tmp/pds-ledger.ndjson');
   const envelopePath = process.env.PDS_FABRIC_ENVELOPE_PATH ?? resolve(process.cwd(), '../../tmp/pds-fabric-envelope.ndjson');
   const chaincodeStatePath = process.env.PDS_CHAINCODE_STATE_PATH ?? resolve(process.cwd(), '../../tmp/chaincode-world-state.json');
-  const contractPath = resolve(process.cwd(), '../../blockchain/fabric-network/fabric-contract.json');
-  const connectionProfilePath = resolve(process.cwd(), `../../blockchain/fabric-network/connection-profiles/${clientOrgToProfileFile(clientOrg)}`);
+  const contractPath = resolveFabricNetworkPath('fabric-contract.json');
+  const connectionProfilePath = resolveFabricNetworkPath('connection-profiles', clientOrgToProfileFile(clientOrg));
   const contract = defaultFabricContractManifest();
   const contractFromFile = JSON.parse(readFileSync(contractPath, 'utf8')) as {
     network: string;
@@ -71,7 +71,7 @@ export const loadFabricRuntimeConfig = (): FabricRuntimeConfig => {
     chaincode: string;
     operations: unknown[];
   };
-  const networkManifest = JSON.parse(readFileSync(resolve(process.cwd(), '../../blockchain/fabric-network/network-manifest.json'), 'utf8')) as {
+  const networkManifest = JSON.parse(readFileSync(resolveFabricNetworkPath('network-manifest.json'), 'utf8')) as {
     organizations: FabricOrgManifest[];
   };
 
@@ -91,7 +91,7 @@ export const loadFabricRuntimeConfig = (): FabricRuntimeConfig => {
   const channel = process.env.PDS_FABRIC_CHANNEL ?? contract.channel;
   const chaincode = process.env.PDS_FABRIC_CHAINCODE ?? contract.chaincode;
   const mspId = process.env.PDS_FABRIC_MSP_ID ?? clientOrgToMspId(clientOrg);
-  const cryptoBase = resolve(process.cwd(), '../../blockchain/fabric-network/crypto');
+  const cryptoBase = resolveFabricNetworkPath('crypto');
 
   return {
     ledgerMode,
@@ -110,7 +110,7 @@ export const loadFabricRuntimeConfig = (): FabricRuntimeConfig => {
     peerTlsCertPath: process.env.PDS_FABRIC_PEER_TLS_CERT_PATH ?? resolve(cryptoBase, 'peerOrganizations/food.example.com/peers/peer0.food.example.com/tls/ca.crt'),
     peerHostAlias: process.env.PDS_FABRIC_PEER_HOST_ALIAS ?? 'peer0.food.example.com',
     mspId,
-    certPath: process.env.PDS_FABRIC_CERT_PATH ?? resolve(cryptoBase, 'peerOrganizations/food.example.com/users/User1@food.example.com/msp/signcerts/cert.pem'),
+    certPath: process.env.PDS_FABRIC_CERT_PATH ?? resolve(cryptoBase, 'peerOrganizations/food.example.com/users/User1@food.example.com/msp/signcerts/User1@food.example.com-cert.pem'),
     keyPath: process.env.PDS_FABRIC_KEY_PATH ?? resolve(cryptoBase, 'peerOrganizations/food.example.com/users/User1@food.example.com/msp/keystore')
   };
 };

@@ -1,7 +1,7 @@
 [
   {
     "authTxnId": "AUTH-2026-001",
-    "beneficiaryRefHash": "demo-beneficiary-ref-hash",
+    "beneficiaryRefHash": "beneficiary-hash",
     "rationCardHash": "demo-ration-card-hash",
     "authMode": "MOCK_OTP",
     "authResult": "SUCCESS",
