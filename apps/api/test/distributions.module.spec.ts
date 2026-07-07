@@ -32,7 +32,8 @@ describe('DistributionsModule', () => {
       authMode: auth.authMode,
       authResult: auth.authResult,
       authTxnRefHash: auth.authTxnRefHash,
-      dealerId: 'DEALER-001'
+      dealerId: 'DEALER-001',
+      timestamp: '2026-06-09T10:10:00.000Z'
     });
 
     expect(distribution.distributionId).toBe('DIST-MOD-001');
@@ -55,7 +56,8 @@ describe('DistributionsModule', () => {
       authMode: AuthMode.MOCK_OTP,
       authResult: AuthResult.SUCCESS,
       authTxnRefHash: 'auth-ref-dup-1',
-      dealerId: 'DEALER-001'
+      dealerId: 'DEALER-001',
+      timestamp: '2026-06-09T10:10:00.000Z'
     });
 
     expect(() =>
@@ -69,7 +71,8 @@ describe('DistributionsModule', () => {
         authMode: AuthMode.MOCK_OTP,
         authResult: AuthResult.SUCCESS,
         authTxnRefHash: 'auth-ref-dup-2',
-        dealerId: 'DEALER-001'
+        dealerId: 'DEALER-001',
+        timestamp: '2026-06-09T10:11:00.000Z'
       })
     ).toThrow(/exceeds balance/);
 
@@ -102,7 +105,8 @@ describe('DistributionsModule', () => {
       authTxnRefHash: 'auth-ref-exception',
       dealerId: 'DEALER-001',
       approvedBy: 'SUPERVISOR-101',
-      exceptionReason: 'Biometric failure'
+      exceptionReason: 'Biometric failure',
+      timestamp: '2026-06-09T10:10:00.000Z'
     });
 
     expect(distribution.distributionId).toBe('DIST-MOD-EXCEPTION');

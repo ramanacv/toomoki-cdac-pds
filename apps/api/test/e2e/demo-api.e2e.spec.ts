@@ -141,7 +141,8 @@ describe('Demo API e2e', () => {
           authMode: AuthMode.MOCK_OTP,
           authResult: AuthResult.SUCCESS,
           authTxnRefHash: auth.body.authTxnRefHash,
-          dealerId: 'DEALER-001'
+          dealerId: 'DEALER-001',
+          timestamp: '2026-06-09T10:10:00.000Z'
         })
       ).status
     );
@@ -280,7 +281,8 @@ describe('Demo API e2e', () => {
         authMode: AuthMode.MOCK_OTP,
         authResult: AuthResult.SUCCESS,
         authTxnRefHash: auth.body.authTxnRefHash,
-        dealerId: 'DEALER-001'
+        dealerId: 'DEALER-001',
+        timestamp: '2026-06-09T10:10:00.000Z'
       })
       .expect(201);
 

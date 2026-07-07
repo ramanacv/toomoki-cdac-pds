@@ -114,7 +114,8 @@ export const runHappyPathDemo = async (): Promise<DemoFlowResult> => {
       authMode: auth.authMode,
       authResult: auth.authResult,
       authTxnRefHash: auth.authTxnRefHash,
-      dealerId: 'FPS-DEALER-101'
+      dealerId: 'FPS-DEALER-101',
+      timestamp: '2026-06-09T10:10:00.000Z'
     });
     await service.flushPersist();
 
