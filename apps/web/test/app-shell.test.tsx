@@ -91,7 +91,7 @@ describe('app shell', () => {
   it('redirects deep links to screens the role cannot access', async () => {
     await renderApp('/stakeholders?role=FPS');
 
-    expect(await screen.findByRole('heading', { name: 'Overview' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Role workbench' })).toBeInTheDocument();
     expect(screen.queryByText('Demo operating network')).not.toBeInTheDocument();
   });
 
@@ -103,6 +103,18 @@ describe('app shell', () => {
 
     await user.click(sidebar().getByRole('link', { name: 'Stakeholders' }));
     expect(await screen.findByRole('heading', { name: 'Demo operating network' })).toBeInTheDocument();
+  });
+
+  it('keeps workflow actions on the workbench only', async () => {
+    const user = await renderApp('/?role=GODOWN');
+
+    // GODOWN acts from its workbench, which is also its default landing screen.
+    expect(await screen.findByRole('heading', { name: 'Role workbench' })).toBeInTheDocument();
+
+    await user.click(sidebar().getByRole('link', { name: 'Transfers' }));
+    expect(await screen.findByRole('heading', { name: 'Operational movement log' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Role workbench' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Management inspection' })).not.toBeInTheDocument();
   });
 
   it('switches roles from the top bar and re-filters navigation', async () => {

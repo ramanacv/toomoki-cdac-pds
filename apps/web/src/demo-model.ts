@@ -157,9 +157,9 @@ export const roleScreens: Record<DemoRole, DemoScreen[]> = {
   WELFARE_INSTITUTE: ['workbench', 'transfers', 'audit-alerts', 'verify'],
   SHIV_BHOJAN_OPERATOR: ['workbench', 'transfers', 'verify'],
   DEPARTMENT: ['dashboard', 'stakeholders', 'allocations', 'audit-alerts', 'verify'],
-  PROCUREMENT: ['dashboard', 'stakeholders', 'lots', 'transfers', 'verify'],
-  GODOWN: ['dashboard', 'lots', 'transfers', 'allocations', 'audit-alerts', 'verify'],
-  FPS: ['dashboard', 'allocations', 'distribution', 'verify'],
+  PROCUREMENT: ['dashboard', 'workbench', 'stakeholders', 'lots', 'transfers', 'verify'],
+  GODOWN: ['dashboard', 'workbench', 'lots', 'transfers', 'allocations', 'audit-alerts', 'verify'],
+  FPS: ['dashboard', 'workbench', 'allocations', 'distribution', 'verify'],
   AUDITOR: ['dashboard', 'stakeholders', 'lots', 'transfers', 'allocations', 'distribution', 'audit-alerts', 'verify']
 };
 

@@ -388,7 +388,7 @@ export function getWorkflowActions(context: WorkflowContext): WorkflowActionSpec
         id: `${leg.id}-receive`,
         label: `Confirm receipt at ${leg.toOrg}`,
         detail: `Record stock received against ${transfer.dispatchedQtyKg} kg dispatched.`,
-        roles: leg.toOrg === 'FPS-101' ? ['FPS'] : leg.toOrg === 'WI-101' ? ['WELFARE_INSTITUTE'] : leg.toOrg === 'SBE-101' ? ['SHIV_BHOJAN_OPERATOR'] : ['DEPOT', 'FCI_DEPOT'],
+        roles: leg.toOrg === 'FPS-101' ? ['FPS'] : leg.toOrg === 'WI-101' ? ['WELFARE_INSTITUTE'] : leg.toOrg === 'SBE-101' ? ['SHIV_BHOJAN_OPERATOR'] : ['DEPOT', 'FCI_DEPOT', 'GODOWN'],
         status: 'dispatched',
         request: { kind: 'receive', transferId: leg.id, receivedQtyKg: transfer.dispatchedQtyKg }
       });
