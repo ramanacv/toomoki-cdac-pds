@@ -15,6 +15,18 @@
       "peers": ["peer0.food.example.com"]
     }
   },
+  "channels": {
+    "pdschannel": {
+      "peers": {
+        "peer0.food.example.com": {
+          "endorsingPeer": true,
+          "chaincodeQuery": true,
+          "ledgerQuery": true,
+          "eventSource": true
+        }
+      }
+    }
+  },
   "peers": {
     "peer0.food.example.com": {
       "url": "grpcs://peer0.food.example.com:7051",

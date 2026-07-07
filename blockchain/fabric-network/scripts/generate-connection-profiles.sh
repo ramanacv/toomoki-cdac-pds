@@ -31,6 +31,18 @@ generate_profile() {
       "peers": ["${peer}"]
     }
   },
+  "channels": {
+    "pdschannel": {
+      "peers": {
+        "${peer}": {
+          "endorsingPeer": true,
+          "chaincodeQuery": true,
+          "ledgerQuery": true,
+          "eventSource": true
+        }
+      }
+    }
+  },
   "peers": {
     "${peer}": {
       "url": "grpcs://${peer}:${port}",
