@@ -175,7 +175,7 @@ CREATE TABLE IF NOT EXISTS distribution_transactions (
 CREATE INDEX IF NOT EXISTS idx_distribution_transactions_fps ON distribution_transactions (fps_id);
 CREATE INDEX IF NOT EXISTS idx_distribution_transactions_ration_card ON distribution_transactions (ration_card_hash);
 CREATE INDEX IF NOT EXISTS idx_distribution_transactions_beneficiary_ref ON distribution_transactions (beneficiary_ref_hash);
-CREATE INDEX IF NOT EXISTS idx_distribution_transactions_commodity_month ON distribution_transactions (commodity, date_trunc('month', timestamp));
+CREATE INDEX IF NOT EXISTS idx_distribution_transactions_commodity_timestamp ON distribution_transactions (commodity, timestamp);
 CREATE INDEX IF NOT EXISTS idx_distribution_transactions_timestamp ON distribution_transactions (timestamp);
 
 CREATE TABLE IF NOT EXISTS ledger_tx_index (
