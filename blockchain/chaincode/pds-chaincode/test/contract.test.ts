@@ -67,7 +67,7 @@ describe('PdsControlContract / PdsDataContract authorization (T1.5)', () => {
     );
   });
 
-  it('RecordLedgerProof is gated to AuditAuthorityMSP and rejects unknown event types', async () => {
+  it('RecordLedgerProof is gated to audit/department MSPs and rejects unknown event types', async () => {
     const msp = { mspId: 'FairPriceShopMSP' };
     const ctx = makeContext(msp);
     const data = new PdsDataContract();
@@ -99,6 +99,21 @@ describe('PdsControlContract / PdsDataContract authorization (T1.5)', () => {
         })
       )
     ).rejects.toThrow(/Unsupported ledger event type/);
+
+    msp.mspId = 'FoodAndCivilSuppliesMSP';
+    await expect(
+      data.RecordLedgerProof(
+        ctx,
+        JSON.stringify({
+          ledgerTxId: 'TX-Z',
+          entityType: 'lot',
+          entityId: 'LOT-1',
+          eventType: 'TotallyBogusEventType',
+          payload: {},
+          timestamp: '2026-06-01T00:00:00.000Z'
+        })
+      )
+    ).rejects.toThrow(/Unsupported ledger event type/);
   });
 });
 
@@ -116,10 +131,24 @@ describe('assertAuthorized (unit)', () => {
   it('AllocateToFPS and RecordDistribution MSP gating', () => {
     const godown = identity('GodownWarehouseMSP');
     const fps = identity('FairPriceShopMSP');
+    const department = identity('FoodAndCivilSuppliesMSP');
     expect(() => assertAuthorized('AllocateToFPS', godown)).not.toThrow();
+    expect(() => assertAuthorized('AllocateToFPS', department)).not.toThrow();
     expect(() => assertAuthorized('AllocateToFPS', fps)).toThrow(/not authorized/);
     expect(() => assertAuthorized('RecordDistribution', fps)).not.toThrow();
+    expect(() => assertAuthorized('RecordDistribution', department)).not.toThrow();
     expect(() => assertAuthorized('RecordDistribution', godown)).toThrow(/not authorized/);
+  });
+
+  it('allows the department MSP to orchestrate demo supply-chain writes in fabric mode', () => {
+    const department = identity('FoodAndCivilSuppliesMSP');
+    expect(() => assertAuthorized('CreateCommodityLot', department)).not.toThrow();
+    expect(() => assertAuthorized('TransformLot', department)).not.toThrow();
+    expect(() => assertAuthorized('DispatchLot', department)).not.toThrow();
+    expect(() => assertAuthorized('ReceiveLot', department)).not.toThrow();
+    expect(() => assertAuthorized('RecordFPSReceipt', department)).not.toThrow();
+    expect(() => assertAuthorized('RegisterBeneficiaryHash', department)).not.toThrow();
+    expect(() => assertAuthorized('RecordLedgerProof', department)).not.toThrow();
   });
 
   it('does not gate unmapped (query) operations', () => {

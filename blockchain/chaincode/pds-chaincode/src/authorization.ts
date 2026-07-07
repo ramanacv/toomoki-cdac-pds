@@ -7,7 +7,7 @@
  *   - ProcurementMillerMSP  → procurement center (CreateCommodityLot, DispatchLot from procurement)
  *   - GodownWarehouseMSP    → state/block godowns (ReceiveLot, AllocateToFPS, DispatchLot from godown)
  *   - FairPriceShopMSP      → FPS (RecordDistribution, RegisterBeneficiaryHash)
- *   - FoodAndCivilSuppliesMSP → department / entitlement authority (CreateMonthlyEntitlement)
+ *   - FoodAndCivilSuppliesMSP → department / entitlement authority and demo orchestration identity
  *   - AuditAuthorityMSP     → auditors (RaiseAuditFlag, ResolveAuditFlag)
  *
  * Query operations (Get*) are read-only and open to any authenticated MSP.
@@ -29,21 +29,21 @@ export type ClientIdentity = {
  */
 const OPERATION_MSP_ALLOWLIST: Record<string, Set<string>> = {
   // Supply chain
-  CreateCommodityLot: new Set(['ProcurementMillerMSP']),
-  TransformLot: new Set(['ProcurementMillerMSP']),
-  DispatchLot: new Set(['ProcurementMillerMSP', 'GodownWarehouseMSP']),
-  ReceiveLot: new Set(['GodownWarehouseMSP', 'ProcurementMillerMSP']),
-  AllocateToFPS: new Set(['GodownWarehouseMSP']),
-  RecordFPSReceipt: new Set(['FairPriceShopMSP']),
+  CreateCommodityLot: new Set(['ProcurementMillerMSP', 'FoodAndCivilSuppliesMSP']),
+  TransformLot: new Set(['ProcurementMillerMSP', 'FoodAndCivilSuppliesMSP']),
+  DispatchLot: new Set(['ProcurementMillerMSP', 'GodownWarehouseMSP', 'FoodAndCivilSuppliesMSP']),
+  ReceiveLot: new Set(['GodownWarehouseMSP', 'ProcurementMillerMSP', 'FoodAndCivilSuppliesMSP']),
+  AllocateToFPS: new Set(['GodownWarehouseMSP', 'FoodAndCivilSuppliesMSP']),
+  RecordFPSReceipt: new Set(['FairPriceShopMSP', 'FoodAndCivilSuppliesMSP']),
   // Beneficiary auth & distribution
-  RegisterBeneficiaryHash: new Set(['FairPriceShopMSP']),
+  RegisterBeneficiaryHash: new Set(['FairPriceShopMSP', 'FoodAndCivilSuppliesMSP']),
   CreateMonthlyEntitlement: new Set(['FoodAndCivilSuppliesMSP']),
-  RecordDistribution: new Set(['FairPriceShopMSP']),
+  RecordDistribution: new Set(['FairPriceShopMSP', 'FoodAndCivilSuppliesMSP']),
   // Audit
   RaiseAuditFlag: new Set(['AuditAuthorityMSP', 'FoodAndCivilSuppliesMSP']),
   ResolveAuditFlag: new Set(['AuditAuthorityMSP', 'FoodAndCivilSuppliesMSP']),
   RegisterStakeholder: new Set(['FoodAndCivilSuppliesMSP', 'AuditAuthorityMSP']),
-  RecordLedgerProof: new Set(['AuditAuthorityMSP']),
+  RecordLedgerProof: new Set(['AuditAuthorityMSP', 'FoodAndCivilSuppliesMSP']),
   // Ration card lifecycle
   IssueRationCard: new Set(['FoodAndCivilSuppliesMSP']),
   ActivateRationCard: new Set(['FoodAndCivilSuppliesMSP']),

@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { describe, expect, it } from 'vitest';
-import { AuthMode, AuthResult, StakeholderStatus, StakeholderType } from '@pds/shared-types';
+import { AlertType, AuthMode, AuthResult, StakeholderStatus, StakeholderType } from '@pds/shared-types';
 import { PdsRuntime } from '../src/pds-runtime.js';
 
 const createStatePath = (): string => join(mkdtempSync(join(tmpdir(), 'pds-api-')), 'state.json');
@@ -109,11 +109,142 @@ describe('PdsRuntime', () => {
         authMode: auth.authMode,
         authResult: auth.authResult,
         authTxnRefHash: auth.authTxnRefHash,
-        dealerId: 'DEALER-001'
+        dealerId: 'DEALER-001',
+        timestamp: '2026-06-09T10:10:00.000Z'
       });
       expect(distribution.ledgerTxId).toBeDefined();
       expect(service.getDistributionReceipt('DIST-API-001').distributionId).toBe('DIST-API-001');
       expect(service.listDistributions().some((item) => item.distributionId === 'DIST-API-001')).toBe(true);
+    } finally {
+      await cleanup(service, statePath);
+    }
+  });
+
+  it('supports the role-workbench POC sequence from seed state', async () => {
+    const statePath = createStatePath();
+    const service = await boot(true, statePath);
+    try {
+      const approval = service.authorizeMovement({
+        transferId: 'TR-POC-MILLER-ISSUE',
+        authorizedBy: 'DSO-001',
+        roRef: 'RO-DSO-POC-001'
+      });
+      expect(approval.ledgerTxId).toBeDefined();
+
+      const legs = [
+        ['TR-POC-PROC-FCI', 'LOT-RICE-2026-001', 'PROC-001', 'FCI-001', 1000, 'KA01AB1999'],
+        ['TR-POC-FCI-BUF', 'LOT-RICE-2026-001', 'FCI-001', 'FCI-BUF-001', 1000, 'FCI01AB2001'],
+        ['TR-POC-BUF-DEPOT', 'LOT-RICE-2026-001', 'FCI-BUF-001', 'GODOWN-S-001', 1000, 'KA01AB2002'],
+        ['TR-POC-DEPOT-MILLER', 'LOT-RICE-2026-001', 'GODOWN-S-001', 'MLL-001', 1000, 'KA01AB2003']
+      ] as const;
+
+      for (const [transferId, lotId, fromOrg, toOrg, dispatchedQtyKg, vehicleNo] of legs) {
+        service.dispatchLot({ transferId, lotId, fromOrg, toOrg, dispatchedQtyKg, vehicleNo, stage: 'I', transporterId: 'TRANS-001' });
+        service.receiveLot({ transferId, receivedQtyKg: dispatchedQtyKg });
+      }
+
+      const childLot = service.transformLot({
+        parentLotId: 'LOT-RICE-2026-001',
+        childLotId: 'LOT-RICE-2026-002',
+        transformedBy: 'MLL-001',
+        commodity: 'Rice',
+        quantityKg: 850,
+        qualityGrade: 'A',
+        source: 'Miller 01'
+      });
+      expect(childLot.currentOwner).toBe('MLL-001');
+
+      service.dispatchLot({
+        transferId: 'TR-POC-MILLER-ISSUE',
+        lotId: 'LOT-RICE-2026-002',
+        fromOrg: 'MLL-001',
+        toOrg: 'ISSUE-001',
+        dispatchedQtyKg: 850,
+        vehicleNo: 'KA01AB2004',
+        stage: 'II',
+        roRef: 'RO-DSO-POC-001',
+        transporterId: 'TRANS-001',
+        transformedFromLotId: 'LOT-RICE-2026-001'
+      });
+      service.receiveLot({ transferId: 'TR-POC-MILLER-ISSUE', receivedQtyKg: 850 });
+
+      const endpointLegs = [
+        ['TR-POC-ISSUE-FPS', 'FPS-101', 300, 'KA01AB2005', 'RO-DSO-POC-FPS'],
+        ['TR-POC-ISSUE-WI', 'WI-101', 200, 'KA01AB2006', 'RO-DSO-POC-WI'],
+        ['TR-POC-ISSUE-SBE', 'SBE-101', 200, 'KA01AB2007', 'RO-DSO-POC-SBE']
+      ] as const;
+      for (const [transferId, toOrg, dispatchedQtyKg, vehicleNo, roRef] of endpointLegs) {
+        service.dispatchLot({
+          transferId,
+          lotId: 'LOT-RICE-2026-002',
+          fromOrg: 'ISSUE-001',
+          toOrg,
+          dispatchedQtyKg,
+          vehicleNo,
+          stage: 'II',
+          roRef,
+          authorizedBy: 'DSO-001',
+          transporterId: 'TRANS-001'
+        });
+        service.receiveLot({ transferId, receivedQtyKg: dispatchedQtyKg });
+      }
+
+      const distribution = service.recordDistribution({
+        distributionId: 'DIST-POC-001',
+        fpsId: 'FPS-101',
+        rationCardHash: 'demo-ration-card-hash',
+        beneficiaryRefHash: 'beneficiary-hash',
+        commodity: 'Rice',
+        deliveredKg: 25,
+        authMode: AuthMode.MOCK_OTP,
+        authResult: AuthResult.SUCCESS,
+        authTxnRefHash: 'auth-ref-poc-001',
+        dealerId: 'FPS-DEALER-101',
+        timestamp: '2026-06-30T10:00:00.000Z'
+      });
+      expect(distribution.ledgerTxId).toBeDefined();
+
+      expect(() =>
+        service.recordDistribution({
+          distributionId: 'DIST-POC-002',
+          fpsId: 'FPS-101',
+          rationCardHash: 'demo-ration-card-hash',
+          beneficiaryRefHash: 'beneficiary-hash',
+          commodity: 'Rice',
+          deliveredKg: 25,
+          authMode: AuthMode.MOCK_OTP,
+          authResult: AuthResult.SUCCESS,
+          authTxnRefHash: 'auth-ref-poc-duplicate',
+          dealerId: 'FPS-DEALER-101',
+          timestamp: '2026-06-30T10:05:00.000Z'
+        })
+      ).toThrow(/Requested quantity exceeds balance/);
+      expect(service.getAlerts().some((alert) => alert.alertType === AlertType.DUPLICATE_CLAIM)).toBe(true);
+
+      service.createOrUpdateEntitlement({
+        rationCardHash: 'exception-ration-card-hash',
+        commodity: 'Rice',
+        month: '2026-06',
+        monthlyEntitlementKg: 10,
+        alreadyLiftedKg: 0,
+        availableBalanceKg: 10,
+        active: true
+      });
+      const exceptionDistribution = service.recordDistribution({
+        distributionId: 'DIST-POC-EXCEPTION',
+        fpsId: 'FPS-101',
+        rationCardHash: 'exception-ration-card-hash',
+        beneficiaryRefHash: 'exception-beneficiary-hash',
+        commodity: 'Rice',
+        deliveredKg: 10,
+        authMode: AuthMode.SUPERVISOR_EXCEPTION,
+        authResult: AuthResult.EXCEPTION_APPROVED,
+        authTxnRefHash: 'auth-ref-poc-exception',
+        dealerId: 'FPS-DEALER-101',
+        timestamp: '2026-06-30T10:10:00.000Z'
+      });
+      expect(exceptionDistribution.distributionId).toBe('DIST-POC-EXCEPTION');
+      expect(service.getAlerts().some((alert) => alert.alertType === AlertType.UNAUTHORIZED_TRANSACTION)).toBe(true);
     } finally {
       await cleanup(service, statePath);
     }

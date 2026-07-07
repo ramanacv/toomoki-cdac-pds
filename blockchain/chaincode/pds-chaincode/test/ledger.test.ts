@@ -184,7 +184,8 @@ describe('PdsLedgerEngine', () => {
       authMode: auth.authMode,
       authResult: auth.authResult,
       authTxnRefHash: auth.authTxnRefHash,
-      dealerId: 'DEALER-001'
+      dealerId: 'DEALER-001',
+      timestamp: '2026-06-09T10:10:00.000Z'
     });
 
     expect(distribution.ledgerTxId).toBeDefined();
@@ -357,10 +358,23 @@ describe('PdsLedgerEngine', () => {
     // Total conserved across both orgs.
     expect(stockOf('PROC-001', 'Wheat') + stockOf('MLL-001', 'Wheat')).toBe(100);
 
-    // Re-dispatch of a RECEIVED lot must be rejected (lot is now owned by MLL-001).
+    // The remaining stock can still be dispatched by the holder even after a
+    // partial receipt moved the lot's currentOwner to the receiving org.
+    engine.dispatchLot({
+      transferId: 'TR-CONSERVE-2',
+      lotId: 'LOT-CONSERVE',
+      fromOrg: 'PROC-001',
+      toOrg: 'MLL-001',
+      dispatchedQtyKg: 40,
+      vehicleNo: 'KA01AB0002'
+    });
+    expect(stockOf('PROC-001', 'Wheat')).toBe(0);
+    engine.receiveLot({ transferId: 'TR-CONSERVE-2', receivedQtyKg: 40 });
+
+    // Dispatch beyond the sender's remaining stock must still be rejected.
     expect(() =>
       engine.dispatchLot({
-        transferId: 'TR-CONSERVE-2',
+        transferId: 'TR-CONSERVE-3',
         lotId: 'LOT-CONSERVE',
         fromOrg: 'PROC-001',
         toOrg: 'MLL-001',
@@ -511,7 +525,8 @@ describe('PdsLedgerEngine', () => {
       authMode: auth.authMode,
       authResult: auth.authResult,
       authTxnRefHash: auth.authTxnRefHash,
-      dealerId: 'DEALER-1'
+      dealerId: 'DEALER-1',
+      timestamp: '2026-06-09T10:10:00.000Z'
     });
     expect(() =>
       engine.recordDistribution({
@@ -524,7 +539,8 @@ describe('PdsLedgerEngine', () => {
         authMode: auth.authMode,
         authResult: auth.authResult,
         authTxnRefHash: auth.authTxnRefHash,
-        dealerId: 'DEALER-1'
+        dealerId: 'DEALER-1',
+        timestamp: '2026-06-09T10:10:00.000Z'
       })
     ).toThrow(/already exists/);
   });

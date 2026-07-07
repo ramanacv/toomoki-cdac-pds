@@ -139,6 +139,19 @@ type PlannedLeg = {
 
 const plannedLegs: PlannedLeg[] = [
   {
+    id: 'TR-POC-PROC-FCI',
+    lotId: 'LOT-RICE-2026-001',
+    fromOrg: 'PROC-001',
+    toOrg: 'FCI-001',
+    label: 'Dispatch procurement stock to FCI',
+    detail: 'Procurement centre hands the seeded lot to FCI before central buffer movement.',
+    roles: ['PROCUREMENT'],
+    qtyKg: 1000,
+    vehicleNo: 'KA01AB1999',
+    stage: 'I',
+    transporterId: 'TRANS-001'
+  },
+  {
     id: 'TR-POC-FCI-BUF',
     lotId: 'LOT-RICE-2026-001',
     fromOrg: 'FCI-001',
@@ -272,6 +285,7 @@ export function getRoleQueue(context: WorkflowContext, role: DemoRole): Workflow
 export function getWorkflowActions(context: WorkflowContext): WorkflowActionSpec[] {
   const actions: WorkflowActionSpec[] = [];
   const stageTwo = findTransfer(context.transfers, 'TR-POC-MILLER-ISSUE');
+  const stageTwoApproved = context.ledgerEvents?.some((event) => event.entityId === 'TR-POC-MILLER-ISSUE' && isAuthorizationEvent(event.eventType));
   const millingReceived = isReceived(findTransfer(context.transfers, 'TR-POC-DEPOT-MILLER'));
   const transformed = context.ledgerEvents?.some((event) => event.eventType === 'TransformLot' && event.entityId === DEMO_LOT_ID);
   if (millingReceived && !transformed) {
@@ -296,7 +310,7 @@ export function getWorkflowActions(context: WorkflowContext): WorkflowActionSpec
     });
     return actions;
   }
-  if (!stageTwo) {
+  if (!stageTwo && !stageTwoApproved) {
     actions.push({
       id: 'RO-DSO-POC-001',
       label: 'Approve Stage-II RO-lite movement',
@@ -317,7 +331,7 @@ export function getWorkflowActions(context: WorkflowContext): WorkflowActionSpec
     const stageTwoMissingApproval =
       leg.stage === 'II' &&
       leg.id === 'TR-POC-MILLER-ISSUE' &&
-      !context.ledgerEvents?.some((event) => event.entityId === leg.id && isAuthorizationEvent(event.eventType));
+      !stageTwoApproved;
 
     if (!transfer) {
       actions.push({
@@ -366,8 +380,8 @@ export function getWorkflowActions(context: WorkflowContext): WorkflowActionSpec
   if (endpointReceipts && !context.distributions.some((item) => item.distributionId === 'DIST-POC-001')) {
     actions.push({
       id: 'DIST-POC-001',
-      label: 'Issue beneficiary ration',
-      detail: 'Record successful AAY/PHH/NPH-aware beneficiary distribution after simulated auth.',
+      label: 'Authenticate and issue beneficiary ration',
+      detail: 'FPS operator verifies the ration-card holder with mock OTP/biometric auth, records the household delivery, and writes the citizen receipt proof.',
       roles: ['FPS'],
       status: 'pending',
       request: {

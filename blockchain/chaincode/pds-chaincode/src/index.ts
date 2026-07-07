@@ -329,7 +329,8 @@ export class PdsLedgerEngine {
     if (lot.status === LotStatus.DISPATCHED) {
       throw new Error(`Lot ${lot.lotId} is already in transit (DISPATCHED); cannot re-dispatch until received`);
     }
-    if (lot.currentOwner !== input.fromOrg) {
+    const senderStock = this.stock.get(keyFor(input.fromOrg, lot.commodity)) ?? 0;
+    if (lot.currentOwner !== input.fromOrg && senderStock < input.dispatchedQtyKg) {
       throw new Error(`Lot ${lot.lotId} is owned by ${lot.currentOwner}, not ${input.fromOrg}`);
     }
     if (input.dispatchedQtyKg <= 0) {

@@ -20,6 +20,7 @@ const emptyContext: WorkflowContext = {
 };
 
 const completedTransfers = [
+  ['TR-POC-PROC-FCI', 'PROC-001', 'FCI-001', 1000],
   ['TR-POC-FCI-BUF', 'FCI-001', 'FCI-BUF-001', 1000],
   ['TR-POC-BUF-DEPOT', 'FCI-BUF-001', 'GODOWN-S-001', 1000],
   ['TR-POC-DEPOT-MILLER', 'GODOWN-S-001', 'MLL-001', 1000],
@@ -58,6 +59,20 @@ describe('workflow actions', () => {
     expect(result.context.ledgerEvents).toHaveLength(1);
   });
 
+  it('advances to procurement dispatch after RO approval', () => {
+    const result = applyMockWorkflowAction(emptyContext, {
+      kind: 'authorize-movement',
+      transferId: 'TR-POC-MILLER-ISSUE',
+      authorizedBy: 'DSO-001'
+    });
+
+    const action = getNextWorkflowAction(result.context);
+    expect(action?.id).toBe('TR-POC-PROC-FCI');
+    expect(action?.request.kind).toBe('dispatch');
+    expect(getRoleQueue(result.context, 'PROCUREMENT')).toHaveLength(1);
+    expect(getRoleQueue(result.context, 'FCI_DEPOT')).toHaveLength(0);
+  });
+
   it('blocks unauthorized Stage-II dispatch and raises an audit alert', () => {
     const result = applyMockWorkflowAction(emptyContext, {
       kind: 'dispatch',
@@ -77,7 +92,7 @@ describe('workflow actions', () => {
   });
 
   it('offers and applies the milling transform after stock reaches the miller', () => {
-    const millerReady = completedTransfers.slice(0, 3);
+    const millerReady = completedTransfers.slice(0, 4);
     const action = getNextWorkflowAction({
       ...emptyContext,
       transfers: millerReady,
@@ -144,6 +159,30 @@ describe('workflow actions', () => {
   });
 
   it('tracks the full POC workflow progress', () => {
-    expect(getWorkflowProgress(emptyContext)).toEqual({ completed: 0, total: 12 });
+    expect(getWorkflowProgress(emptyContext)).toEqual({ completed: 0, total: 13 });
+  });
+
+  it('can replay the full mock role-workbench action graph to completion', () => {
+    let context: WorkflowContext = emptyContext;
+    const executed: string[] = [];
+
+    for (let index = 0; index < 30; index += 1) {
+      const action = getNextWorkflowAction(context);
+      if (!action) {
+        break;
+      }
+      executed.push(action.id);
+      context = applyMockWorkflowAction(context, action.request).context;
+    }
+
+    expect(executed).toContain('RO-DSO-POC-001');
+    expect(executed).toContain('TR-POC-PROC-FCI');
+    expect(executed).toContain('TR-POC-ISSUE-FPS');
+    expect(executed).toContain('DIST-POC-001');
+    expect(executed).toContain('DIST-POC-002');
+    expect(executed).toContain('DIST-POC-EXCEPTION');
+    expect(getNextWorkflowAction(context)).toBeNull();
+    const progress = getWorkflowProgress(context);
+    expect(progress.completed).toBe(progress.total);
   });
 });
