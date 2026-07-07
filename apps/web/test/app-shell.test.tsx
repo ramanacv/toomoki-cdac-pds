@@ -37,7 +37,7 @@ vi.mock('@/api.js', () => ({
 }));
 
 import { AppRoutes } from '@/App.js';
-import { probeApi } from '@/api.js';
+import { loadWorkspaceData, probeApi } from '@/api.js';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -126,6 +126,39 @@ describe('app shell', () => {
 
     expect(await sidebar().findByRole('link', { name: 'Distribution' })).toBeInTheDocument();
     expect(sidebar().queryByRole('link', { name: 'Stakeholders' })).not.toBeInTheDocument();
+  });
+
+  it('hides the auditor probe on the audit page until it is runnable', async () => {
+    await renderApp('/audit?role=AUDITOR');
+
+    expect(await screen.findByRole('heading', { name: 'Audit signals and evidence' })).toBeInTheDocument();
+    expect(screen.queryByText('Attempt duplicate claim')).not.toBeInTheDocument();
+  });
+
+  it('surfaces the duplicate-claim probe to auditors on the audit page', async () => {
+    const base = await (loadWorkspaceData as unknown as { getMockImplementation: () => () => Promise<Record<string, unknown>> })
+      .getMockImplementation()!();
+    (loadWorkspaceData as unknown as { mockResolvedValueOnce: (v: unknown) => void }).mockResolvedValueOnce({
+      ...base,
+      distributions: [
+        ...(base.distributions as unknown[]),
+        {
+          distributionId: 'DIST-POC-001',
+          deliveredKg: 25,
+          rationCardHash: 'demo-ration-card-hash',
+          commodity: 'Rice',
+          fpsId: 'FPS-101',
+          authResult: 'SUCCESS',
+          authTxnRefHash: 'auth-ref-poc',
+          ledgerTxId: 'TX-POC'
+        }
+      ]
+    });
+
+    await renderApp('/audit?role=AUDITOR');
+
+    expect(await screen.findByText('Attempt duplicate claim')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Audit signals and evidence' })).toBeInTheDocument();
   });
 
   it('switches scenarios through the demo controls drawer', async () => {
