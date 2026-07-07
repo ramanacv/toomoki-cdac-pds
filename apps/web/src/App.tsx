@@ -1,70 +1,100 @@
-import { useState } from 'react';
-import { BrowserRouter, Navigate, Route, Routes, useSearchParams } from 'react-router-dom';
-import type { DemoRole, DemoScenario } from '@/demo-model.js';
-import { LoginPage } from '@/pages/LoginPage.js';
-import { DashboardPage } from '@/pages/DashboardPage.js';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { WorkspaceLayout } from '@/pages/WorkspaceLayout.js';
 import { AdminDashboard } from '@/pages/AdminDashboard.js';
+import { DefaultScreenRedirect, ScreenGuard } from '@/pages/workspace/ScreenGuard.js';
+import { OverviewPage } from '@/pages/workspace/OverviewPage.js';
+import { WorkbenchPage } from '@/pages/workspace/WorkbenchPage.js';
+import { StakeholdersPage } from '@/pages/workspace/StakeholdersPage.js';
+import { LotsPage } from '@/pages/workspace/LotsPage.js';
+import { TransfersPage } from '@/pages/workspace/TransfersPage.js';
+import { AllocationsPage } from '@/pages/workspace/AllocationsPage.js';
+import { DistributionPage } from '@/pages/workspace/DistributionPage.js';
+import { AuditAlertsPage } from '@/pages/workspace/AuditAlertsPage.js';
+import { VerifyPage } from '@/pages/workspace/VerifyPage.js';
 import { Toaster } from '@/components/ui/sonner.js';
 import { TooltipProvider } from '@/components/ui/tooltip.js';
 
-const VALID_ROLES: DemoRole[] = [
-  'MANAGEMENT',
-  'CONTROL_OFFICE',
-  'FCI_DEPOT',
-  'DEPOT',
-  'FPS',
-  'WELFARE_INSTITUTE',
-  'SHIV_BHOJAN_OPERATOR',
-  'AUDITOR',
-  'DEPARTMENT',
-  'PROCUREMENT',
-  'GODOWN'
-];
-const VALID_SCENARIOS: DemoScenario[] = ['happy-path', 'short-receipt', 'duplicate-claim'];
-
-function parseRole(value: string | null): DemoRole {
-  return VALID_ROLES.includes(value as DemoRole) ? (value as DemoRole) : 'MANAGEMENT';
-}
-
-function parseScenario(value: string | null): DemoScenario {
-  return VALID_SCENARIOS.includes(value as DemoScenario) ? (value as DemoScenario) : 'happy-path';
-}
-
-function WorkspaceRoute() {
-  const [params, setParams] = useSearchParams();
-  const [authenticated, setAuthenticated] = useState(false);
-  const [operatorName, setOperatorName] = useState('Demo Officer');
-  const role = parseRole(params.get('role'));
-  const scenario = parseScenario(params.get('scenario'));
-
-  const updateParam = (key: 'role' | 'scenario', value: string) => {
-    const next = new URLSearchParams(params);
-    next.set(key, value);
-    setParams(next, { replace: true });
-  };
-
-  if (!authenticated) {
-    return (
-      <LoginPage
-        apiOnline={false}
-        operatorName={operatorName}
-        role={role}
-        onOperatorNameChange={setOperatorName}
-        onRoleChange={(next) => updateParam('role', next)}
-        onSignIn={() => setAuthenticated(true)}
-        adminHref="/admin"
-      />
-    );
-  }
-
+export function AppRoutes() {
   return (
-    <DashboardPage
-      initialRole={role}
-      initialScenario={scenario}
-      operatorName={operatorName}
-      onLogout={() => setAuthenticated(false)}
-      adminHref="/admin"
-    />
+    <Routes>
+      <Route path="/" element={<WorkspaceLayout />}>
+        <Route index element={<DefaultScreenRedirect />} />
+        <Route
+          path="dashboard"
+          element={
+            <ScreenGuard screen="dashboard">
+              <OverviewPage />
+            </ScreenGuard>
+          }
+        />
+        <Route
+          path="workbench"
+          element={
+            <ScreenGuard screen="workbench">
+              <WorkbenchPage />
+            </ScreenGuard>
+          }
+        />
+        <Route
+          path="stakeholders"
+          element={
+            <ScreenGuard screen="stakeholders">
+              <StakeholdersPage />
+            </ScreenGuard>
+          }
+        />
+        <Route
+          path="lots"
+          element={
+            <ScreenGuard screen="lots">
+              <LotsPage />
+            </ScreenGuard>
+          }
+        />
+        <Route
+          path="transfers"
+          element={
+            <ScreenGuard screen="transfers">
+              <TransfersPage />
+            </ScreenGuard>
+          }
+        />
+        <Route
+          path="allocations"
+          element={
+            <ScreenGuard screen="allocations">
+              <AllocationsPage />
+            </ScreenGuard>
+          }
+        />
+        <Route
+          path="distribution"
+          element={
+            <ScreenGuard screen="distribution">
+              <DistributionPage />
+            </ScreenGuard>
+          }
+        />
+        <Route
+          path="audit"
+          element={
+            <ScreenGuard screen="audit-alerts">
+              <AuditAlertsPage />
+            </ScreenGuard>
+          }
+        />
+        <Route
+          path="verify"
+          element={
+            <ScreenGuard screen="verify">
+              <VerifyPage />
+            </ScreenGuard>
+          }
+        />
+      </Route>
+      <Route path="/admin" element={<AdminDashboard />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   );
 }
 
@@ -75,13 +105,9 @@ export function App() {
         <a href="#main" className="skip-link">
           Skip to content
         </a>
-        <Routes>
-          <Route path="/" element={<WorkspaceRoute />} />
-          <Route path="/admin" element={<AdminDashboard />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+        <AppRoutes />
         <Toaster />
       </TooltipProvider>
     </BrowserRouter>
   );
-};
+}

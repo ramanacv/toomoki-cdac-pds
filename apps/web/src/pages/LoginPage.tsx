@@ -3,7 +3,6 @@ import type { DemoRole } from '@/demo-model.js';
 import { roleProfiles, screenDefinitions, getRoleScreens } from '@/demo-model.js';
 import { RuntimeCard } from '@/components/RuntimeCard';
 import { Panel } from '@/components/Panel';
-import { RoleTabs } from '@/components/RoleTabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -32,16 +31,13 @@ export function LoginPage({
   const [localName, setLocalName] = useState(operatorName);
 
   return (
-    <main className="mx-auto w-full min-h-screen max-w-[1240px] px-4 py-10">
-      <section className="mb-6 grid gap-6 md:grid-cols-[minmax(0,1.3fr)_minmax(290px,0.7fr)]">
-        <div className="surface-blur relative overflow-hidden rounded-3xl p-8">
-          <p className="eyebrow">PDS-Chain MVP login</p>
-          <h1 className="max-w-[13ch] text-4xl font-semibold leading-tight tracking-tight md:text-5xl">
-            Sign in to the role-aware demo workspace.
-          </h1>
-          <p className="mt-4 max-w-[66ch] leading-relaxed text-muted-foreground">
-            Use a demo role to open the screens relevant to your job: procurement, godown, FPS,
-            department, or audit.
+    <main className="mx-auto w-full min-h-screen max-w-[880px] px-4 py-10">
+      <section className="mb-6 grid gap-6 md:grid-cols-[minmax(0,1fr)_minmax(290px,0.8fr)]">
+        <div className="px-1 py-2">
+          <p className="eyebrow">PDS-Chain</p>
+          <h1 className="text-3xl font-semibold tracking-tight">Sign in</h1>
+          <p className="mt-2 leading-relaxed text-muted-foreground">
+            Choose a demo role to open the screens relevant to your job.
           </p>
         </div>
         <RuntimeCard
@@ -114,10 +110,6 @@ export function LoginPage({
           <Button variant="secondary" asChild>
             <a href={adminHref}>Open admin console</a>
           </Button>
-        </div>
-
-        <div className="mt-6">
-          <RoleTabs role={role} onChange={onRoleChange} />
         </div>
       </Panel>
     </main>
