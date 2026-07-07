@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { AlertType, AuthMode, AuthResult, TransferStatus } from '@pds/shared-types';
-import { demoLots } from '../src/demo-model.js';
+import { demoEntitlements, demoLots } from '../src/demo-model.js';
 import {
   applyMockWorkflowAction,
   getNextWorkflowAction,
@@ -16,6 +16,7 @@ const emptyContext: WorkflowContext = {
   allocations: [],
   authTransactions: [],
   distributions: [],
+  entitlements: demoEntitlements,
   alerts: [],
   ledgerEvents: []
 };
@@ -178,7 +179,8 @@ describe('workflow actions', () => {
           timestamp: '2026-06-09T10:05:00.000Z',
           ledgerTxId: 'TX-1'
         }
-      ]
+      ],
+      entitlements: demoEntitlements
     });
 
     expect(action?.request.kind).toBe('duplicate-distribute');

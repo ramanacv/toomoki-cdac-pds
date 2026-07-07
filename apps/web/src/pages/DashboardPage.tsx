@@ -119,6 +119,7 @@ export function DashboardPage({
             allocations={workspace.allocations}
             authTransactions={workspace.authTransactions}
             distributions={workspace.distributions}
+            entitlements={workspace.entitlements}
             alerts={workspace.alerts}
             ledgerEvents={workspace.ledgerEvents}
             onComplete={workspace.refresh}

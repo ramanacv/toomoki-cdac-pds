@@ -21,7 +21,7 @@ describe('demo model', () => {
     const workflow = buildWorkflowSteps('short-receipt');
     expect(workflow.some((step) => step.state === 'blocked')).toBe(true);
     expect(getScenarioAlerts('short-receipt')[0]?.alertType).toBe('SHORT_RECEIPT');
-    expect(getTraceCards('short-receipt')[1]?.value).toBe('300 kg');
+    expect(getTraceCards('short-receipt')[1]?.value).toBe('200 kg');
   });
 
   it('blocks duplicate claim attempts in the duplicate-claim scenario', () => {

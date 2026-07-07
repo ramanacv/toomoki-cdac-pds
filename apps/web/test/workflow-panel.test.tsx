@@ -8,7 +8,7 @@ vi.mock('@/api.js', () => ({
 }));
 
 import { executeWorkflowAction } from '@/api.js';
-import { demoLots } from '@/demo-model.js';
+import { demoEntitlements, demoLots } from '@/demo-model.js';
 import { demoQuantities } from '@pds/fixtures';
 import { TransferStatus } from '@pds/shared-types';
 
@@ -18,6 +18,7 @@ const baseProps = {
   allocations: [],
   authTransactions: [],
   distributions: [],
+  entitlements: demoEntitlements,
   alerts: [],
   ledgerEvents: [],
   onComplete: vi.fn().mockResolvedValue(undefined),

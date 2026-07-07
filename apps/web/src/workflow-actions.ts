@@ -5,6 +5,7 @@ import type {
   DistributionTransaction,
   FPSAllocation,
   LedgerEvent,
+  MonthlyEntitlement,
   TransferOrder
 } from '@pds/shared-types';
 import { AlertType, AuthMode, AuthResult, LotStatus, TransferStatus } from '@pds/shared-types';
@@ -14,8 +15,9 @@ import type { DemoRole } from './demo-model.js';
 const DEMO_LOT_ID = 'LOT-RICE-2026-002';
 const DEMO_RATION_CARD_HASH = 'demo-ration-card-hash';
 const DEMO_BENEFICIARY_HASH = 'beneficiary-hash';
-const DEMO_MONTH = '2026-06';
 const now = () => new Date('2026-06-30T10:00:00.000Z').toISOString();
+const monthTimestamp = (month: string) => `${month}-15T10:00:00.000Z`;
+const monthKey = (timestamp: string) => timestamp.slice(0, 7);
 
 export type WorkflowActionRequest =
   | {
@@ -91,6 +93,7 @@ export type WorkflowActionRequest =
         authResult: AuthResult;
         authTxnRefHash: string;
         dealerId: string;
+        timestamp?: string;
         approvedBy?: string;
         exceptionReason?: string;
       };
@@ -111,6 +114,7 @@ export type WorkflowContext = {
   allocations: FPSAllocation[];
   authTransactions: AuthTransaction[];
   distributions: DistributionTransaction[];
+  entitlements?: MonthlyEntitlement[];
   alerts?: AuditAlert[];
   ledgerEvents?: LedgerEvent[];
 };
@@ -265,6 +269,24 @@ const isAuthorizationEvent = (eventType: string): boolean =>
 
 const txId = (prefix: string, id: string) => `MOCK-${prefix}-${id}`;
 
+const getEntitlementForDistribution = (
+  entitlements: MonthlyEntitlement[] | undefined,
+  rationCardHash: string,
+  commodity: string
+): MonthlyEntitlement | undefined =>
+  [...(entitlements ?? [])]
+    .filter((item) => item.rationCardHash === rationCardHash && item.commodity === commodity)
+    .sort((left, right) => right.month.localeCompare(left.month))[0];
+
+const getDistributionTimestamp = (
+  context: Pick<WorkflowContext, 'entitlements'>,
+  rationCardHash: string,
+  commodity: string
+): string | undefined => {
+  const entitlement = getEntitlementForDistribution(context.entitlements, rationCardHash, commodity);
+  return entitlement ? monthTimestamp(entitlement.month) : undefined;
+};
+
 const evidence = (
   eventType: string,
   entityType: LedgerEvent['entityType'],
@@ -379,6 +401,7 @@ export function getWorkflowActions(context: WorkflowContext): WorkflowActionSpec
   );
 
   if (endpointReceipts && !context.distributions.some((item) => item.distributionId === 'DIST-POC-001')) {
+    const timestamp = getDistributionTimestamp(context, DEMO_RATION_CARD_HASH, 'Rice');
     actions.push({
       id: 'DIST-POC-001',
       label: 'Authenticate and issue beneficiary ration',
@@ -397,7 +420,8 @@ export function getWorkflowActions(context: WorkflowContext): WorkflowActionSpec
           authMode: AuthMode.MOCK_OTP,
           authResult: AuthResult.SUCCESS,
           authTxnRefHash: 'auth-ref-poc-001',
-          dealerId: 'FPS-DEALER-101'
+          dealerId: 'FPS-DEALER-101',
+          ...(timestamp ? { timestamp } : {})
         }
       }
     });
@@ -405,6 +429,7 @@ export function getWorkflowActions(context: WorkflowContext): WorkflowActionSpec
 
   if (context.distributions.some((item) => item.distributionId === 'DIST-POC-001')) {
     if (!context.alerts?.some((alert) => alert.alertId === 'ALERT-POC-DUPLICATE')) {
+      const timestamp = getDistributionTimestamp(context, DEMO_RATION_CARD_HASH, 'Rice');
       actions.push({
         id: 'DIST-POC-002',
         label: 'Attempt duplicate claim',
@@ -423,13 +448,15 @@ export function getWorkflowActions(context: WorkflowContext): WorkflowActionSpec
             authMode: AuthMode.MOCK_OTP,
             authResult: AuthResult.SUCCESS,
             authTxnRefHash: 'auth-ref-poc-duplicate',
-            dealerId: 'FPS-DEALER-101'
+            dealerId: 'FPS-DEALER-101',
+            ...(timestamp ? { timestamp } : {})
           }
         }
       });
     }
 
     if (!context.distributions.some((item) => item.distributionId === 'DIST-POC-EXCEPTION')) {
+      const timestamp = getDistributionTimestamp(context, 'exception-ration-card-hash', 'Rice');
       actions.push({
         id: 'DIST-POC-EXCEPTION',
         label: 'Approve supervisor exception issue',
@@ -450,7 +477,8 @@ export function getWorkflowActions(context: WorkflowContext): WorkflowActionSpec
             authTxnRefHash: 'auth-ref-poc-exception',
             dealerId: 'FPS-DEALER-101',
             approvedBy: 'SUPERVISOR-101',
-            exceptionReason: 'Biometric failure approved at shop.'
+            exceptionReason: 'Biometric failure approved at shop.',
+            ...(timestamp ? { timestamp } : {})
           }
         }
       });
@@ -479,6 +507,7 @@ export function applyMockWorkflowAction(context: WorkflowContext, request: Workf
     allocations: [...context.allocations],
     authTransactions: [...context.authTransactions],
     distributions: [...context.distributions],
+    entitlements: [...(context.entitlements ?? [])],
     alerts: [...(context.alerts ?? [])],
     ledgerEvents: [...(context.ledgerEvents ?? [])]
   };
@@ -568,6 +597,7 @@ export function applyMockWorkflowAction(context: WorkflowContext, request: Workf
     }
     message = `${transfer.transferId} receipt recorded.`;
   } else if (request.kind === 'duplicate-distribute') {
+    const timestamp = request.payload.timestamp ?? getDistributionTimestamp(current, request.payload.rationCardHash, request.payload.commodity) ?? now();
     event = evidence('DUPLICATE_CLAIM_BLOCKED', 'audit', request.payload.distributionId, request.payload);
     current.alerts.push({
       alertId: 'ALERT-POC-DUPLICATE',
@@ -576,14 +606,15 @@ export function applyMockWorkflowAction(context: WorkflowContext, request: Workf
       riskLevel: 'HIGH',
       message: 'Duplicate or over-entitlement claim blocked before distribution.',
       status: 'OPEN',
-      evidence: { rationCardHash: request.payload.rationCardHash, month: DEMO_MONTH, deliveredKg: request.payload.deliveredKg },
-      createdAt: now()
+      evidence: { rationCardHash: request.payload.rationCardHash, month: monthKey(timestamp), deliveredKg: request.payload.deliveredKg },
+      createdAt: timestamp
     });
     message = 'Duplicate claim blocked and written to the auditor queue.';
   } else if (request.kind === 'distribute' || request.kind === 'supervisor-exception-distribute') {
+    const timestamp = request.payload.timestamp ?? getDistributionTimestamp(current, request.payload.rationCardHash, request.payload.commodity) ?? now();
     const distribution: DistributionTransaction = {
       ...request.payload,
-      timestamp: now(),
+      timestamp,
       ledgerTxId: txId('DISTRIBUTION', request.payload.distributionId)
     };
     current.distributions.push(distribution);
@@ -595,7 +626,7 @@ export function applyMockWorkflowAction(context: WorkflowContext, request: Workf
       authResult: request.payload.authResult,
       authTxnRefHash: request.payload.authTxnRefHash,
       ...(request.payload.approvedBy ? { approvedBy: request.payload.approvedBy } : {}),
-      timestamp: now()
+      timestamp
     });
     event = evidence(request.kind === 'supervisor-exception-distribute' ? 'SUPERVISOR_EXCEPTION_DISTRIBUTION' : 'RECORD_DISTRIBUTION', 'distribution', distribution.distributionId, distribution);
     if (request.kind === 'supervisor-exception-distribute') {

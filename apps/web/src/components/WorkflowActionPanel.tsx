@@ -6,6 +6,7 @@ import type {
   FPSAllocation,
   AuditAlert,
   LedgerEvent,
+  MonthlyEntitlement,
   TransferOrder
 } from '@pds/shared-types';
 import { executeWorkflowAction } from '@/api.js';
@@ -35,6 +36,7 @@ type WorkflowActionPanelProps = {
   allocations: FPSAllocation[];
   authTransactions: AuthTransaction[];
   distributions: DistributionTransaction[];
+  entitlements: MonthlyEntitlement[];
   alerts: AuditAlert[];
   ledgerEvents: LedgerEvent[];
   onComplete: () => Promise<void>;
@@ -49,6 +51,7 @@ export function WorkflowActionPanel({
   allocations,
   authTransactions,
   distributions,
+  entitlements,
   alerts,
   ledgerEvents,
   onComplete,
@@ -61,8 +64,8 @@ export function WorkflowActionPanel({
   const [completedActionId, setCompletedActionId] = useState<string | null>(null);
 
   const context = useMemo(
-    () => ({ lots, transfers, allocations, authTransactions, distributions, alerts, ledgerEvents }),
-    [allocations, alerts, authTransactions, distributions, ledgerEvents, lots, transfers]
+    () => ({ lots, transfers, allocations, authTransactions, distributions, entitlements, alerts, ledgerEvents }),
+    [allocations, alerts, authTransactions, distributions, entitlements, ledgerEvents, lots, transfers]
   );
 
   const progress = getWorkflowProgress(context);
@@ -159,9 +162,10 @@ export function WorkflowActionPanel({
         <div className="flex flex-col gap-4">
           <div className="grid gap-3 md:grid-cols-2">
             {displayedActions.map((action) => {
+              const request = action.request;
               const receiveTransfer =
-                action.request.kind === 'receive'
-                  ? transfers.find((transfer) => transfer.transferId === action.request.transferId)
+                request.kind === 'receive'
+                  ? transfers.find((transfer) => transfer.transferId === request.transferId)
                   : undefined;
               const actionAllowed = action.roles.includes(role);
               const allowedRoles = action.roles.map(roleTitle).join(', ');

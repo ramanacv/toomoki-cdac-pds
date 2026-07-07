@@ -12,9 +12,15 @@ export class EntitlementsController {
   entitlements(
     @Param('rationCardHash') rationCardHash: string,
     @Query('commodity') commodity = 'Rice',
-    @Query('month') month = '2026-06'
+    @Query('month') month?: string
   ) {
-    return this.ledger.getEntitlement(rationCardHash, commodity, month);
+    const resolvedMonth =
+      month ??
+      [...this.ledger.listEntitlements()]
+        .filter((entitlement) => entitlement.rationCardHash === rationCardHash && entitlement.commodity === commodity)
+        .sort((left, right) => right.month.localeCompare(left.month))[0]?.month ??
+      new Date().toISOString().slice(0, 7);
+    return this.ledger.getEntitlement(rationCardHash, commodity, resolvedMonth);
   }
 
   @Get('/entitlements')
