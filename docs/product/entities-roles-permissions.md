@@ -307,7 +307,196 @@ All `Get*` operations and `CheckDuplicateClaim` are open to any authenticated MS
 
 ---
 
-## 6. Known Gaps (vs. the entity model)
+## 6. Demo Script — Per-Role Workflow Sequence
+
+A narrator-ready walkthrough. Each role has its own numbered script in the order the actor acts in the chain. Section 6.18 stitches them into a single end-to-end run. Section 6.19 covers exception paths.
+
+Conventions:
+- **REST** = callable today via the API (`apps/api/src/modules/*`).
+- **chaincode-only** = implemented in `PdsLedgerEngine` and MSP-gated, but not yet exposed as a REST endpoint (see §7 gap 3). Until controllers are added, run these via the demo invoker / Fabric gateway directly.
+- Seed IDs come from `mock/entities/stakeholders.json` and `mock/entities/transfers.json`.
+
+### 6.1 DFPD — Department of Food & Public Distribution (central policy)
+
+The chain originator. Authorises the central release of grain to FCI.
+
+1. **(Setup)** Confirm `DFPD-001` is registered with `jurisdiction: CENTRAL`.
+2. **Authorise central movement** — `POST /transfers/TR-SEED-DFPD-FCI/authorize` with `authorizedBy: DFPD-001`, `roRef: RO-CENTRAL-2026-06`. (REST)
+3. **(Observer)** Watch the FCI procurement + buffer-storage legs (§6.2, §6.3) execute against that RO.
+
+### 6.2 FCI — Food Corporation of India (procurement + bulk transport)
+
+1. **Create the commodity lot** — `POST /lots` with `lotId: LOT-RICE-2026-001`, `currentOwner: FCI-001`, `source: FCI procurement`, `quantityKg: 10000`. Opens 10,000 kg stock at FCI. (REST)
+2. **Dispatch to FCI buffer godown** — `POST /transfers` with `fromOrg: FCI-001`, `toOrg: FCI-BUF-001`, `stage: I`, `transporterId: TRANS-001`, `dispatchedQtyKg: 10000`. (REST)
+3. **(Passive)** Transporter `TRANS-001` is recorded on the dispatch leg (in-transit custody; no separate action).
+
+### 6.3 FCI Buffer Godown (central reserve storage)
+
+1. **Receive from FCI** — `POST /transfers/TR-SEED-FCI-BUF/receive` with `receivedQtyKg: 10000`. Stock lands at `FCI-BUF-001`. (REST)
+2. **Dispatch to state depot** — `POST /transfers` with `fromOrg: FCI-BUF-001`, `toOrg: GODOWN-S-001`, `stage: I`, `transporterId: TRANS-001`, `dispatchedQtyKg: 8000`. (REST)
+
+### 6.4 State Food Department (entitlement + stakeholder authority)
+
+Heavy setup role — runs once per demo.
+
+1. **Register stakeholders** — `POST /stakeholders` for each of the 17 actors (or rely on seed). (REST)
+2. **Propose an entitlement rule** — chaincode-only: `ProposeEntitlementRule` with `category: PHH`, `commodity: Rice`, `monthlyKg: 35`, `proposedBy: FOOD-001`. Status → `PENDING_APPROVAL`.
+3. **(Hand-off)** Auditor approves (§6.16 step 1).
+4. **Create monthly entitlement** — chaincode-only: `CreateMonthlyEntitlement` for `demo-ration-card-hash`, validated against the now-active rule.
+5. **Issue ration card** — chaincode-only: `IssueRationCard` for `demo-ration-card-hash`, `cardType: PHH`, `assignedFpsId: FPS-101`.
+6. **Activate ration card** — chaincode-only: `ActivateRationCard` → status `ACTIVE`.
+7. **(End-of-month)** `RolloverUnclaimedQuota` to carry unclaimed balance into the next month. chaincode-only.
+
+### 6.5 DSO / FDO / TSO (district / divisional / taluka supply officers)
+
+Stage-II movement authorisers. They do **not** hold stock; they issue ROs.
+
+1. **DSO authorises depot → miller hop** — `POST /transfers/TR-SEED-SG-MLL/authorize` with `authorizedBy: DSO-001`, `roRef: RO-DSO-2026-06-001`. (REST)
+2. **DSO authorises issue-point → FPS hop** — `POST /transfers/TR-SEED-ISSUE-FPS/authorize` with `authorizedBy: DSO-001`, `roRef: RO-DSO-2026-06-FPS`. (REST)
+3. **TSO authorises block-godown → issue-point hop** — `POST /transfers/TR-SEED-BG-ISSUE/authorize` with `authorizedBy: TSO-001`, `roRef: RO-TSO-2026-06-001`. (REST)
+4. **(Observer)** Stage-II dispatches without an RO + authoriser are rejected by the engine and raise `UNAUTHORIZED_TRANSACTION`.
+
+### 6.6 Procurement Centre (state-side procurement alternative)
+
+Used when grain is procured at state MSP (not via FCI).
+
+1. **Create the lot** — `POST /lots` with `currentOwner: PROC-001`, `source: Procurement Centre 01`. (REST)
+2. **Dispatch to state depot or miller** — `POST /transfers` with `fromOrg: PROC-001`. (REST)
+
+### 6.7 Miller (paddy → rice transformation)
+
+1. **Receive paddy from state depot** — `POST /transfers/TR-SEED-SG-MLL/receive` with `receivedQtyKg: 3000`. Stock lands at `MLL-001` for commodity `Rice` (parent). (REST)
+2. **Transform the lot** — `POST /lots/transform` with `parentLotId: LOT-RICE-2026-001`, `childLotId: LOT-RICE-2026-002`, `transformedBy: MLL-001`, `quantityKg: 2500`, `commodity: Rice`. Consumes 2,500 kg parent stock; opens 2,500 kg child stock; sets `transformedFromLotId`. (REST)
+3. **Dispatch rice to block godown** — `POST /transfers` with `fromOrg: MLL-001`, `toOrg: GODOWN-B-001`, `lotId: LOT-RICE-2026-002`, `stage: II`, `transformedFromLotId: LOT-RICE-2026-001`, `authorizedBy: DSO-001`, `roRef: RO-DSO-2026-06-001`. (REST)
+
+### 6.8 State Government Depot (STATE_GODOWN, Stage-II node)
+
+1. **Receive from FCI buffer** — `POST /transfers/TR-SEED-BUF-SG/receive` with `receivedQtyKg: 8000`. (REST)
+2. **Dispatch to miller** — `POST /transfers` with `fromOrg: GODOWN-S-001`, `toOrg: MLL-001`, `stage: I`, `transporterId: TRANS-001`. (REST)
+3. **(Optional) Allocate to FPS** — `POST /fps-allocations` with `sourceGodownId: GODOWN-S-001`, `fpsId: FPS-101`. (REST) — alternative path to the issue-point flow.
+4. **(Optional) Record FPS receipt** — `POST /fps-allocations/{id}/receipt`. (REST)
+
+### 6.9 Block Godown (sub-district buffer)
+
+1. **Receive rice from miller** — `POST /transfers/TR-SEED-MLL-BG/receive` with `receivedQtyKg: 2500`. (REST)
+2. **Dispatch to issue point** — `POST /transfers` with `fromOrg: GODOWN-B-001`, `toOrg: ISSUE-001`, `stage: II`, `authorizedBy: TSO-001`, `roRef: RO-TSO-2026-06-001`, `transporterId: TRANS-001`. (REST)
+
+### 6.10 Issue Point (final dispatch node to retail)
+
+1. **Receive from block godown** — `POST /transfers/TR-SEED-BG-ISSUE/receive` with `receivedQtyKg: 1800`. (REST)
+2. **Dispatch to FPS** — `POST /transfers` with `fromOrg: ISSUE-001`, `toOrg: FPS-101`, `stage: II`, `authorizedBy: DSO-001`, `roRef: RO-DSO-2026-06-FPS`, `dispatchedQtyKg: 600`, `transporterId: TRANS-001`. (REST)
+3. **Dispatch to Welfare Institute** — `POST /transfers` with `toOrg: WI-101`, `dispatchedQtyKg: 300`, `roRef: RO-DSO-2026-06-WI`. (REST)
+4. **Dispatch to Shiv Bhojan Eatery** — `POST /transfers` with `toOrg: SBE-101`, `dispatchedQtyKg: 300`, `roRef: RO-DSO-2026-06-SBE`. (REST)
+
+### 6.11 Transporter (in-transit custody)
+
+Passive role — no standalone steps. Recorded via `transporterId` on every `DispatchLot`. To demo transporter evidence, open `GET /transfers/{id}` and show the `transporterId`, `vehicleNo`, and dispatch/receive timestamps.
+
+### 6.12 Fair Price Shop (retail distribution + beneficiary auth)
+
+The citizen-facing endpoint. Most user-visible demo action.
+
+1. **Receive allocation from issue point** — `POST /transfers/TR-SEED-ISSUE-FPS/receive` with `receivedQtyKg: 600`. Stock lands at `FPS-101`. (REST)
+2. **Register beneficiary hash** — chaincode-only: `RegisterBeneficiaryHash` for `beneficiary-hash` (no PII).
+3. **Authenticate beneficiary** — `POST /auth/mock-otp` (or `/auth/simulated-biometric`) with `rationCardHash: demo-ration-card-hash`, `beneficiaryRefHash: beneficiary-hash`. Returns `authTxnRefHash`. (REST)
+4. **(Supervisor-exception path)** `POST /auth/supervisor-exception` with `approvedBy` + reason → `authResult: EXCEPTION_APPROVED`. Engine raises `UNAUTHORIZED_TRANSACTION` for auditor review. (REST)
+5. **Validate entitlement** — `POST /entitlements/validate` with the ration-card hash, commodity, month. (REST)
+6. **Record distribution** — `POST /distributions` with `fpsId: FPS-101`, `dealerId`, `authTxnRefHash`, `deliveredKg: 25`. Engine checks active card, entitlement balance, stock; writes `RecordDistribution`. (REST)
+7. **(Duplicate-claim guard)** A second `POST /distributions` for the same card/month beyond balance raises `DUPLICATE_CLAIM` and is rejected.
+8. **Issue masked receipt** — `GET /distributions/{id}/receipt`. (REST)
+
+### 6.13 Welfare Institute (bulk beneficiary receipt)
+
+1. **Receive from issue point** — `POST /transfers/TR-SEED-ISSUE-WI/receive`. In the seed, `receivedQtyKg: 280` against `dispatchedQtyKg: 300` → status `RECEIVED_WITH_SHORTAGE` and a `SHORT_RECEIPT` audit alert. (REST)
+2. **(Observer)** Auditor picks up the shortage alert (§6.16 step 4).
+
+### 6.14 Shiv Bhojan Eatery (cooked-meal input)
+
+1. **Receive from issue point** — `POST /transfers/TR-SEED-ISSUE-SBE/receive` with `receivedQtyKg: 300`. (REST)
+
+### 6.15 Beneficiary / Citizen (ration-card holder, not a stakeholder)
+
+1. **(Lift ration)** Authenticated at FPS (§6.12 step 3-6).
+2. **File a grievance** — chaincode-only: `FileGrievance` with `grievanceType: QUANTITY_SHORT`, `fpsId: FPS-101`, `rationCardHash`. 7-day SLA starts.
+3. **(Portability - MVP)** `TransferRationCard` to a different FPS for ONORC lifts (chaincode-only today).
+
+### 6.16 Auditor (oversight + approval authority)
+
+1. **Approve the entitlement rule** — chaincode-only: `ApproveEntitlementRule` for the rule proposed in §6.4 step 2. Supersedes any prior active rule; status → `ACTIVE`.
+2. **Inspect lot trace** — `GET /trace/lots/LOT-RICE-2026-002`. Returns the parent→child lineage spanning FCI → buffer → depot → miller → block godown → issue point → retail. (REST)
+3. **Inspect distribution trace** — `GET /trace/distributions/{id}`. (REST)
+4. **Review alerts** — `GET /audit-alerts`. Shortage at WI, supervisor exceptions, duplicate claims all visible. (REST)
+5. **Resolve an alert** — `POST /audit-alerts/{alertId}/resolve` with `resolvedBy: AUD-001`, `resolutionNote`. (REST)
+6. **Escalate overdue grievances** — chaincode-only: `EscalateOverdueGrievances` with the current timestamp. Grievances past SLA → `ESCALATED` + `GRIEVANCE_SLA_BREACH` alerts.
+7. **Verify DB ↔ ledger integrity** — `GET /trace/verify` (or `VerifyDatabaseHash`) comparing the operational DB digest with the ledger digest. (REST)
+8. **(Replay)** `RecordLedgerProof` to project a validated event (auditor-only; event-type allowlist + PII denylist enforced). chaincode-only.
+
+### 6.17 End-to-end combined demo script (happy path)
+
+A single narrator run, in chain order. Read down the column.
+
+| # | Actor | Action | Call |
+|---|---|---|---|
+| 1 | DFPD | Authorise central release | `POST /transfers/TR-SEED-DFPD-FCI/authorize` |
+| 2 | FCI | Create lot `LOT-RICE-2026-001` (10,000 kg) | `POST /lots` |
+| 3 | FCI | Dispatch to FCI buffer (Stage-I, transporter) | `POST /transfers` |
+| 4 | FCI Buffer | Receive 10,000 kg | `POST /transfers/{id}/receive` |
+| 5 | FCI Buffer | Dispatch to State Depot (Stage-I) | `POST /transfers` |
+| 6 | State Depot | Receive 8,000 kg | `POST /transfers/{id}/receive` |
+| 7 | State Dept | Propose entitlement rule (PHH / Rice / 35 kg) | chaincode: `ProposeEntitlementRule` |
+| 8 | Auditor | Approve the rule | chaincode: `ApproveEntitlementRule` |
+| 9 | State Dept | Create monthly entitlement | chaincode: `CreateMonthlyEntitlement` |
+| 10 | State Dept | Issue + activate ration card | chaincode: `IssueRationCard` / `ActivateRationCard` |
+| 11 | DSO | Authorise depot → miller RO | `POST /transfers/{id}/authorize` |
+| 12 | State Depot | Dispatch 3,000 kg to Miller | `POST /transfers` |
+| 13 | Miller | Receive paddy | `POST /transfers/{id}/receive` |
+| 14 | Miller | Transform → child lot `LOT-RICE-2026-002` (2,500 kg) | `POST /lots/transform` |
+| 15 | DSO | Authorise miller → block-godown RO | `POST /transfers/{id}/authorize` |
+| 16 | Miller | Dispatch rice to Block Godown (Stage-II) | `POST /transfers` |
+| 17 | Block Godown | Receive 2,500 kg | `POST /transfers/{id}/receive` |
+| 18 | TSO | Authorise block-godown → issue-point RO | `POST /transfers/{id}/authorize` |
+| 19 | Block Godown | Dispatch 1,800 kg to Issue Point | `POST /transfers` |
+| 20 | Issue Point | Receive 1,800 kg | `POST /transfers/{id}/receive` |
+| 21 | DSO | Authorise issue-point → FPS RO | `POST /transfers/{id}/authorize` |
+| 22 | Issue Point | Dispatch 600 kg to FPS | `POST /transfers` |
+| 23 | Issue Point | Dispatch 300 kg to Welfare Institute | `POST /transfers` |
+| 24 | Issue Point | Dispatch 300 kg to Shiv Bhojan Eatery | `POST /transfers` |
+| 25 | FPS | Receive 600 kg | `POST /transfers/{id}/receive` |
+| 26 | FPS | Authenticate beneficiary (mock OTP) | `POST /auth/mock-otp` |
+| 27 | FPS | Validate entitlement | `POST /entitlements/validate` |
+| 28 | FPS | Record distribution (25 kg) | `POST /distributions` |
+| 29 | Auditor | Inspect lot trace (FCI → FPS) | `GET /trace/lots/LOT-RICE-2026-002` |
+| 30 | Auditor | Verify DB ↔ ledger digest | `GET /trace/verify` |
+
+### 6.18 Exception-path scripts
+
+**A. Short receipt at Welfare Institute** (already in seed)
+- Issue Point dispatches 300 kg to WI-101 (step 23 above).
+- WI receives 280 kg → `POST /transfers/TR-SEED-ISSUE-WI/receive` returns `RECEIVED_WITH_SHORTAGE`, `shortageQtyKg: 20`.
+- Engine raises `SHORT_RECEIPT` alert automatically.
+- Auditor resolves via `POST /audit-alerts/{alertId}/resolve`.
+
+**B. Duplicate claim at FPS**
+- FPS records a distribution for `demo-ration-card-hash` (step 28).
+- A second `POST /distributions` for the same card/month beyond balance → engine raises `DUPLICATE_CLAIM` and rejects the call.
+- Auditor reviews via `GET /audit-alerts`.
+
+**C. Supervisor-exception distribution**
+- FPS calls `POST /auth/supervisor-exception` with `approvedBy` + reason instead of mock OTP.
+- Distribution proceeds with `authResult: EXCEPTION_APPROVED`.
+- Engine raises `UNAUTHORIZED_TRANSACTION` for auditor review.
+
+**D. Grievance SLA breach**
+- Beneficiary files a grievance (chaincode: `FileGrievance`); 7-day SLA starts.
+- Auditor runs `EscalateOverdueGrievances` with a timestamp past `slaDeadlineAt`.
+- Grievance → `ESCALATED`; `GRIEVANCE_SLA_BREACH` alert raised; FPS/Dept resolve via `ResolveGrievance`.
+
+**E. Stage-II dispatch without RO**
+- Any `POST /transfers` with `stage: II` but no `roRef` + `authorizedBy` → engine raises `UNAUTHORIZED_TRANSACTION` and rejects.
+
+---
+
+## 7. Known Gaps (vs. the entity model)
 
 1. **`PdsRole` (5) and Fabric MSPs (5) don't cover the new stakeholder types.** DFPD, FCI, Transporter, Miller, Welfare Institute, Shiv Bhojan Eatery, DSO/FDO/TSO have no dedicated principal — they're forced into one of the 5 coarse MSPs today.
 2. **No per-endpoint RBAC at the API layer.** `BusinessAuthGuard.optionsFor()` returns `{}` by default and no controller overrides it; the `roles` hook is unused.
