@@ -9,6 +9,7 @@ import type {
 } from '@pds/shared-types';
 import { Panel } from '@/components/Panel';
 import { CardTopline, DefinitionList, EntityCard } from '@/components/Entity';
+import { formatDateTime } from '@/lib/constants';
 
 const alertTone: Record<AuditAlert['riskLevel'], 'low' | 'medium' | 'high'> = {
   LOW: 'low',
@@ -50,7 +51,10 @@ export function TransfersPanel({ transfers }: { transfers: TransferOrder[] }) {
             <DefinitionList
               entries={[
                 { label: 'Dispatched', value: `${transfer.dispatchedQtyKg} kg` },
-                { label: 'Received', value: `${transfer.receivedQtyKg ?? 'Pending'} kg` }
+                { label: 'Received', value: transfer.receivedQtyKg == null ? 'Pending' : `${transfer.receivedQtyKg} kg` },
+                { label: 'Dispatch time', value: formatDateTime(transfer.dispatchTimestamp) },
+                { label: 'Receive time', value: formatDateTime(transfer.receiveTimestamp) },
+                ...(transfer.authorizedAt ? [{ label: 'Authorized', value: formatDateTime(transfer.authorizedAt) }] : [])
               ]}
             />
           </EntityCard>
@@ -75,7 +79,8 @@ export function AuthLedgerPanel({ authTransactions }: { authTransactions: AuthTr
             <DefinitionList
               entries={[
                 { label: 'Beneficiary', value: auth.beneficiaryRefHash },
-                { label: 'Auth ref', value: auth.authTxnRefHash }
+                { label: 'Auth ref', value: auth.authTxnRefHash },
+                { label: 'Auth time', value: formatDateTime(auth.timestamp) }
               ]}
             />
           </EntityCard>
@@ -156,7 +161,8 @@ export function DistributionPanel({ distributions }: { distributions: Distributi
             <DefinitionList
               entries={[
                 { label: 'Auth ref', value: distribution.authTxnRefHash },
-                { label: 'Ledger tx', value: distribution.ledgerTxId ?? 'Pending' }
+                { label: 'Ledger tx', value: distribution.ledgerTxId ?? 'Pending' },
+                { label: 'Issued at', value: formatDateTime(distribution.timestamp) }
               ]}
             />
           </EntityCard>
@@ -181,7 +187,9 @@ export function AlertsPanel({ alerts }: { alerts: AuditAlert[] }) {
             <DefinitionList
               entries={[
                 { label: 'Entity', value: alert.entityId },
-                { label: 'Status', value: alert.status }
+                { label: 'Status', value: alert.status },
+                { label: 'Created', value: formatDateTime(alert.createdAt) },
+                ...(alert.resolvedAt ? [{ label: 'Resolved', value: formatDateTime(alert.resolvedAt) }] : [])
               ]}
             />
           </EntityCard>

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type {
   AuthTransaction,
   CommodityLot,
@@ -24,6 +24,8 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { DefinitionList } from '@/components/Entity';
+import { formatDateTime, roleTitle } from '@/lib/constants';
 
 type WorkflowActionPanelProps = {
   apiOnline: boolean;
@@ -56,6 +58,7 @@ export function WorkflowActionPanel({
   const [receiveQtyKg, setReceiveQtyKg] = useState(1000);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [completedActionId, setCompletedActionId] = useState<string | null>(null);
 
   const context = useMemo(
     () => ({ lots, transfers, allocations, authTransactions, distributions, alerts, ledgerEvents }),
@@ -66,16 +69,24 @@ export function WorkflowActionPanel({
   const allActions = getWorkflowActions(context);
   const roleQueue = getRoleQueue(context, role);
   const nextAction = roleQueue.find((action) => action.status !== 'blocked') ?? roleQueue[0] ?? allActions[0] ?? null;
-  const roleAllowed = nextAction ? nextAction.roles.includes(role) : false;
+  const displayedActions = role === 'MANAGEMENT' ? allActions : roleQueue.length > 0 ? roleQueue : nextAction ? [nextAction] : [];
+  const nextActionAllowed = nextAction ? nextAction.roles.includes(role) : false;
+
+  useEffect(() => {
+    setMessage(null);
+    setError(null);
+    setCompletedActionId(null);
+  }, [role]);
 
   const runAction = async (action: WorkflowActionSpec) => {
-    if (!action || !roleAllowed) {
+    if (!action || !action.roles.includes(role) || completedActionId === action.id) {
       return;
     }
 
     setBusy(true);
     setMessage(null);
     setError(null);
+    setCompletedActionId(null);
 
     try {
       const request =
@@ -102,16 +113,19 @@ export function WorkflowActionPanel({
         } else {
           setMessage(`${action.label} completed and persisted through the API.`);
         }
+        setCompletedActionId(action.id);
       } else {
         const result = applyMockWorkflowAction(context, request);
         onMockComplete(result);
         setMessage(`${result.message} Ledger event ${result.evidence.ledgerTxId}.`);
+        setCompletedActionId(action.id);
       }
     } catch (actionError) {
       const text = actionError instanceof Error ? actionError.message : 'Workflow action failed';
       if (action.request.kind === 'duplicate-distribute') {
         setMessage('Duplicate claim blocked as expected.');
         setError(text);
+        setCompletedActionId(action.id);
       } else {
         setError(text);
       }
@@ -138,27 +152,66 @@ export function WorkflowActionPanel({
       {nextAction ? (
         <div className="flex flex-col gap-4">
           <div className="grid gap-3 md:grid-cols-2">
-            {(role === 'MANAGEMENT' ? allActions : roleQueue.length > 0 ? roleQueue : [nextAction]).map((action) => (
-              <div key={action.id} className="rounded-2xl border border-border bg-card/70 p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <strong className="block">{action.label}</strong>
-                  <Badge variant={action.status === 'blocked' ? 'destructive' : 'secondary'}>
-                    {action.status}
-                  </Badge>
+            {displayedActions.map((action) => {
+              const receiveTransfer =
+                action.request.kind === 'receive'
+                  ? transfers.find((transfer) => transfer.transferId === action.request.transferId)
+                  : undefined;
+              const actionAllowed = action.roles.includes(role);
+              const allowedRoles = action.roles.map(roleTitle).join(', ');
+
+              return (
+                <div key={action.id} className="rounded-2xl border border-border bg-card/70 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <strong className="block">{action.label}</strong>
+                    <Badge variant={action.status === 'blocked' ? 'destructive' : 'secondary'}>
+                      {completedActionId === action.id ? 'done' : actionAllowed || role === 'MANAGEMENT' ? action.status : 'upstream'}
+                    </Badge>
+                  </div>
+                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{action.detail}</p>
+                  {role !== 'MANAGEMENT' && !actionAllowed && (
+                    <DefinitionList
+                      className="mt-3"
+                      entries={[
+                        { label: 'Pending with', value: allowedRoles },
+                        { label: 'Selected role', value: roleTitle(role) }
+                      ]}
+                    />
+                  )}
+                  {receiveTransfer && (
+                    <DefinitionList
+                      className="mt-3"
+                      entries={[
+                        { label: 'From', value: receiveTransfer.fromOrg },
+                        { label: 'Dispatch time', value: formatDateTime(receiveTransfer.dispatchTimestamp) },
+                        { label: 'Receive time', value: formatDateTime(receiveTransfer.receiveTimestamp) }
+                      ]}
+                    />
+                  )}
+                  {role !== 'MANAGEMENT' && actionAllowed && (
+                    <Button
+                      type="button"
+                      className="mt-3"
+                      disabled={busy || action.status === 'blocked' || completedActionId === action.id}
+                      onClick={() => void runAction(action)}
+                    >
+                      {busy
+                        ? 'Submitting...'
+                        : completedActionId === action.id
+                          ? 'Done'
+                          : action.status === 'blocked'
+                            ? 'Blocked'
+                            : 'Run action'}
+                    </Button>
+                  )}
+                  {role !== 'MANAGEMENT' && !actionAllowed && (
+                    <Button type="button" variant="secondary" className="mt-3" disabled>
+                      Waiting for {allowedRoles}
+                    </Button>
+                  )}
                 </div>
-                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{action.detail}</p>
-                {role !== 'MANAGEMENT' && action.roles.includes(role) && (
-                  <Button
-                    type="button"
-                    className="mt-3"
-                    disabled={busy || action.status === 'blocked'}
-                    onClick={() => void runAction(action)}
-                  >
-                    {busy ? 'Submitting...' : action.status === 'blocked' ? 'Blocked' : 'Run action'}
-                  </Button>
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {nextAction.request.kind === 'receive' && (
@@ -174,7 +227,7 @@ export function WorkflowActionPanel({
             </div>
           )}
 
-          {!roleAllowed && role !== 'MANAGEMENT' && <Badge variant="secondary">Allowed: {nextAction.roles.join(', ')}</Badge>}
+          {!nextActionAllowed && role !== 'MANAGEMENT' && <Badge variant="secondary">Allowed: {nextAction.roles.map(roleTitle).join(', ')}</Badge>}
         </div>
       ) : (
         <p className="leading-relaxed text-muted-foreground">

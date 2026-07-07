@@ -4,13 +4,29 @@ import { roleProfiles } from '@/demo-model.js';
 export const roleOrder: DemoRole[] = [
   'MANAGEMENT',
   'CONTROL_OFFICE',
+  'DEPARTMENT',
+  'PROCUREMENT',
   'FCI_DEPOT',
+  'GODOWN',
   'DEPOT',
   'FPS',
   'WELFARE_INSTITUTE',
   'SHIV_BHOJAN_OPERATOR',
   'AUDITOR'
 ];
+
+export const workflowRoles = new Set<DemoRole>([
+  'CONTROL_OFFICE',
+  'PROCUREMENT',
+  'FCI_DEPOT',
+  'DEPOT',
+  'FPS',
+  'WELFARE_INSTITUTE',
+  'SHIV_BHOJAN_OPERATOR'
+]);
+
+export const roleCategory = (role: DemoRole): 'workflow' | 'optional' =>
+  workflowRoles.has(role) ? 'workflow' : 'optional';
 
 export const scenarioOptions: Array<{ id: DemoScenario; label: string; short: string }> = [
   { id: 'happy-path', label: 'Happy path', short: 'All custody checkpoints clear.' },
@@ -31,3 +47,14 @@ export const summaryCardData = (summary: {
 ];
 
 export const roleTitle = (role: DemoRole): string => roleProfiles[role].title;
+
+export const formatDateTime = (value?: string): string => {
+  if (!value) return 'Pending';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat('en-IN', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+    hour12: false
+  }).format(date);
+};

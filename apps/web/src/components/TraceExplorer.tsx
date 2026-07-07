@@ -4,6 +4,7 @@ import { Panel } from '@/components/Panel';
 import { buildApiUrl } from '@/api.js';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { formatDateTime } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 
 const accentClass: Record<TraceCard['accent'], string> = {
@@ -138,6 +139,10 @@ export function TraceExplorer({
                 <span className="text-sm text-muted-foreground">
                   {transfer.transferId} · {transfer.dispatchedQtyKg} kg · {transfer.stage ? `Stage-${transfer.stage}` : 'custody'}
                   {transfer.roRef ? ` · ${transfer.roRef}` : ''}
+                </span>
+                <span className="mt-1 block text-xs text-muted-foreground">
+                  Dispatched {formatDateTime(transfer.dispatchTimestamp)} · Received {formatDateTime(transfer.receiveTimestamp)}
+                  {transfer.authorizedAt ? ` · Authorized ${formatDateTime(transfer.authorizedAt)}` : ''}
                 </span>
               </div>
               <span className="text-sm font-semibold text-muted-foreground">{transfer.status}</span>
