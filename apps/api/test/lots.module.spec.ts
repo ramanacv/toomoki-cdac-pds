@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { LotsController } from '../src/modules/lots/lots.controller.js';
 import { createControllerWithFacade, createDemoLedgerFixture, type DemoLedgerFixture } from './helpers/demo-ledger.js';
+import { demoQuantities } from '@pds/fixtures';
 
 describe('LotsModule', () => {
   let fixture: DemoLedgerFixture;
@@ -39,17 +40,20 @@ describe('LotsModule', () => {
       lotId: 'LOT-RICE-2026-001',
       fromOrg: 'PROC-001',
       toOrg: 'MLL-001',
-      dispatchedQtyKg: 1000,
+      dispatchedQtyKg: demoQuantities.stageOneTransferKg,
       vehicleNo: 'KA01LOT0001'
     });
-    fixture.facade.receiveLot({ transferId: 'TR-LOT-TRANSFORM-SETUP', receivedQtyKg: 1000 });
+    fixture.facade.receiveLot({
+      transferId: 'TR-LOT-TRANSFORM-SETUP',
+      receivedQtyKg: demoQuantities.stageOneTransferKg
+    });
 
     const child = controller.transformLot({
       parentLotId: 'LOT-RICE-2026-001',
       childLotId: 'LOT-RICE-2026-MILLED',
       transformedBy: 'MLL-001',
       commodity: 'Rice',
-      quantityKg: 850,
+      quantityKg: demoQuantities.millerToIssueKg,
       qualityGrade: 'A',
       source: 'Miller 01'
     });

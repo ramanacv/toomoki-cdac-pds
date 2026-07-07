@@ -11,7 +11,7 @@ import type {
   TransferOrder
 } from '@pds/shared-types';
 import { AuthMode, AuthResult } from '@pds/shared-types';
-import { getWorkspaceSnapshot, type DemoScenario } from '@pds/fixtures';
+import { demoQuantities, getWorkspaceSnapshot, type DemoScenario } from '@pds/fixtures';
 import { getDataSourceMode, usesMockData } from './data-source.js';
 import { getScenarioAlerts } from './demo-model.js';
 import type { WorkflowActionRequest } from './workflow-actions.js';
@@ -197,10 +197,12 @@ export const runShortReceiptDemo = async (): Promise<TransferOrder> => {
     lotId: 'LOT-RICE-2026-001',
     fromOrg: 'PROC-001',
     toOrg: 'MLL-001',
-    dispatchedQtyKg: 1000,
+    dispatchedQtyKg: demoQuantities.shortReceiptDispatchKg,
     vehicleNo: 'KA01AB9001'
   });
-  return postJson<TransferOrder>('/transfers/TR-UI-SHORT-001/receive', { receivedQtyKg: 800 });
+  return postJson<TransferOrder>('/transfers/TR-UI-SHORT-001/receive', {
+    receivedQtyKg: demoQuantities.shortReceiptReceivedKg
+  });
 };
 
 export const authenticateBeneficiary = async (authTxnId: string) =>

@@ -8,6 +8,7 @@ import type {
   TransferOrder
 } from '@pds/shared-types';
 import { AlertType, AuthMode, AuthResult, LotStatus, TransferStatus } from '@pds/shared-types';
+import { demoQuantities } from '@pds/fixtures';
 import type { DemoRole } from './demo-model.js';
 
 const DEMO_LOT_ID = 'LOT-RICE-2026-002';
@@ -146,7 +147,7 @@ const plannedLegs: PlannedLeg[] = [
     label: 'Dispatch procurement stock to FCI',
     detail: 'Procurement centre hands the seeded lot to FCI before central buffer movement.',
     roles: ['PROCUREMENT'],
-    qtyKg: 1000,
+    qtyKg: demoQuantities.stageOneTransferKg,
     vehicleNo: 'KA01AB1999',
     stage: 'I',
     transporterId: 'TRANS-001'
@@ -159,7 +160,7 @@ const plannedLegs: PlannedLeg[] = [
     label: 'Dispatch FCI stock to buffer godown',
     detail: 'FCI records central reserve movement before state lifting.',
     roles: ['FCI_DEPOT'],
-    qtyKg: 1000,
+    qtyKg: demoQuantities.stageOneTransferKg,
     vehicleNo: 'FCI01AB2001',
     stage: 'I',
     transporterId: 'TRANS-001'
@@ -172,7 +173,7 @@ const plannedLegs: PlannedLeg[] = [
     label: 'Stage-I dispatch to state depot',
     detail: 'Move lifted stock from FCI buffer godown to the state depot.',
     roles: ['FCI_DEPOT'],
-    qtyKg: 1000,
+    qtyKg: demoQuantities.stageOneTransferKg,
     vehicleNo: 'KA01AB2002',
     stage: 'I',
     transporterId: 'TRANS-001'
@@ -185,7 +186,7 @@ const plannedLegs: PlannedLeg[] = [
     label: 'Dispatch paddy to miller',
     detail: 'Send stock for the POC milling transformation leg.',
     roles: ['DEPOT'],
-    qtyKg: 1000,
+    qtyKg: demoQuantities.stageOneTransferKg,
     vehicleNo: 'KA01AB2003',
     stage: 'I',
     transporterId: 'TRANS-001'
@@ -198,7 +199,7 @@ const plannedLegs: PlannedLeg[] = [
     label: 'Stage-II dispatch to issue point',
     detail: 'RO-lite approval is required before this movement can dispatch.',
     roles: ['DEPOT'],
-    qtyKg: 850,
+    qtyKg: demoQuantities.millerToIssueKg,
     vehicleNo: 'KA01AB2004',
     stage: 'II',
     roRef: 'RO-DSO-POC-001',
@@ -214,7 +215,7 @@ const plannedLegs: PlannedLeg[] = [
     label: 'Dispatch to FPS',
     detail: 'Issue point sends stock to the fair price shop endpoint.',
     roles: ['DEPOT'],
-    qtyKg: 300,
+    qtyKg: demoQuantities.endpointDispatchKg.fps,
     vehicleNo: 'KA01AB2005',
     stage: 'II',
     roRef: 'RO-DSO-POC-FPS',
@@ -229,7 +230,7 @@ const plannedLegs: PlannedLeg[] = [
     label: 'Dispatch to welfare institute',
     detail: 'Issue point sends hostel allocation to the welfare endpoint.',
     roles: ['DEPOT'],
-    qtyKg: 200,
+    qtyKg: demoQuantities.endpointDispatchKg.welfareInstitute,
     vehicleNo: 'KA01AB2006',
     stage: 'II',
     roRef: 'RO-DSO-POC-WI',
@@ -244,7 +245,7 @@ const plannedLegs: PlannedLeg[] = [
     label: 'Dispatch to Shiv Bhojan eatery',
     detail: 'Issue point sends meal-scheme stock to the eatery endpoint.',
     roles: ['DEPOT'],
-    qtyKg: 200,
+    qtyKg: demoQuantities.endpointDispatchKg.shivBhojan,
     vehicleNo: 'KA01AB2007',
     stage: 'II',
     roRef: 'RO-DSO-POC-SBE',
@@ -302,7 +303,7 @@ export function getWorkflowActions(context: WorkflowContext): WorkflowActionSpec
           childLotId: DEMO_LOT_ID,
           transformedBy: 'MLL-001',
           commodity: 'Rice',
-          quantityKg: 850,
+          quantityKg: demoQuantities.millerToIssueKg,
           qualityGrade: 'A',
           source: 'Miller 01'
         }
@@ -392,7 +393,7 @@ export function getWorkflowActions(context: WorkflowContext): WorkflowActionSpec
           rationCardHash: DEMO_RATION_CARD_HASH,
           beneficiaryRefHash: DEMO_BENEFICIARY_HASH,
           commodity: 'Rice',
-          deliveredKg: 25,
+          deliveredKg: demoQuantities.citizenDistributionKg,
           authMode: AuthMode.MOCK_OTP,
           authResult: AuthResult.SUCCESS,
           authTxnRefHash: 'auth-ref-poc-001',
@@ -418,7 +419,7 @@ export function getWorkflowActions(context: WorkflowContext): WorkflowActionSpec
             rationCardHash: DEMO_RATION_CARD_HASH,
             beneficiaryRefHash: DEMO_BENEFICIARY_HASH,
             commodity: 'Rice',
-            deliveredKg: 25,
+            deliveredKg: demoQuantities.citizenDistributionKg,
             authMode: AuthMode.MOCK_OTP,
             authResult: AuthResult.SUCCESS,
             authTxnRefHash: 'auth-ref-poc-duplicate',
@@ -541,6 +542,12 @@ export function applyMockWorkflowAction(context: WorkflowContext, request: Workf
     const transfer = current.transfers.find((item) => item.transferId === request.transferId);
     if (!transfer) {
       throw new Error(`Transfer ${request.transferId} not found`);
+    }
+    if (request.receivedQtyKg <= 0) {
+      throw new Error('receivedQtyKg must be positive');
+    }
+    if (request.receivedQtyKg > transfer.dispatchedQtyKg) {
+      throw new Error(`receivedQtyKg cannot exceed dispatchedQtyKg for transfer ${transfer.transferId}`);
     }
     transfer.receivedQtyKg = request.receivedQtyKg;
     transfer.shortageQtyKg = Math.max(0, transfer.dispatchedQtyKg - request.receivedQtyKg);

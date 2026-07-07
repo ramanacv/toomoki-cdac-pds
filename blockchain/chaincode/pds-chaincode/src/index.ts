@@ -433,6 +433,12 @@ export class PdsLedgerEngine {
     if (transfer.status !== TransferStatus.DISPATCHED) {
       throw new Error(`Transfer ${transfer.transferId} already received`);
     }
+    if (input.receivedQtyKg <= 0) {
+      throw new Error('receivedQtyKg must be positive');
+    }
+    if (input.receivedQtyKg > transfer.dispatchedQtyKg) {
+      throw new Error(`receivedQtyKg cannot exceed dispatchedQtyKg for transfer ${transfer.transferId}`);
+    }
 
     const shortageQtyKg = Math.max(0, transfer.dispatchedQtyKg - input.receivedQtyKg);
     const status = shortageQtyKg > 0 ? TransferStatus.RECEIVED_WITH_SHORTAGE : TransferStatus.RECEIVED;

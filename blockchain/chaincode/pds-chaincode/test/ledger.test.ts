@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { AuthMode, AuthResult, AlertType, GrievanceType, RationCardType, EntitlementRuleStatus, StakeholderType, StakeholderStatus } from '@pds/shared-types';
+import { AuthMode, AuthResult, AlertType, GrievanceType, RationCardType, EntitlementRuleStatus, StakeholderType, StakeholderStatus, TransferStatus } from '@pds/shared-types';
 import { PdsLedgerEngine } from '../src/index.js';
 
 describe('PdsLedgerEngine', () => {
@@ -382,6 +382,58 @@ describe('PdsLedgerEngine', () => {
         vehicleNo: 'KA01AB0002'
       })
     ).toThrow(/owned by/);
+  });
+
+  it('records shortage without creating stock and rejects non-positive or excess receipt quantities', () => {
+    const engine = new PdsLedgerEngine(false);
+    engine.registerStakeholder({
+      stakeholderId: 'PROC-001',
+      stakeholderType: StakeholderType.PROCUREMENT_CENTER,
+      name: 'Proc',
+      district: 'X',
+      licenseNo: 'L',
+      status: StakeholderStatus.ACTIVE
+    });
+    engine.registerStakeholder({
+      stakeholderId: 'MLL-001',
+      stakeholderType: StakeholderType.MILLER,
+      name: 'Miller',
+      district: 'X',
+      licenseNo: 'L2',
+      status: StakeholderStatus.ACTIVE
+    });
+    engine.createCommodityLot({
+      lotId: 'LOT-RECEIPT-QTY',
+      commodity: 'Rice',
+      season: 'Kharif',
+      quantityKg: 100,
+      qualityGrade: 'A',
+      source: 's',
+      currentOwner: 'PROC-001',
+      currentLocation: 'yard'
+    });
+
+    const stockOf = (org: string, commodity: string): number =>
+      engine.exportState().stock.find(([key]) => key === `${org}:${commodity}`)?.[1] ?? 0;
+
+    engine.dispatchLot({
+      transferId: 'TR-RECEIPT-QTY-OVER',
+      lotId: 'LOT-RECEIPT-QTY',
+      fromOrg: 'PROC-001',
+      toOrg: 'MLL-001',
+      dispatchedQtyKg: 60,
+      vehicleNo: 'KA01AB0001'
+    });
+
+    expect(() => engine.receiveLot({ transferId: 'TR-RECEIPT-QTY-OVER', receivedQtyKg: 0 })).toThrow(/must be positive/);
+    expect(() => engine.receiveLot({ transferId: 'TR-RECEIPT-QTY-OVER', receivedQtyKg: 61 })).toThrow(/cannot exceed dispatchedQtyKg/);
+    expect(stockOf('PROC-001', 'Rice')).toBe(40);
+    expect(stockOf('MLL-001', 'Rice')).toBe(0);
+
+    const received = engine.receiveLot({ transferId: 'TR-RECEIPT-QTY-OVER', receivedQtyKg: 50 });
+    expect(received.status).toBe(TransferStatus.RECEIVED_WITH_SHORTAGE);
+    expect(received.shortageQtyKg).toBe(10);
+    expect(stockOf('PROC-001', 'Rice') + stockOf('MLL-001', 'Rice')).toBe(90);
   });
 
   it('rejects dispatch with non-positive or over-stock dispatchedQtyKg (T1.3)', () => {

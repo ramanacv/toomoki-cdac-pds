@@ -16,3 +16,4 @@ export {
   getScenarioDashboardSummary,
   getWorkspaceSnapshot
 } from './data.js';
+export { demoQuantities } from './quantities.js';

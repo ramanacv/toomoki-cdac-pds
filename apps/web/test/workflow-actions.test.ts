@@ -8,6 +8,7 @@ import {
   getWorkflowProgress,
   type WorkflowContext
 } from '../src/workflow-actions.js';
+import { demoQuantities } from '@pds/fixtures';
 
 const emptyContext: WorkflowContext = {
   lots: demoLots,
@@ -20,14 +21,14 @@ const emptyContext: WorkflowContext = {
 };
 
 const completedTransfers = [
-  ['TR-POC-PROC-FCI', 'PROC-001', 'FCI-001', 1000],
-  ['TR-POC-FCI-BUF', 'FCI-001', 'FCI-BUF-001', 1000],
-  ['TR-POC-BUF-DEPOT', 'FCI-BUF-001', 'GODOWN-S-001', 1000],
-  ['TR-POC-DEPOT-MILLER', 'GODOWN-S-001', 'MLL-001', 1000],
-  ['TR-POC-MILLER-ISSUE', 'MLL-001', 'ISSUE-001', 850],
-  ['TR-POC-ISSUE-FPS', 'ISSUE-001', 'FPS-101', 300],
-  ['TR-POC-ISSUE-WI', 'ISSUE-001', 'WI-101', 200],
-  ['TR-POC-ISSUE-SBE', 'ISSUE-001', 'SBE-101', 200]
+  ['TR-POC-PROC-FCI', 'PROC-001', 'FCI-001', demoQuantities.stageOneTransferKg],
+  ['TR-POC-FCI-BUF', 'FCI-001', 'FCI-BUF-001', demoQuantities.stageOneTransferKg],
+  ['TR-POC-BUF-DEPOT', 'FCI-BUF-001', 'GODOWN-S-001', demoQuantities.stageOneTransferKg],
+  ['TR-POC-DEPOT-MILLER', 'GODOWN-S-001', 'MLL-001', demoQuantities.stageOneTransferKg],
+  ['TR-POC-MILLER-ISSUE', 'MLL-001', 'ISSUE-001', demoQuantities.millerToIssueKg],
+  ['TR-POC-ISSUE-FPS', 'ISSUE-001', 'FPS-101', demoQuantities.endpointDispatchKg.fps],
+  ['TR-POC-ISSUE-WI', 'ISSUE-001', 'WI-101', demoQuantities.endpointDispatchKg.welfareInstitute],
+  ['TR-POC-ISSUE-SBE', 'ISSUE-001', 'SBE-101', demoQuantities.endpointDispatchKg.shivBhojan]
 ].map(([transferId, fromOrg, toOrg, qty]) => ({
   transferId: String(transferId),
   lotId: 'LOT-RICE-2026-002',
@@ -81,7 +82,7 @@ describe('workflow actions', () => {
         lotId: 'LOT-RICE-2026-002',
         fromOrg: 'MLL-001',
         toOrg: 'ISSUE-001',
-        dispatchedQtyKg: 850,
+        dispatchedQtyKg: demoQuantities.millerToIssueKg,
         vehicleNo: 'KA01AB2004',
         stage: 'II'
       }
@@ -89,6 +90,32 @@ describe('workflow actions', () => {
 
     expect(result.evidence.eventType).toBe('DISPATCH_BLOCKED');
     expect(result.context.alerts[0]?.alertType).toBe(AlertType.UNAUTHORIZED_TRANSACTION);
+  });
+
+  it('rejects receipt quantities above the dispatched amount', () => {
+    const context: WorkflowContext = {
+      ...emptyContext,
+      transfers: [
+        {
+          transferId: 'TR-SHORT-UI',
+          lotId: 'LOT-RICE-2026-002',
+          fromOrg: 'ISSUE-001',
+          toOrg: 'WI-101',
+          dispatchedQtyKg: demoQuantities.endpointDispatchKg.fps,
+          vehicleNo: 'KA01AB1206',
+          status: TransferStatus.DISPATCHED,
+          dispatchTimestamp: '2026-06-09T15:15:00.000Z'
+        }
+      ]
+    };
+
+    expect(() =>
+      applyMockWorkflowAction(context, {
+        kind: 'receive',
+        transferId: 'TR-SHORT-UI',
+        receivedQtyKg: demoQuantities.endpointDispatchKg.fps + 1
+      })
+    ).toThrow(/cannot exceed dispatchedQtyKg/);
   });
 
   it('offers and applies the milling transform after stock reaches the miller', () => {

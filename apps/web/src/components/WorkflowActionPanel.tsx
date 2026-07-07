@@ -55,7 +55,7 @@ export function WorkflowActionPanel({
   onMockComplete
 }: WorkflowActionPanelProps) {
   const [busy, setBusy] = useState(false);
-  const [receiveQtyKg, setReceiveQtyKg] = useState(1000);
+  const [receiveQtyKg, setReceiveQtyKg] = useState('');
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [completedActionId, setCompletedActionId] = useState<string | null>(null);
@@ -78,6 +78,12 @@ export function WorkflowActionPanel({
     setCompletedActionId(null);
   }, [role]);
 
+  useEffect(() => {
+    if (nextAction?.request.kind === 'receive') {
+      setReceiveQtyKg(String(nextAction.request.receivedQtyKg));
+    }
+  }, [nextAction]);
+
   const runAction = async (action: WorkflowActionSpec) => {
     if (!action || !action.roles.includes(role) || completedActionId === action.id) {
       return;
@@ -91,7 +97,7 @@ export function WorkflowActionPanel({
     try {
       const request =
         action.request.kind === 'receive'
-          ? { ...action.request, receivedQtyKg: receiveQtyKg }
+          ? { ...action.request, receivedQtyKg: Number(receiveQtyKg) }
           : action.request;
 
       if (apiOnline) {
@@ -222,7 +228,7 @@ export function WorkflowActionPanel({
                 type="number"
                 min={1}
                 value={receiveQtyKg}
-                onChange={(event) => setReceiveQtyKg(Number(event.target.value))}
+                onChange={(event) => setReceiveQtyKg(event.target.value)}
               />
             </div>
           )}

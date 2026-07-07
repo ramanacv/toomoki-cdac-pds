@@ -1,4 +1,5 @@
 import type { CommodityLot, DistributionTransaction, TransferOrder } from '@pds/shared-types';
+import { demoQuantities } from '@pds/fixtures';
 import type { TraceCard } from '@/demo-model.js';
 import { Panel } from '@/components/Panel';
 import { buildApiUrl } from '@/api.js';
@@ -121,7 +122,7 @@ export function TraceExplorer({
           {traceLot?.currentLocation ?? 'Block Godown 01'}.
         </p>
         <p className="leading-relaxed">
-          Selected receipt: <strong>{visibleDistribution?.deliveredKg ?? 25} kg</strong> for ration
+          Selected receipt: <strong>{visibleDistribution?.deliveredKg ?? demoQuantities.citizenDistributionKg} kg</strong> for ration
           card hash {visibleDistribution?.rationCardHash ?? 'demo-ration-card-hash'}.
         </p>
       </div>

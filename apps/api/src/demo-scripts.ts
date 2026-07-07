@@ -13,6 +13,7 @@ import {
   type MonthlyEntitlement,
   type Stakeholder
 } from '@pds/shared-types';
+import { demoQuantities } from '@pds/fixtures';
 import { PdsRuntime } from './modules/core/pds-runtime.js';
 
 export type DemoFlowResult = {
@@ -54,48 +55,48 @@ export const runHappyPathDemo = async (): Promise<DemoFlowResult> => {
       lotId: 'LOT-RICE-2026-001',
       fromOrg: 'PROC-001',
       toOrg: 'MLL-001',
-      dispatchedQtyKg: 1000,
+      dispatchedQtyKg: demoQuantities.stageOneTransferKg,
       vehicleNo: 'KA01AB2001'
     });
     service.receiveLot({
       transferId: 'TR-DEMO-001',
-      receivedQtyKg: 1000
+      receivedQtyKg: demoQuantities.stageOneTransferKg
     });
     service.dispatchLot({
       transferId: 'TR-DEMO-002',
       lotId: 'LOT-RICE-2026-001',
       fromOrg: 'MLL-001',
       toOrg: 'GODOWN-S-001',
-      dispatchedQtyKg: 1000,
+      dispatchedQtyKg: demoQuantities.stageOneTransferKg,
       vehicleNo: 'KA01AB2002'
     });
     service.receiveLot({
       transferId: 'TR-DEMO-002',
-      receivedQtyKg: 1000
+      receivedQtyKg: demoQuantities.stageOneTransferKg
     });
     service.dispatchLot({
       transferId: 'TR-DEMO-003',
       lotId: 'LOT-RICE-2026-001',
       fromOrg: 'GODOWN-S-001',
       toOrg: 'GODOWN-B-001',
-      dispatchedQtyKg: 1000,
+      dispatchedQtyKg: demoQuantities.stageOneTransferKg,
       vehicleNo: 'KA01AB2003'
     });
     service.receiveLot({
       transferId: 'TR-DEMO-003',
-      receivedQtyKg: 1000
+      receivedQtyKg: demoQuantities.stageOneTransferKg
     });
     service.allocateToFps({
       allocationId: 'ALLOC-DEMO-001',
       fpsId: 'FPS-101',
       commodity: 'Rice',
-      allocatedQtyKg: 100,
+      allocatedQtyKg: demoQuantities.fpsAllocationKg,
       month: '2026-06',
       sourceGodownId: 'GODOWN-B-001'
     });
     service.recordFpsReceipt({
       allocationId: 'ALLOC-DEMO-001',
-      receivedQtyKg: 100
+      receivedQtyKg: demoQuantities.fpsReceiptKg
     });
     const auth = service.simulateAuthentication({
       authTxnId: 'AUTH-DEMO-001',
@@ -110,7 +111,7 @@ export const runHappyPathDemo = async (): Promise<DemoFlowResult> => {
       rationCardHash: 'demo-ration-card-hash',
       beneficiaryRefHash: 'beneficiary-hash',
       commodity: 'Rice',
-      deliveredKg: 25,
+      deliveredKg: demoQuantities.citizenDistributionKg,
       authMode: auth.authMode,
       authResult: auth.authResult,
       authTxnRefHash: auth.authTxnRefHash,
@@ -143,18 +144,22 @@ export const runExceptionDemo = async (): Promise<DemoExceptionResult> => {
       lotId: 'LOT-RICE-2026-001',
       fromOrg: 'PROC-001',
       toOrg: 'MLL-001',
-      dispatchedQtyKg: 1000,
+      dispatchedQtyKg: demoQuantities.shortReceiptDispatchKg,
       vehicleNo: 'KA01AB3001'
     });
     const transfer = service.receiveLot({
       transferId: 'TR-EXC-001',
-      receivedQtyKg: 800
+      receivedQtyKg: demoQuantities.shortReceiptReceivedKg
     });
     const alert = service.getAlerts().find((item) => item.alertType === AlertType.SHORT_RECEIPT) ?? service.raiseAuditFlag({
       alertType: AlertType.SHORT_RECEIPT,
       entityId: transfer.transferId,
       message: 'Fallback shortage alert',
-      evidence: { dispatchedQtyKg: 1000, receivedQtyKg: 800, shortageQtyKg: 200 }
+      evidence: {
+        dispatchedQtyKg: demoQuantities.shortReceiptDispatchKg,
+        receivedQtyKg: demoQuantities.shortReceiptReceivedKg,
+        shortageQtyKg: demoQuantities.shortReceiptDispatchKg - demoQuantities.shortReceiptReceivedKg
+      }
     });
     await service.flushPersist();
 

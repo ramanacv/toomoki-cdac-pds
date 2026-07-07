@@ -9,6 +9,7 @@ vi.mock('@/api.js', () => ({
 
 import { executeWorkflowAction } from '@/api.js';
 import { demoLots } from '@/demo-model.js';
+import { demoQuantities } from '@pds/fixtures';
 import { TransferStatus } from '@pds/shared-types';
 
 const baseProps = {
@@ -28,12 +29,23 @@ const receivedTransfer = (transferId: string, fromOrg: string, toOrg: string, lo
   lotId,
   fromOrg,
   toOrg,
-  dispatchedQtyKg: 1000,
-  receivedQtyKg: 1000,
+  dispatchedQtyKg: demoQuantities.stageOneTransferKg,
+  receivedQtyKg: demoQuantities.stageOneTransferKg,
   vehicleNo: 'KA01AB1000',
   status: TransferStatus.RECEIVED,
   dispatchTimestamp: '2026-06-30T10:00:00.000Z',
   receiveTimestamp: '2026-06-30T10:05:00.000Z'
+});
+
+const dispatchedTransfer = (transferId: string, fromOrg: string, toOrg: string, dispatchedQtyKg: number, lotId = 'LOT-RICE-2026-002') => ({
+  transferId,
+  lotId,
+  fromOrg,
+  toOrg,
+  dispatchedQtyKg,
+  vehicleNo: 'KA01AB1000',
+  status: TransferStatus.DISPATCHED,
+  dispatchTimestamp: '2026-06-30T10:00:00.000Z'
 });
 
 const contextBeforeShivBhojanDispatch = {
@@ -179,5 +191,28 @@ describe('WorkflowActionPanel', () => {
 
     expect(screen.getByText('Dispatch to Shiv Bhojan eatery')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Run action' })).toBeEnabled();
+  });
+
+  it('prefills the receive quantity from the dispatched amount for the active transfer', () => {
+    render(
+      <WorkflowActionPanel
+        {...baseProps}
+        {...contextBeforeShivBhojanDispatch}
+        transfers={[
+          ...contextBeforeShivBhojanDispatch.transfers,
+          dispatchedTransfer(
+            'TR-POC-ISSUE-SBE',
+            'ISSUE-001',
+            'SBE-101',
+            demoQuantities.endpointDispatchKg.shivBhojan,
+            'LOT-RICE-2026-002'
+          )
+        ]}
+        apiOnline={false}
+        role="SHIV_BHOJAN_OPERATOR"
+      />
+    );
+
+    expect(screen.getByLabelText('Received quantity (kg)')).toHaveValue(demoQuantities.endpointDispatchKg.shivBhojan);
   });
 });

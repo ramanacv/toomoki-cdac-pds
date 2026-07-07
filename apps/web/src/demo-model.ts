@@ -5,6 +5,7 @@ import {
   dashboardSummary as demoSummaryFallback,
   distributions as demoDistributions,
   entitlements as demoEntitlements,
+  demoQuantities,
   getScenarioAlerts,
   getScenarioDashboardSummary,
   getScenarioFixture,
@@ -276,7 +277,7 @@ export function getTraceCards(scenario: DemoScenario): TraceCard[] {
       },
       {
         title: 'Shortage',
-        value: '300 kg',
+        value: `${demoQuantities.shortReceiptDispatchKg - demoQuantities.shortReceiptReceivedKg} kg`,
         detail: 'Shortage is captured as a ledger-visible audit signal.',
         accent: 'amber'
       },
@@ -321,7 +322,7 @@ export function getTraceCards(scenario: DemoScenario): TraceCard[] {
     },
     {
       title: 'Delivery',
-      value: '25 kg',
+      value: `${demoQuantities.citizenDistributionKg} kg`,
       detail: 'Beneficiary entitlement was validated before issue.',
       accent: 'emerald'
     },
