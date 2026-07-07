@@ -70,7 +70,8 @@ describe('app shell', () => {
     await renderApp('/?role=CONTROL_OFFICE');
 
     expect(await screen.findByRole('heading', { name: 'Role workbench' })).toBeInTheDocument();
-    expect(sidebar().queryByRole('link', { name: 'Dashboard' })).not.toBeInTheDocument();
+    // Every role gets the overview for orientation, but operational roles land on their queue.
+    expect(sidebar().getByRole('link', { name: 'Dashboard' })).toBeInTheDocument();
   });
 
   it('lands oversight roles on the trimmed overview', async () => {

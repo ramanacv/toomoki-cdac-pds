@@ -151,11 +151,11 @@ export const screenDefinitions: ScreenDefinition[] = [
 
 export const roleScreens: Record<DemoRole, DemoScreen[]> = {
   MANAGEMENT: ['dashboard', 'workbench', 'stakeholders', 'transfers', 'distribution', 'audit-alerts', 'verify'],
-  CONTROL_OFFICE: ['workbench', 'transfers', 'audit-alerts', 'verify'],
-  FCI_DEPOT: ['workbench', 'lots', 'transfers', 'verify'],
-  DEPOT: ['workbench', 'lots', 'transfers', 'allocations', 'verify'],
-  WELFARE_INSTITUTE: ['workbench', 'transfers', 'audit-alerts', 'verify'],
-  SHIV_BHOJAN_OPERATOR: ['workbench', 'transfers', 'verify'],
+  CONTROL_OFFICE: ['dashboard', 'workbench', 'transfers', 'audit-alerts', 'verify'],
+  FCI_DEPOT: ['dashboard', 'workbench', 'lots', 'transfers', 'verify'],
+  DEPOT: ['dashboard', 'workbench', 'lots', 'transfers', 'allocations', 'verify'],
+  WELFARE_INSTITUTE: ['dashboard', 'workbench', 'transfers', 'audit-alerts', 'verify'],
+  SHIV_BHOJAN_OPERATOR: ['dashboard', 'workbench', 'transfers', 'verify'],
   DEPARTMENT: ['dashboard', 'stakeholders', 'allocations', 'audit-alerts', 'verify'],
   PROCUREMENT: ['dashboard', 'workbench', 'stakeholders', 'lots', 'transfers', 'verify'],
   GODOWN: ['dashboard', 'workbench', 'lots', 'transfers', 'allocations', 'audit-alerts', 'verify'],
