@@ -7,6 +7,7 @@ import { AuthOtpDto, SupervisorExceptionAuthDto } from '../src/modules/auth/dto/
 import { DistributionDto } from '../src/modules/distributions/dto/distribution.dto.js';
 import { EntitlementValidateDto } from '../src/modules/entitlements/dto/entitlement.dto.js';
 import { LotCreateDto } from '../src/modules/lots/dto/lot.dto.js';
+import { ResetLedgerDto } from '../src/modules/admin/dto/reset-ledger.dto.js';
 import { ResolveAuditAlertDto } from '../src/modules/audit/dto/resolve-audit-alert.dto.js';
 import { StakeholderCreateDto } from '../src/modules/stakeholders/dto/stakeholder.dto.js';
 import { DispatchDto, TransferReceiveDto } from '../src/modules/transfers/dto/transfer.dto.js';
@@ -181,5 +182,14 @@ describe('module DTO validation', () => {
     expectInvalid(plainToInstance(VerifyLedgerDto, { digest: '' }));
     expectInvalid(plainToInstance(VerifyLedgerDto, { digest: 'not-hex!!' }));
     expectInvalid(plainToInstance(VerifyLedgerDto, { digest: 'xyz' }));
+  });
+
+  it('validates the commodity-scoped reset payload', () => {
+    // commodity must be decorated (not just declared) so the global
+    // ValidationPipe's whitelist option doesn't silently strip it from the
+    // body before it reaches the controller.
+    expectValid(plainToInstance(ResetLedgerDto, {}));
+    expectValid(plainToInstance(ResetLedgerDto, { commodity: 'Rice' }));
+    expectInvalid(plainToInstance(ResetLedgerDto, { commodity: 42 }));
   });
 });

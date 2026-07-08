@@ -1,6 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { WorkspaceLayout } from '@/pages/WorkspaceLayout.js';
-import { AdminDashboard } from '@/pages/AdminDashboard.js';
+import { AdminLayout } from '@/pages/AdminLayout.js';
 import { DefaultScreenRedirect, ScreenGuard } from '@/pages/workspace/ScreenGuard.js';
 import { OverviewPage } from '@/pages/workspace/OverviewPage.js';
 import { WorkbenchPage } from '@/pages/workspace/WorkbenchPage.js';
@@ -11,6 +11,12 @@ import { AllocationsPage } from '@/pages/workspace/AllocationsPage.js';
 import { DistributionPage } from '@/pages/workspace/DistributionPage.js';
 import { AuditAlertsPage } from '@/pages/workspace/AuditAlertsPage.js';
 import { VerifyPage } from '@/pages/workspace/VerifyPage.js';
+import { AdminOverviewPage } from '@/pages/admin/AdminOverviewPage.js';
+import { AdminNetworkPage } from '@/pages/admin/AdminNetworkPage.js';
+import { AdminStakeholdersPage } from '@/pages/admin/AdminStakeholdersPage.js';
+import { AdminLedgerPage } from '@/pages/admin/AdminLedgerPage.js';
+import { AdminAlertsPage } from '@/pages/admin/AdminAlertsPage.js';
+import { AdminToolsPage } from '@/pages/admin/AdminToolsPage.js';
 import { Toaster } from '@/components/ui/sonner.js';
 import { TooltipProvider } from '@/components/ui/tooltip.js';
 
@@ -92,7 +98,15 @@ export function AppRoutes() {
           }
         />
       </Route>
-      <Route path="/admin" element={<AdminDashboard />} />
+      <Route path="/admin" element={<AdminLayout />}>
+        <Route index element={<Navigate to="/admin/overview" replace />} />
+        <Route path="overview" element={<AdminOverviewPage />} />
+        <Route path="network" element={<AdminNetworkPage />} />
+        <Route path="stakeholders" element={<AdminStakeholdersPage />} />
+        <Route path="ledger" element={<AdminLedgerPage />} />
+        <Route path="alerts" element={<AdminAlertsPage />} />
+        <Route path="tools" element={<AdminToolsPage />} />
+      </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

@@ -247,34 +247,112 @@ export class PdsLedgerEngine {
   }
 
   /**
-   * Wipe all movement/quantity data (lots, transfers, allocations, auth
-   * transactions, distributions, audit alerts, stock, and event history) so
-   * testing can restart from a clean slate after a calculation bug produced
-   * bad figures downstream. Stakeholders, ration cards, grievances, and
-   * entitlement rule definitions (policy config, not accumulated quantities)
-   * are left intact — only lifted/available balances on entitlements reset.
-   * The demo's starting lots are recreated afterwards so the scripted
-   * frontend workflow can be replayed from its first step.
+   * Shared by resetTransactionalData() and its replay projection. With no
+   * commodity, wipes every movement/quantity collection. With a commodity,
+   * only removes lots of that commodity, transfers of those lots, allocations
+   * and distributions tagged with that commodity, their stock positions, and
+   * any audit alerts referencing one of those entities — other commodities'
+   * data is untouched. Auth transactions carry no commodity field, so a
+   * commodity-scoped reset never clears them. Returns the set of entity ids
+   * removed, so the caller can also drop ledger events referencing them.
    */
-  resetTransactionalData(): { ledgerTxId: string } {
-    this.lots.clear();
-    this.transfers.clear();
-    this.allocations.clear();
-    this.authTransactions.clear();
-    this.distributions.clear();
-    this.alerts.clear();
-    this.stock.clear();
-    this.events = [];
+  private applyTransactionalReset(commodity?: string): Set<string> {
+    if (!commodity) {
+      this.lots.clear();
+      this.transfers.clear();
+      this.allocations.clear();
+      this.authTransactions.clear();
+      this.distributions.clear();
+      this.alerts.clear();
+      this.stock.clear();
 
-    for (const entitlement of this.entitlements.values()) {
-      entitlement.alreadyLiftedKg = 0;
-      entitlement.availableBalanceKg = entitlement.monthlyEntitlementKg;
+      for (const entitlement of this.entitlements.values()) {
+        entitlement.alreadyLiftedKg = 0;
+        entitlement.availableBalanceKg = entitlement.monthlyEntitlementKg;
+      }
+
+      this.reseedInitialLots();
+      return new Set();
     }
 
-    this.reseedInitialLots();
+    const affectedLotIds = new Set(
+      [...this.lots.values()].filter((lot) => lot.commodity === commodity).map((lot) => lot.lotId)
+    );
+    const affectedAllocationIds = new Set(
+      [...this.allocations.values()]
+        .filter((allocation) => allocation.commodity === commodity)
+        .map((allocation) => allocation.allocationId)
+    );
+    const affectedDistributionIds = new Set(
+      [...this.distributions.values()]
+        .filter((distribution) => distribution.commodity === commodity)
+        .map((distribution) => distribution.distributionId)
+    );
+    const affectedTransferIds = new Set(
+      [...this.transfers.values()]
+        .filter((transfer) => affectedLotIds.has(transfer.lotId))
+        .map((transfer) => transfer.transferId)
+    );
+
+    for (const lotId of affectedLotIds) this.lots.delete(lotId);
+    for (const transferId of affectedTransferIds) this.transfers.delete(transferId);
+    for (const allocationId of affectedAllocationIds) this.allocations.delete(allocationId);
+    for (const distributionId of affectedDistributionIds) this.distributions.delete(distributionId);
+
+    for (const key of [...this.stock.keys()]) {
+      if (key.slice(key.lastIndexOf(':') + 1) === commodity) {
+        this.stock.delete(key);
+      }
+    }
+
+    const affectedEntityIds = new Set([
+      ...affectedLotIds,
+      ...affectedTransferIds,
+      ...affectedAllocationIds,
+      ...affectedDistributionIds
+    ]);
+    for (const [alertId, alert] of this.alerts) {
+      if (affectedEntityIds.has(alert.entityId)) this.alerts.delete(alertId);
+    }
+
+    for (const entitlement of this.entitlements.values()) {
+      if (entitlement.commodity === commodity) {
+        entitlement.alreadyLiftedKg = 0;
+        entitlement.availableBalanceKg = entitlement.monthlyEntitlementKg;
+      }
+    }
+
+    const { backendSeed } = this.loadFixtures();
+    for (const seedLot of backendSeed.initialLots.filter((lot) => lot.commodity === commodity)) {
+      const lot: CommodityLot = { ...seedLot, status: LotStatus.CREATED };
+      this.lots.set(lot.lotId, lot);
+      this.addStock(lot.currentOwner, lot.commodity, lot.quantityKg);
+    }
+
+    return affectedEntityIds;
+  }
+
+  /**
+   * Wipe movement/quantity data so testing can restart from a clean slate
+   * after a calculation bug produced bad figures downstream. Stakeholders,
+   * ration cards, grievances, and entitlement rule definitions (policy
+   * config, not accumulated quantities) are always left intact.
+   *
+   * Pass a commodity to scope the reset to just that commodity's lots,
+   * transfers, allocations, distributions, stock, and related alerts —
+   * other commodities' data and ledger history are left untouched. Omit it
+   * to wipe everything (the original full-reset behavior), which also clears
+   * all ledger event history down to this single reset event.
+   */
+  resetTransactionalData(commodity?: string): { ledgerTxId: string } {
+    const affectedEntityIds = this.applyTransactionalReset(commodity);
+    this.events = commodity
+      ? this.events.filter((event) => !affectedEntityIds.has(event.entityId))
+      : [];
 
     const { ledgerTxId } = this.recordEvent('workflow', 'ledger', 'ResetTransactionalData', {
-      resetAt: makeTimestamp()
+      resetAt: makeTimestamp(),
+      ...(commodity ? { commodity } : {})
     });
     return { ledgerTxId };
   }
@@ -1465,21 +1543,15 @@ export class PdsLedgerEngine {
         // Rollover updates multiple entitlements; projection not applicable for replay.
         break;
       case 'ResetTransactionalData': {
-        this.lots.clear();
-        this.transfers.clear();
-        this.allocations.clear();
-        this.authTransactions.clear();
-        this.distributions.clear();
-        this.alerts.clear();
-        this.stock.clear();
-        for (const entitlement of this.entitlements.values()) {
-          entitlement.alreadyLiftedKg = 0;
-          entitlement.availableBalanceKg = entitlement.monthlyEntitlementKg;
-        }
-        this.reseedInitialLots();
-        // Mirror resetTransactionalData()'s end state: this replay event becomes
-        // the sole history entry (push already happened in applyLedgerEvent).
-        this.events = [event];
+        const commodity = typeof payload.commodity === 'string' ? payload.commodity : undefined;
+        const affectedEntityIds = this.applyTransactionalReset(commodity);
+        // Mirror resetTransactionalData()'s end state. A full reset makes this
+        // replay event the sole history entry; a commodity-scoped reset only
+        // drops events tied to the affected entities (push already happened
+        // in applyLedgerEvent, so `event` itself is kept either way).
+        this.events = commodity
+          ? this.events.filter((candidate) => candidate === event || !affectedEntityIds.has(candidate.entityId))
+          : [event];
         break;
       }
       default:

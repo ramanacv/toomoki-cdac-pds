@@ -98,6 +98,25 @@ describe('AdminService', () => {
     expect(after.metrics.stakeholders).toBe(before.metrics.stakeholders);
   });
 
+  it('scopes a reset to one commodity, leaving the others in place', () => {
+    const before = service.getOverview();
+    const wheatStockBefore = before.stock.find((position) => position.commodity === 'Wheat');
+    expect(wheatStockBefore?.quantityKg).toBeGreaterThan(0);
+
+    const result = service.resetLedger('Rice');
+    expect(result.ledgerTxId).toMatch(/^TX-/);
+    expect(result.message).toContain('Rice');
+
+    const after = service.getOverview();
+    expect(after.metrics.lots).toBe(before.metrics.lots);
+    expect(after.stock.map((position) => position.commodity)).toEqual(
+      expect.arrayContaining(['Rice', 'Wheat', 'Dal', 'Sugar', 'Cooking Oil', 'Kerosene'])
+    );
+    const wheatStockAfter = after.stock.find((position) => position.commodity === 'Wheat');
+    expect(wheatStockAfter?.quantityKg).toBe(wheatStockBefore?.quantityKg);
+    expect(after.metrics.stakeholders).toBe(before.metrics.stakeholders);
+  });
+
   it('cleans up temp files', () => {
     rmSync(dir, { recursive: true, force: true });
     expect(true).toBe(true);

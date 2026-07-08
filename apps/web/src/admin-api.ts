@@ -126,10 +126,11 @@ async function fetchAdminJson<T>(path: string): Promise<T> {
   return (await response.json()) as T;
 }
 
-async function postAdminJson<T>(path: string): Promise<T> {
+async function postAdminJson<T>(path: string, body?: Record<string, unknown>): Promise<T> {
   const response = await fetch(buildApiUrl(path), {
     method: 'POST',
-    headers: adminHeaders()
+    headers: { ...adminHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify(body ?? {})
   });
   if (!response.ok) {
     const message = await response.text();
@@ -147,4 +148,5 @@ export const loadAdminActivity = (): Promise<AdminOverview['activity']> => fetch
 export const loadAdminStakeholderSummary = (): Promise<AdminOverview['stakeholders']> =>
   fetchAdminJson('/admin/stakeholders/summary');
 
-export const resetAdminLedger = (): Promise<AdminResetResult> => postAdminJson('/admin/reset');
+export const resetAdminLedger = (commodity?: string): Promise<AdminResetResult> =>
+  postAdminJson('/admin/reset', commodity ? { commodity } : undefined);

@@ -1105,4 +1105,135 @@ describe('resetTransactionalData', () => {
     expect(replayedState.events[0]?.eventType).toBe('ResetTransactionalData');
     expect(replayedState.stakeholders.length).toBeGreaterThan(0);
   });
+
+  it('scopes the reset to a single commodity, leaving other commodities untouched', () => {
+    const engine = new PdsLedgerEngine(true);
+    engine.dispatchLot({
+      transferId: 'TR-RESET-RICE',
+      lotId: 'LOT-RICE-2026-001',
+      fromOrg: 'PROC-001',
+      toOrg: 'FCI-001',
+      dispatchedQtyKg: 1000,
+      vehicleNo: 'KA01AB0101'
+    });
+    engine.dispatchLot({
+      transferId: 'TR-RESET-WHEAT',
+      lotId: 'LOT-WHEAT-2026-001',
+      fromOrg: 'PROC-001',
+      toOrg: 'FCI-001',
+      dispatchedQtyKg: 500,
+      vehicleNo: 'KA01AB0103'
+    });
+    engine.raiseAuditFlag({
+      alertType: AlertType.SHORT_RECEIPT,
+      entityId: 'TR-RESET-RICE',
+      message: 'Rice shortage under investigation',
+      evidence: {}
+    });
+    engine.raiseAuditFlag({
+      alertType: AlertType.SHORT_RECEIPT,
+      entityId: 'TR-RESET-WHEAT',
+      message: 'Wheat shortage under investigation',
+      evidence: {}
+    });
+    engine.createOrUpdateEntitlement({
+      rationCardHash: 'demo-ration-card-hash',
+      commodity: 'Rice',
+      month: '2026-06',
+      monthlyEntitlementKg: 25,
+      alreadyLiftedKg: 25,
+      availableBalanceKg: 0,
+      active: true
+    });
+    engine.createOrUpdateEntitlement({
+      rationCardHash: 'demo-ration-card-hash',
+      commodity: 'Wheat',
+      month: '2026-06',
+      monthlyEntitlementKg: 10,
+      alreadyLiftedKg: 10,
+      availableBalanceKg: 0,
+      active: true
+    });
+
+    const result = engine.resetTransactionalData('Rice');
+    expect(result.ledgerTxId).toMatch(/^TX-/);
+
+    const state = engine.exportState();
+    const stock = new Map(state.stock);
+
+    // Rice: cleared and reseeded to its initial lot/stock.
+    expect(state.lots.filter((lot) => lot.commodity === 'Rice')).toHaveLength(1);
+    expect(state.lots.find((lot) => lot.commodity === 'Rice')?.lotId).toBe('LOT-RICE-2026-001');
+    expect(state.transfers.some((transfer) => transfer.transferId === 'TR-RESET-RICE')).toBe(false);
+    expect(state.alerts.some((alert) => alert.entityId === 'TR-RESET-RICE')).toBe(false);
+    expect(stock.get('PROC-001:Rice')).toBe(10000);
+    const riceEntitlement = state.entitlements.find(
+      (item) => item.rationCardHash === 'demo-ration-card-hash' && item.commodity === 'Rice'
+    );
+    expect(riceEntitlement?.alreadyLiftedKg).toBe(0);
+    expect(riceEntitlement?.availableBalanceKg).toBe(25);
+
+    // Wheat: untouched by the Rice-scoped reset.
+    expect(state.transfers.some((transfer) => transfer.transferId === 'TR-RESET-WHEAT')).toBe(true);
+    expect(state.alerts.some((alert) => alert.entityId === 'TR-RESET-WHEAT')).toBe(true);
+    expect(stock.get('PROC-001:Wheat')).toBe(6500);
+    const wheatEntitlement = state.entitlements.find(
+      (item) => item.rationCardHash === 'demo-ration-card-hash' && item.commodity === 'Wheat'
+    );
+    expect(wheatEntitlement?.alreadyLiftedKg).toBe(10);
+
+    // The reset event itself, and the surviving Wheat-related event, remain in
+    // history — a commodity-scoped reset does not wipe unrelated history.
+    expect(state.events.some((event) => event.eventType === 'ResetTransactionalData')).toBe(true);
+    expect(state.events.some((event) => event.entityId === 'TR-RESET-WHEAT')).toBe(true);
+    expect(state.events.some((event) => event.entityId === 'TR-RESET-RICE')).toBe(false);
+  });
+
+  it('replays a commodity-scoped reset event without affecting other commodities', () => {
+    const source = new PdsLedgerEngine(true);
+    source.dispatchLot({
+      transferId: 'TR-RESET-REPLAY-RICE',
+      lotId: 'LOT-RICE-2026-001',
+      fromOrg: 'PROC-001',
+      toOrg: 'FCI-001',
+      dispatchedQtyKg: 1000,
+      vehicleNo: 'KA01AB0104'
+    });
+    source.dispatchLot({
+      transferId: 'TR-RESET-REPLAY-WHEAT',
+      lotId: 'LOT-WHEAT-2026-001',
+      fromOrg: 'PROC-001',
+      toOrg: 'FCI-001',
+      dispatchedQtyKg: 500,
+      vehicleNo: 'KA01AB0105'
+    });
+    source.resetTransactionalData('Rice');
+    const resetEvent = source.exportState().events.find((event) => event.eventType === 'ResetTransactionalData');
+    expect(resetEvent?.payload.commodity).toBe('Rice');
+
+    const replayTarget = new PdsLedgerEngine(true);
+    replayTarget.dispatchLot({
+      transferId: 'TR-RESET-REPLAY-RICE',
+      lotId: 'LOT-RICE-2026-001',
+      fromOrg: 'PROC-001',
+      toOrg: 'FCI-001',
+      dispatchedQtyKg: 1000,
+      vehicleNo: 'KA01AB0104'
+    });
+    replayTarget.dispatchLot({
+      transferId: 'TR-RESET-REPLAY-WHEAT',
+      lotId: 'LOT-WHEAT-2026-001',
+      fromOrg: 'PROC-001',
+      toOrg: 'FCI-001',
+      dispatchedQtyKg: 500,
+      vehicleNo: 'KA01AB0105'
+    });
+    expect(() => replayTarget.applyLedgerEvent(resetEvent!)).not.toThrow();
+
+    const replayedState = replayTarget.exportState();
+    expect(replayedState.transfers.some((transfer) => transfer.transferId === 'TR-RESET-REPLAY-RICE')).toBe(false);
+    expect(replayedState.transfers.some((transfer) => transfer.transferId === 'TR-RESET-REPLAY-WHEAT')).toBe(true);
+    expect(new Map(replayedState.stock).get('PROC-001:Rice')).toBe(10000);
+    expect(new Map(replayedState.stock).get('PROC-001:Wheat')).toBe(6500);
+  });
 });

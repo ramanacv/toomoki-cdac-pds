@@ -64,7 +64,7 @@ describe('AdminModule', () => {
     const beforeReset = controller.overview();
     expect(beforeReset.metrics.lots).toBeGreaterThan(0);
 
-    const resetResult = controller.reset();
+    const resetResult = controller.reset({});
     expect(resetResult.ledgerTxId).toMatch(/^TX-/);
 
     const afterReset = controller.overview();
@@ -74,5 +74,26 @@ describe('AdminModule', () => {
     expect(afterReset.stock.map((position) => position.commodity)).toEqual(
       expect.arrayContaining(['Rice', 'Wheat', 'Dal', 'Sugar', 'Cooking Oil', 'Kerosene'])
     );
+  });
+
+  it('accepts a commodity-scoped reset and rejects an unknown commodity', async () => {
+    fixture = await createDemoLedgerFixture();
+
+    const moduleRef = await Test.createTestingModule({
+      controllers: [AdminController],
+      providers: [
+        AdminService,
+        { provide: PdsLedgerFacade, useValue: fixture.facade },
+        { provide: 'FABRIC_RUNTIME_CONFIG', useValue: fabricConfigFixture() }
+      ]
+    }).compile();
+
+    controller = moduleRef.get(AdminController);
+
+    const result = controller.reset({ commodity: 'Rice' });
+    expect(result.ledgerTxId).toMatch(/^TX-/);
+    expect(result.message).toContain('Rice');
+
+    expect(() => controller.reset({ commodity: 'Not-A-Commodity' })).toThrow('Unknown commodity: Not-A-Commodity');
   });
 });

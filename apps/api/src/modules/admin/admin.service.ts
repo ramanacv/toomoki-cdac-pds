@@ -80,12 +80,13 @@ export class AdminService {
     return this.buildStakeholderSummary();
   }
 
-  resetLedger(): AdminResetResult {
-    const { ledgerTxId } = this.ledger.resetTransactionalData();
+  resetLedger(commodity?: string): AdminResetResult {
+    const { ledgerTxId } = this.ledger.resetTransactionalData(commodity);
     return {
       ledgerTxId,
-      message:
-        'Movement data, allocations, distributions, audit alerts, stock, and ledger events were cleared. Initial commodity lots were reseeded and entitlement balances were reset to their monthly limits. Stakeholders, ration cards, and entitlement rules were left untouched.'
+      message: commodity
+        ? `Movement data, allocations, distributions, stock, and related audit alerts for ${commodity} were cleared. Its initial lot was reseeded and its entitlement balances were reset to their monthly limits. Other commodities, stakeholders, ration cards, and entitlement rules were left untouched.`
+        : 'Movement data, allocations, distributions, audit alerts, stock, and ledger events were cleared. Initial commodity lots were reseeded and entitlement balances were reset to their monthly limits. Stakeholders, ration cards, and entitlement rules were left untouched.'
     };
   }
 
