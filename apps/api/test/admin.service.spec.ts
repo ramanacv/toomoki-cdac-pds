@@ -61,6 +61,9 @@ describe('AdminService', () => {
     expect(overview.network.demo?.worldStateSummary.lots).toBeGreaterThan(0);
     expect(overview.activity.eventCount).toBeGreaterThan(0);
     expect(overview.health.some((check) => check.name === 'api')).toBe(true);
+    expect(overview.stock.every((position) => position.quantityKg > 0)).toBe(true);
+    expect(overview.entitlementSummary.recordCount).toBeGreaterThanOrEqual(overview.entitlementSummary.activeCount);
+    expect(overview.entitlementSummary.utilizationPct).toBeGreaterThanOrEqual(0);
   });
 
   it('returns network, activity, and stakeholder summaries', () => {
@@ -71,6 +74,7 @@ describe('AdminService', () => {
     expect(network.persistenceBackend).toBeDefined();
     expect(activity.recentEvents.length).toBeGreaterThan(0);
     expect(stakeholders.byType.length).toBeGreaterThan(0);
+    expect(stakeholders.byStatus.length).toBeGreaterThan(0);
     expect(stakeholders.fabricOrgMapping.length).toBeGreaterThan(0);
   });
 

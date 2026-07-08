@@ -489,6 +489,22 @@ export class PdsLedgerEngine {
     }
     this.assertActiveStakeholder(input.fpsId);
     this.assertActiveStakeholder(input.sourceGodownId);
+    const availableStockKg = this.stock.get(keyFor(input.sourceGodownId, input.commodity)) ?? 0;
+    if (availableStockKg < input.allocatedQtyKg) {
+      this.raiseAuditFlag({
+        alertType: AlertType.UNAUTHORIZED_TRANSACTION,
+        entityId: input.allocationId,
+        message: `Allocation ${input.allocationId} blocked: insufficient stock at ${input.sourceGodownId}`,
+        evidence: {
+          allocationId: input.allocationId,
+          sourceGodownId: input.sourceGodownId,
+          commodity: input.commodity,
+          requestedQtyKg: input.allocatedQtyKg,
+          availableQtyKg: availableStockKg
+        }
+      });
+      throw new Error(`Insufficient stock for ${input.sourceGodownId} ${input.commodity}`);
+    }
     this.consumeStock(input.sourceGodownId, input.commodity, input.allocatedQtyKg);
     const allocation: FPSAllocation = { ...input, status: 'ALLOCATED' };
     this.allocations.set(allocation.allocationId, allocation);
@@ -505,6 +521,16 @@ export class PdsLedgerEngine {
       throw new Error('receivedQtyKg must be positive');
     }
     if (input.receivedQtyKg > allocation.allocatedQtyKg) {
+      this.raiseAuditFlag({
+        alertType: AlertType.UNAUTHORIZED_TRANSACTION,
+        entityId: allocation.allocationId,
+        message: `FPS receipt blocked: received quantity exceeds allocation for ${allocation.allocationId}`,
+        evidence: {
+          allocationId: allocation.allocationId,
+          allocatedQtyKg: allocation.allocatedQtyKg,
+          receivedQtyKg: input.receivedQtyKg
+        }
+      });
       throw new Error(
         `receivedQtyKg cannot exceed allocatedQtyKg for allocation ${allocation.allocationId}`
       );

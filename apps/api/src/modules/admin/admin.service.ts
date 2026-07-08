@@ -9,12 +9,14 @@ import { usesDemoChaincodeRuntime } from '../config/ledger-mode.config.js';
 import { createFabricGatewayConnection } from '../fabric/fabric-gateway.connection.js';
 import type {
   AdminActivityFeed,
+  AdminEntitlementSummary,
   AdminFabricOrg,
   AdminHealthCheck,
   AdminMetrics,
   AdminNetworkInfo,
   AdminOverview,
-  AdminStakeholderSummary
+  AdminStakeholderSummary,
+  AdminStockPosition
 } from './admin.types.js';
 
 const RECENT_EVENT_LIMIT = 25;
@@ -53,6 +55,8 @@ export class AdminService {
       stakeholders,
       activity,
       auditAlerts: this.buildAuditAlertSummary(alerts),
+      stock: this.buildStockPositions(),
+      entitlementSummary: this.buildEntitlementSummary(),
       health: this.buildHealthChecks(network),
       links: {
         health: '/health',
@@ -213,6 +217,38 @@ export class AdminService {
         role: org.role,
         mspId: org.mspId
       }))
+    };
+  }
+
+  private buildStockPositions(): AdminStockPosition[] {
+    const state = this.ledger.exportState();
+    return state.stock
+      .map(([key, quantityKg]) => {
+        const separatorIndex = key.lastIndexOf(':');
+        return {
+          entityId: key.slice(0, separatorIndex),
+          commodity: key.slice(separatorIndex + 1),
+          quantityKg
+        };
+      })
+      .filter((position) => position.quantityKg > 0)
+      .sort((left, right) => right.quantityKg - left.quantityKg);
+  }
+
+  private buildEntitlementSummary(): AdminEntitlementSummary {
+    const entitlements = this.ledger.exportState().entitlements;
+    const totalMonthlyEntitlementKg = entitlements.reduce((total, item) => total + item.monthlyEntitlementKg, 0);
+    const totalLiftedKg = entitlements.reduce((total, item) => total + item.alreadyLiftedKg, 0);
+    const totalAvailableKg = entitlements.reduce((total, item) => total + item.availableBalanceKg, 0);
+
+    return {
+      totalMonthlyEntitlementKg,
+      totalLiftedKg,
+      totalAvailableKg,
+      utilizationPct:
+        totalMonthlyEntitlementKg > 0 ? Math.round((totalLiftedKg / totalMonthlyEntitlementKg) * 100) : 0,
+      activeCount: entitlements.filter((item) => item.active).length,
+      recordCount: entitlements.length
     };
   }
 

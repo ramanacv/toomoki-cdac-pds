@@ -92,7 +92,7 @@ export function AdminDashboard() {
       </a>
       <section id="admin-main" className="mb-6 grid gap-6 md:grid-cols-[minmax(0,1.3fr)_minmax(290px,0.7fr)]">
         <div className="surface-blur rounded-3xl p-8">
-          <p className="eyebrow">PDS-Chain operator console</p>
+          <p className="eyebrow">ViksitPDS operator console</p>
           <h1 className="text-3xl font-semibold leading-tight tracking-tight md:text-4xl">
             Monitor ledger health, network status, and recent activity.
           </h1>
@@ -259,6 +259,65 @@ export function AdminDashboard() {
                   </EntityCard>
                 ))}
               </div>
+            </Panel>
+
+            <Panel eyebrow="Stakeholders" title="Status breakdown">
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
+                {overview.stakeholders.byStatus.map((entry) => (
+                  <EntityCard key={entry.status} className="space-y-1">
+                    <strong className="block">{entry.status}</strong>
+                    <span className="text-sm text-muted-foreground">{entry.count} stakeholders</span>
+                  </EntityCard>
+                ))}
+              </div>
+            </Panel>
+
+            <Panel
+              eyebrow="Ledger"
+              title="Entitlement utilization"
+              pill={`${overview.entitlementSummary.utilizationPct}% lifted`}
+            >
+              <dl className="grid gap-3 md:grid-cols-2">
+                <div className="grid gap-1">
+                  <dt className="text-sm uppercase tracking-wide text-muted-foreground">Monthly entitlement</dt>
+                  <dd>{overview.entitlementSummary.totalMonthlyEntitlementKg.toLocaleString()} kg</dd>
+                </div>
+                <div className="grid gap-1">
+                  <dt className="text-sm uppercase tracking-wide text-muted-foreground">Already lifted</dt>
+                  <dd>{overview.entitlementSummary.totalLiftedKg.toLocaleString()} kg</dd>
+                </div>
+                <div className="grid gap-1">
+                  <dt className="text-sm uppercase tracking-wide text-muted-foreground">Available balance</dt>
+                  <dd>{overview.entitlementSummary.totalAvailableKg.toLocaleString()} kg</dd>
+                </div>
+                <div className="grid gap-1">
+                  <dt className="text-sm uppercase tracking-wide text-muted-foreground">Active records</dt>
+                  <dd>
+                    {overview.entitlementSummary.activeCount} / {overview.entitlementSummary.recordCount}
+                  </dd>
+                </div>
+              </dl>
+            </Panel>
+
+            <Panel eyebrow="Ledger" title="Stock positions" pill={`${overview.stock.length} positions`}>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead scope="col">Entity</TableHead>
+                    <TableHead scope="col">Commodity</TableHead>
+                    <TableHead scope="col">Quantity</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {overview.stock.map((position) => (
+                    <TableRow key={`${position.entityId}-${position.commodity}`}>
+                      <TableCell>{position.entityId}</TableCell>
+                      <TableCell>{position.commodity}</TableCell>
+                      <TableCell>{position.quantityKg.toLocaleString()} kg</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </Panel>
 
             {overview.stakeholders.fabricOrgMapping.length > 0 && (

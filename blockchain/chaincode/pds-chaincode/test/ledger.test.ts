@@ -928,6 +928,24 @@ describe('Quota rollover', () => {
     ).toThrow(/allocatedQtyKg must be positive/);
   });
 
+  it('rejects allocation beyond available godown stock and raises an audit alert', () => {
+    const engine = new PdsLedgerEngine(true);
+    engine.addStockForTest('GODOWN-B-001', 'Rice', 100);
+    expect(() =>
+      engine.allocateToFps({
+        allocationId: 'ALLOC-OVER-1',
+        fpsId: 'FPS-101',
+        commodity: 'Rice',
+        allocatedQtyKg: 500,
+        month: '2026-06',
+        sourceGodownId: 'GODOWN-B-001'
+      })
+    ).toThrow(/Insufficient stock/);
+    expect(
+      engine.getAlerts().some((alert) => alert.alertType === AlertType.UNAUTHORIZED_TRANSACTION && alert.entityId === 'ALLOC-OVER-1')
+    ).toBe(true);
+  });
+
   it('rejects fps receipt quantities outside the allocated amount', () => {
     const engine = new PdsLedgerEngine(true);
     engine.addStockForTest('GODOWN-B-001', 'Rice', 500);
@@ -945,6 +963,9 @@ describe('Quota rollover', () => {
     expect(() =>
       engine.recordFpsReceipt({ allocationId: 'ALLOC-RCPT-1', receivedQtyKg: 250 })
     ).toThrow(/cannot exceed allocatedQtyKg/);
+    expect(
+      engine.getAlerts().some((alert) => alert.alertType === AlertType.UNAUTHORIZED_TRANSACTION && alert.entityId === 'ALLOC-RCPT-1')
+    ).toBe(true);
     const received = engine.recordFpsReceipt({ allocationId: 'ALLOC-RCPT-1', receivedQtyKg: 180 });
     expect(received.status).toBe('RECEIVED');
     expect(received.receivedQtyKg).toBe(180);

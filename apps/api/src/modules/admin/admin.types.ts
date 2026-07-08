@@ -48,6 +48,21 @@ export type AdminNetworkInfo = {
   };
 };
 
+export type AdminStockPosition = {
+  entityId: string;
+  commodity: string;
+  quantityKg: number;
+};
+
+export type AdminEntitlementSummary = {
+  totalMonthlyEntitlementKg: number;
+  totalLiftedKg: number;
+  totalAvailableKg: number;
+  utilizationPct: number;
+  activeCount: number;
+  recordCount: number;
+};
+
 export type AdminMetrics = {
   stakeholders: number;
   lots: number;
@@ -86,6 +101,8 @@ export type AdminOverview = {
     byRiskLevel: Record<string, number>;
     recent: AuditAlert[];
   };
+  stock: AdminStockPosition[];
+  entitlementSummary: AdminEntitlementSummary;
   health: AdminHealthCheck[];
   links: {
     health: string;

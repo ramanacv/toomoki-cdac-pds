@@ -68,6 +68,15 @@ const adminOverview = vi.hoisted(() => ({
       }
     ]
   },
+  stock: [{ entityId: 'GODOWN-S-001', commodity: 'Rice', quantityKg: 500 }],
+  entitlementSummary: {
+    totalMonthlyEntitlementKg: 25,
+    totalLiftedKg: 10,
+    totalAvailableKg: 15,
+    utilizationPct: 40,
+    activeCount: 1,
+    recordCount: 1
+  },
   health: [
     { name: 'api', status: 'ok' as const, detail: 'API up' },
     { name: 'ledger', status: 'ok' as const, detail: 'Ledger ok' }
@@ -104,7 +113,12 @@ describe('AdminDashboard', () => {
 
   it('uses scoped column headers in the recent events table', async () => {
     render(<AdminDashboard />);
-    const table = await screen.findByRole('table');
+    await screen.findByText('Recent ledger events');
+    const tables = screen.getAllByRole('table');
+    const table = tables.find((candidate) => within(candidate).queryByText('Timestamp'));
+    if (!table) {
+      throw new Error('Recent ledger events table not found');
+    }
     const headerCells = within(table).getAllByRole('columnheader');
     expect(headerCells.length).toBeGreaterThan(0);
     for (const cell of headerCells) {
