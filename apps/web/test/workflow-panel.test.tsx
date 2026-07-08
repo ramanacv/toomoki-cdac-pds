@@ -216,4 +216,73 @@ describe('WorkflowActionPanel', () => {
 
     expect(screen.getByLabelText('Received quantity (kg)')).toHaveValue(demoQuantities.endpointDispatchKg.shivBhojan);
   });
+
+  it('exposes an editable dispatch quantity prefilled with the planned amount', () => {
+    render(
+      <WorkflowActionPanel
+        {...baseProps}
+        apiOnline={false}
+        role="PROCUREMENT"
+      />
+    );
+
+    expect(screen.getByLabelText('Dispatch quantity (kg)')).toHaveValue(demoQuantities.stageOneTransferKg);
+  });
+
+  it('lets an operator edit the dispatch quantity and applies the edited amount', async () => {
+    const user = userEvent.setup();
+    render(
+      <WorkflowActionPanel
+        {...baseProps}
+        apiOnline={false}
+        role="PROCUREMENT"
+      />
+    );
+
+    const input = screen.getByLabelText('Dispatch quantity (kg)');
+    await user.clear(input);
+    await user.type(input, '250');
+    await user.click(screen.getByRole('button', { name: 'Run action' }));
+
+    expect(baseProps.onMockComplete).toHaveBeenCalledTimes(1);
+    const [result] = baseProps.onMockComplete.mock.calls[0] as [{ context: { transfers: Array<{ dispatchedQtyKg: number }> } }];
+    expect(result.context.transfers[0]?.dispatchedQtyKg).toBe(250);
+  });
+
+  it('blocks submission client-side when the edited quantity is zero or blank', async () => {
+    const user = userEvent.setup();
+    render(
+      <WorkflowActionPanel
+        {...baseProps}
+        apiOnline={false}
+        role="PROCUREMENT"
+      />
+    );
+
+    const input = screen.getByLabelText('Dispatch quantity (kg)');
+    await user.clear(input);
+    await user.click(screen.getByRole('button', { name: 'Run action' }));
+
+    expect(screen.getByText(/Enter a quantity greater than zero/)).toBeInTheDocument();
+    expect(baseProps.onMockComplete).not.toHaveBeenCalled();
+  });
+
+  it('surfaces a backend rejection when the edited quantity exceeds available stock', async () => {
+    const user = userEvent.setup();
+    render(
+      <WorkflowActionPanel
+        {...baseProps}
+        apiOnline={false}
+        role="PROCUREMENT"
+      />
+    );
+
+    const input = screen.getByLabelText('Dispatch quantity (kg)');
+    await user.clear(input);
+    await user.type(input, '999999');
+    await user.click(screen.getByRole('button', { name: 'Run action' }));
+
+    expect(await screen.findByText(/Insufficient stock/)).toBeInTheDocument();
+    expect(baseProps.onMockComplete).not.toHaveBeenCalled();
+  });
 });

@@ -17,6 +17,7 @@ import {
   getWorkflowActions,
   getWorkflowProgress,
   type MockWorkflowResult,
+  type WorkflowActionRequest,
   type WorkflowActionSpec
 } from '@/workflow-actions.js';
 import { Panel } from '@/components/Panel';
@@ -27,6 +28,48 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { DefinitionList } from '@/components/Entity';
 import { formatDateTime, roleTitle } from '@/lib/constants';
+
+type EditableQuantity = {
+  label: string;
+  defaultValue: number;
+  apply: (qtyKg: number) => WorkflowActionRequest;
+};
+
+// Only the actions where an operator would realistically adjust the figure
+// (dispatch, receive, milling yield, delivery) expose an editable quantity.
+// The duplicate-claim probe keeps its fixed amount since its narrative is
+// specifically "the same claim again," not "a different quantity."
+function getEditableQuantity(request: WorkflowActionRequest): EditableQuantity | null {
+  switch (request.kind) {
+    case 'receive':
+      return {
+        label: 'Received quantity (kg)',
+        defaultValue: request.receivedQtyKg,
+        apply: (qtyKg) => ({ ...request, receivedQtyKg: qtyKg })
+      };
+    case 'dispatch':
+      return {
+        label: 'Dispatch quantity (kg)',
+        defaultValue: request.payload.dispatchedQtyKg,
+        apply: (qtyKg) => ({ ...request, payload: { ...request.payload, dispatchedQtyKg: qtyKg } })
+      };
+    case 'transform-lot':
+      return {
+        label: 'Milled quantity (kg)',
+        defaultValue: request.payload.quantityKg,
+        apply: (qtyKg) => ({ ...request, payload: { ...request.payload, quantityKg: qtyKg } })
+      };
+    case 'distribute':
+    case 'supervisor-exception-distribute':
+      return {
+        label: 'Delivered quantity (kg)',
+        defaultValue: request.payload.deliveredKg,
+        apply: (qtyKg) => ({ ...request, payload: { ...request.payload, deliveredKg: qtyKg } })
+      };
+    default:
+      return null;
+  }
+}
 
 type WorkflowActionPanelProps = {
   apiOnline: boolean;
@@ -58,7 +101,7 @@ export function WorkflowActionPanel({
   onMockComplete
 }: WorkflowActionPanelProps) {
   const [busy, setBusy] = useState(false);
-  const [receiveQtyKg, setReceiveQtyKg] = useState('');
+  const [quantityInputs, setQuantityInputs] = useState<Record<string, string>>({});
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [completedActionId, setCompletedActionId] = useState<string | null>(null);
@@ -79,17 +122,24 @@ export function WorkflowActionPanel({
     setMessage(null);
     setError(null);
     setCompletedActionId(null);
+    setQuantityInputs({});
   }, [role]);
-
-  useEffect(() => {
-    if (nextAction?.request.kind === 'receive') {
-      setReceiveQtyKg(String(nextAction.request.receivedQtyKg));
-    }
-  }, [nextAction]);
 
   const runAction = async (action: WorkflowActionSpec) => {
     if (!action || !action.roles.includes(role) || completedActionId === action.id) {
       return;
+    }
+
+    const editable = getEditableQuantity(action.request);
+    let request = action.request;
+    if (editable) {
+      const raw = quantityInputs[action.id] ?? String(editable.defaultValue);
+      const qtyKg = Number(raw);
+      if (!Number.isFinite(qtyKg) || qtyKg <= 0) {
+        setError('Enter a quantity greater than zero before running this action.');
+        return;
+      }
+      request = editable.apply(qtyKg);
     }
 
     setBusy(true);
@@ -98,11 +148,6 @@ export function WorkflowActionPanel({
     setCompletedActionId(null);
 
     try {
-      const request =
-        action.request.kind === 'receive'
-          ? { ...action.request, receivedQtyKg: Number(receiveQtyKg) }
-          : action.request;
-
       if (apiOnline) {
         const result = await executeWorkflowAction(request);
         await onComplete();
@@ -169,6 +214,9 @@ export function WorkflowActionPanel({
                   : undefined;
               const actionAllowed = action.roles.includes(role);
               const allowedRoles = action.roles.map(roleTitle).join(', ');
+              const editable = getEditableQuantity(request);
+              const canEdit = role !== 'MANAGEMENT' && actionAllowed && editable && completedActionId !== action.id;
+              const quantityValue = quantityInputs[action.id] ?? (editable ? String(editable.defaultValue) : '');
 
               return (
                 <div key={action.id} className="rounded-2xl border border-border bg-card/70 p-4">
@@ -198,6 +246,21 @@ export function WorkflowActionPanel({
                       ]}
                     />
                   )}
+                  {editable && (
+                    <div className="mt-3 grid max-w-[220px] gap-2">
+                      <Label htmlFor={`qty-${action.id}`}>{editable.label}</Label>
+                      <Input
+                        id={`qty-${action.id}`}
+                        type="number"
+                        min={1}
+                        disabled={!canEdit}
+                        value={quantityValue}
+                        onChange={(event) =>
+                          setQuantityInputs((current) => ({ ...current, [action.id]: event.target.value }))
+                        }
+                      />
+                    </div>
+                  )}
                   {role !== 'MANAGEMENT' && actionAllowed && (
                     <Button
                       type="button"
@@ -223,19 +286,6 @@ export function WorkflowActionPanel({
               );
             })}
           </div>
-
-          {nextAction.request.kind === 'receive' && (
-            <div className="grid max-w-sm gap-2">
-              <Label htmlFor="receive-qty">Received quantity (kg)</Label>
-              <Input
-                id="receive-qty"
-                type="number"
-                min={1}
-                value={receiveQtyKg}
-                onChange={(event) => setReceiveQtyKg(event.target.value)}
-              />
-            </div>
-          )}
 
           {!nextActionAllowed && role !== 'MANAGEMENT' && <Badge variant="secondary">Allowed: {nextAction.roles.map(roleTitle).join(', ')}</Badge>}
         </div>
