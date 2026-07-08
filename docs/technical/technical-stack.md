@@ -1,4 +1,4 @@
-# Technical Stack: PDS-Chain MVP
+# Technical Stack: ViksitPDS MVP
 
 ## Stack Decision
 

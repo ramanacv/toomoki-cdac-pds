@@ -14,7 +14,7 @@ The proposed MVP can be demonstrated within **2 weeks** using a working Hyperled
 
 ## 2. Solution Name
 
-**PDS-Chain: Blockchain-enabled Trust, Traceability and Authenticated Delivery Layer for Public Distribution System**
+**ViksitPDS: Blockchain-enabled Trust, Traceability and Authenticated Delivery Layer for Public Distribution System**
 
 Alternative names:
 
@@ -1078,4 +1078,4 @@ This approach directly addresses the objective of reducing misuse and leakage of
 
 ## 22. Suggested One-line Pitch
 
-> “PDS-Chain is a Hyperledger Fabric-based trust layer for SMART-PDS/state PDS systems that creates immutable traceability from procurement to authenticated beneficiary delivery, enabling leakage detection, duplicate claim prevention and real-time auditability.”
+> “ViksitPDS is a Hyperledger Fabric-based trust layer for SMART-PDS/state PDS systems that creates immutable traceability from procurement to authenticated beneficiary delivery, enabling leakage detection, duplicate claim prevention and real-time auditability.”

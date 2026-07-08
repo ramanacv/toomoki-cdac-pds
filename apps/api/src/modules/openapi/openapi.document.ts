@@ -1,9 +1,9 @@
 export const OPENAPI_SPEC = {
   openapi: '3.0.0',
   info: {
-    title: 'PDS-Chain API',
+    title: 'ViksitPDS API',
     version: '0.1.0',
-    description: 'Local OpenAPI document for the PDS-Chain MVP API'
+    description: 'Local OpenAPI document for the ViksitPDS MVP API'
   },
   servers: [{ url: '/', description: 'Current host' }],
   paths: {

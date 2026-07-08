@@ -1,4 +1,4 @@
-# Feature Specification: PDS-Chain MVP
+# Feature Specification: ViksitPDS MVP
 
 ## Common Rules
 

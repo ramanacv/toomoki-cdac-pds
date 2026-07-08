@@ -1,4 +1,4 @@
-# PDS-Chain MVP Sprint Backlog
+# ViksitPDS MVP Sprint Backlog
 
 This backlog turns the implementation plan into an execution sequence. The order is intentional: foundation first, then ledger and backend, then UI and demo tooling.
 

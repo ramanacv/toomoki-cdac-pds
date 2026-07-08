@@ -1,8 +1,8 @@
-# Product Requirements Document: PDS-Chain MVP
+# Product Requirements Document: ViksitPDS MVP
 
 ## Product Vision
 
-PDS-Chain provides a blockchain-enabled trust layer for PDS transactions so government departments, FPS dealers, godowns, auditors, and beneficiaries can verify commodity movement and ration delivery events without relying only on mutable operational databases.
+ViksitPDS provides a blockchain-enabled trust layer for PDS transactions so government departments, FPS dealers, godowns, auditors, and beneficiaries can verify commodity movement and ration delivery events without relying only on mutable operational databases.
 
 ## Product Goals
 

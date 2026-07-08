@@ -1,8 +1,8 @@
-# PDS-Chain MVP Implementation Plan
+# ViksitPDS MVP Implementation Plan
 
 ## Objective
 
-Build a working 2-week MVP of PDS-Chain that demonstrates a complete commodity journey:
+Build a working 2-week MVP of ViksitPDS that demonstrates a complete commodity journey:
 
 ```text
 Procurement Centre

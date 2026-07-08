@@ -1,4 +1,4 @@
-# PDS-Chain Mock Data
+# ViksitPDS Mock Data
 
 Canonical mock and seed data for local development, demos, and tests.
 

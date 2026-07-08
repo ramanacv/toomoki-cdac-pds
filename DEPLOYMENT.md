@@ -1,6 +1,6 @@
-# PDS-Chain Deployment Guide
+# ViksitPDS Deployment Guide
 
-This document covers how to deploy and operate PDS-Chain for local development, demo, and future pilot environments.
+This document covers how to deploy and operate ViksitPDS for local development, demo, and future pilot environments.
 
 ## Deployment Models
 

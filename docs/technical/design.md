@@ -1,4 +1,4 @@
-# Technical Design: PDS-Chain MVP
+# Technical Design: ViksitPDS MVP
 
 ## Domain Model
 

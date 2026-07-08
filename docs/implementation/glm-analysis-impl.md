@@ -1,4 +1,4 @@
-# PDS-Chain — Implementation Plan for GLM Analysis Findings
+# ViksitPDS — Implementation Plan for GLM Analysis Findings
 
 > Companion to [docs/product/glm-analysis.md](../product/glm-analysis.md).
 > Generated: 2026-06-25

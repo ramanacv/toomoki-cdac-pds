@@ -19,6 +19,6 @@ describe('HealthModule', () => {
   });
 
   it('renders landing page html', () => {
-    expect(controller.root()).toContain('PDS-Chain');
+    expect(controller.root()).toContain('ViksitPDS');
   });
 });

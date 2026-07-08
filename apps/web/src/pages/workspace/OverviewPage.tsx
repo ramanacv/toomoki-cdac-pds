@@ -13,7 +13,7 @@ export function OverviewPage() {
   return (
     <div className="grid gap-4">
       <header className="px-1">
-        <p className="eyebrow">PDS-Chain</p>
+        <p className="eyebrow">ViksitPDS</p>
         <h2 className="text-3xl font-semibold tracking-tight">Overview</h2>
         <p className="mt-1 leading-relaxed text-muted-foreground">{roleProfile.summary}</p>
       </header>

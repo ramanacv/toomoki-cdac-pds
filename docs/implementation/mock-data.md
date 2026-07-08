@@ -1,6 +1,6 @@
 # Mock Data and Fixtures
 
-PDS-Chain keeps all canonical mock and seed data in the repository `mock/` folder. Application code loads this data through the `@pds/fixtures` package instead of embedding records in source files.
+ViksitPDS keeps all canonical mock and seed data in the repository `mock/` folder. Application code loads this data through the `@pds/fixtures` package instead of embedding records in source files.
 
 This separation makes it straightforward to:
 

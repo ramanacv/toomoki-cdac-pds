@@ -1,8 +1,8 @@
-# PDS-Chain Documentation
+# ViksitPDS Documentation
 
-This documentation pack defines the product and technical baseline for a 2-week MVP of **PDS-Chain**, a blockchain-enabled trust, traceability, audit, and authenticated-delivery layer for the Public Distribution System.
+This documentation pack defines the product and technical baseline for a 2-week MVP of **ViksitPDS**, a blockchain-enabled trust, traceability, audit, and authenticated-delivery layer for the Public Distribution System.
 
-PDS-Chain is designed to complement SMART-PDS, state PDS systems, ePoS systems, procurement platforms, godown systems, and command-centre dashboards. It does not replace those systems.
+ViksitPDS is designed to complement SMART-PDS, state PDS systems, ePoS systems, procurement platforms, godown systems, and command-centre dashboards. It does not replace those systems.
 
 ## Source Inputs
 

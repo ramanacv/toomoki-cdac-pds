@@ -1,4 +1,4 @@
-# PDS-Chain — End-to-End Review (GLM Analysis)
+# ViksitPDS — End-to-End Review (GLM Analysis)
 
 > Generated: 2026-06-25
 > Scope: Full review of docs, API (`apps/api`), chaincode (`blockchain/`), frontend (`apps/web`), infra (`infra/`, `scripts/`), and repo hygiene.

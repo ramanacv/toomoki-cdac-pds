@@ -1,4 +1,4 @@
-# PDS-Chain — Entities, Roles, Permissions & Operations Reference
+# ViksitPDS — Entities, Roles, Permissions & Operations Reference
 
 > A product-level reference for the actors in the system, what each one does, which operations each can perform, and what the acronyms mean.
 > Source of truth in code:
