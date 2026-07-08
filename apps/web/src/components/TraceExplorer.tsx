@@ -5,7 +5,8 @@ import { Panel } from '@/components/Panel';
 import { buildApiUrl } from '@/api.js';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { formatDateTime } from '@/lib/constants';
+import { HintLabel } from '@/components/HintLabel';
+import { formatDateTime, stageHints } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 
 const accentClass: Record<TraceCard['accent'], string> = {
@@ -138,7 +139,12 @@ export function TraceExplorer({
               <div>
                 <strong className="block text-sm">{transfer.fromOrg} to {transfer.toOrg}</strong>
                 <span className="text-sm text-muted-foreground">
-                  {transfer.transferId} · {transfer.dispatchedQtyKg} kg · {transfer.stage ? `Stage-${transfer.stage}` : 'custody'}
+                  {transfer.transferId} · {transfer.dispatchedQtyKg} kg ·{' '}
+                  {transfer.stage ? (
+                    <HintLabel label={`Stage-${transfer.stage}`} hint={stageHints[transfer.stage]} />
+                  ) : (
+                    'custody'
+                  )}
                   {transfer.roRef ? ` · ${transfer.roRef}` : ''}
                 </span>
                 <span className="mt-1 block text-xs text-muted-foreground">

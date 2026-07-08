@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
-import type {
-  AuthTransaction,
-  CommodityLot,
-  DistributionTransaction,
-  FPSAllocation,
-  AuditAlert,
-  LedgerEvent,
-  MonthlyEntitlement,
-  TransferOrder
+import {
+  COMMODITIES,
+  type AuthTransaction,
+  type CommodityLot,
+  type DistributionTransaction,
+  type FPSAllocation,
+  type AuditAlert,
+  type LedgerEvent,
+  type MonthlyEntitlement,
+  type TransferOrder
 } from '@pds/shared-types';
 import { executeWorkflowAction } from '@/api.js';
 import type { DemoRole } from '@/demo-model.js';
@@ -26,6 +27,13 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/select';
 import { DefinitionList } from '@/components/Entity';
 import { formatDateTime, roleTitle } from '@/lib/constants';
 
@@ -105,15 +113,16 @@ export function WorkflowActionPanel({
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [completedActionId, setCompletedActionId] = useState<string | null>(null);
+  const [selectedCommodity, setSelectedCommodity] = useState('Rice');
 
   const context = useMemo(
     () => ({ lots, transfers, allocations, authTransactions, distributions, entitlements, alerts, ledgerEvents }),
     [allocations, alerts, authTransactions, distributions, entitlements, ledgerEvents, lots, transfers]
   );
 
-  const progress = getWorkflowProgress(context);
-  const allActions = getWorkflowActions(context);
-  const roleQueue = getRoleQueue(context, role);
+  const progress = getWorkflowProgress(context, selectedCommodity);
+  const allActions = getWorkflowActions(context, selectedCommodity);
+  const roleQueue = getRoleQueue(context, role, selectedCommodity);
   const nextAction = roleQueue.find((action) => action.status !== 'blocked') ?? roleQueue[0] ?? allActions[0] ?? null;
   const displayedActions = role === 'MANAGEMENT' ? allActions : roleQueue.length > 0 ? roleQueue : nextAction ? [nextAction] : [];
   const nextActionAllowed = nextAction ? nextAction.roles.includes(role) : false;
@@ -123,7 +132,7 @@ export function WorkflowActionPanel({
     setError(null);
     setCompletedActionId(null);
     setQuantityInputs({});
-  }, [role]);
+  }, [role, selectedCommodity]);
 
   const runAction = async (action: WorkflowActionSpec) => {
     if (!action || !action.roles.includes(role) || completedActionId === action.id) {
@@ -203,6 +212,21 @@ export function WorkflowActionPanel({
           : 'Actions mutate local demo state and append mock ledger evidence for click-through POC review.'
       }
     >
+      <div className="mb-4 max-w-xs">
+        <Label htmlFor="workflow-commodity">Commodity route</Label>
+        <Select value={selectedCommodity} onValueChange={setSelectedCommodity}>
+          <SelectTrigger id="workflow-commodity" className="mt-2">
+            <SelectValue placeholder="Select commodity" />
+          </SelectTrigger>
+          <SelectContent>
+            {COMMODITIES.map((commodity) => (
+              <SelectItem key={commodity.slug} value={commodity.name}>
+                {commodity.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
       {nextAction ? (
         <div className="flex flex-col gap-4">
           <div className="grid gap-3 md:grid-cols-2">

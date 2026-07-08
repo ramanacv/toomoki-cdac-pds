@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   backendSeed,
+  commodities,
   getScenarioAlerts,
   getScenarioDashboardSummary,
   getWorkspaceSnapshot,
@@ -28,8 +29,21 @@ describe('@pds/fixtures', () => {
   });
 
   it('defines backend seed lot and entitlement', () => {
+    expect(commodities.map((commodity) => commodity.name)).toEqual([
+      'Rice',
+      'Wheat',
+      'Dal',
+      'Sugar',
+      'Cooking Oil',
+      'Kerosene'
+    ]);
+    expect(backendSeed.initialLots).toHaveLength(6);
+    expect(backendSeed.initialEntitlements).toHaveLength(6);
     expect(backendSeed.initialLot.lotId).toBe('LOT-RICE-2026-001');
     expect(backendSeed.initialEntitlement.availableBalanceKg).toBe(25);
+    expect(backendSeed.initialLots.map((lot) => lot.commodity)).toEqual(
+      expect.arrayContaining(['Wheat', 'Dal', 'Sugar', 'Cooking Oil', 'Kerosene'])
+    );
   });
 
   it('returns scenario-specific alerts and dashboard overrides', () => {

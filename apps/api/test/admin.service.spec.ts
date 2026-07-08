@@ -78,6 +78,26 @@ describe('AdminService', () => {
     expect(stakeholders.fabricOrgMapping.length).toBeGreaterThan(0);
   });
 
+  it('resets transactional data while leaving stakeholders intact', () => {
+    const before = service.getOverview();
+    expect(before.metrics.lots).toBeGreaterThan(0);
+    expect(before.stock.length).toBeGreaterThan(0);
+
+    const result = service.resetLedger();
+    expect(result.ledgerTxId).toMatch(/^TX-/);
+
+    const after = service.getOverview();
+    // The demo's starting lots are recreated by the reset so the frontend's
+    // scripted rice workflow can be replayed while the commodity catalog remains visible.
+    expect(after.metrics.lots).toBe(6);
+    expect(after.metrics.transfers).toBe(0);
+    expect(after.metrics.distributions).toBe(0);
+    expect(after.stock.map((position) => position.commodity)).toEqual(
+      expect.arrayContaining(['Rice', 'Wheat', 'Dal', 'Sugar', 'Cooking Oil', 'Kerosene'])
+    );
+    expect(after.metrics.stakeholders).toBe(before.metrics.stakeholders);
+  });
+
   it('cleans up temp files', () => {
     rmSync(dir, { recursive: true, force: true });
     expect(true).toBe(true);

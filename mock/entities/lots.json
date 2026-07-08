@@ -21,5 +21,60 @@
     "currentLocation": "Retail endpoints",
     "status": "RECEIVED",
     "transformedFromLotId": "LOT-RICE-2026-001"
+  },
+  {
+    "lotId": "LOT-WHEAT-2026-001",
+    "commodity": "Wheat",
+    "season": "Rabi 2026",
+    "quantityKg": 7000,
+    "qualityGrade": "A",
+    "source": "Procurement Centre 01",
+    "currentOwner": "PROC-001",
+    "currentLocation": "Procurement Yard",
+    "status": "CREATED"
+  },
+  {
+    "lotId": "LOT-DAL-2026-001",
+    "commodity": "Dal",
+    "season": "Kharif 2026",
+    "quantityKg": 2000,
+    "qualityGrade": "A",
+    "source": "Procurement Centre 01",
+    "currentOwner": "PROC-001",
+    "currentLocation": "Procurement Yard",
+    "status": "CREATED"
+  },
+  {
+    "lotId": "LOT-SUGAR-2026-001",
+    "commodity": "Sugar",
+    "season": "2026",
+    "quantityKg": 2000,
+    "qualityGrade": "A",
+    "source": "Procurement Centre 01",
+    "currentOwner": "PROC-001",
+    "currentLocation": "Procurement Yard",
+    "status": "CREATED"
+  },
+  {
+    "lotId": "LOT-COOKING-OIL-2026-001",
+    "commodity": "Cooking Oil",
+    "season": "2026",
+    "quantityKg": 1000,
+    "qualityGrade": "A",
+    "source": "Procurement Centre 01",
+    "currentOwner": "PROC-001",
+    "currentLocation": "Procurement Yard",
+    "status": "CREATED"
+  },
+  {
+    "lotId": "LOT-KEROSENE-2026-001",
+    "commodity": "Kerosene",
+    "season": "2026",
+    "quantityKg": 1000,
+    "qualityGrade": "A",
+    "source": "Procurement Centre 01",
+    "currentOwner": "PROC-001",
+    "currentLocation": "Procurement Yard",
+    "status": "CREATED"
   }
 ]

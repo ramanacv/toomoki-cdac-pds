@@ -233,6 +233,26 @@ export const recordDistribution = async (input: {
     dealerId: 'FPS-DEALER-101'
   });
 
+export const createStockLot = async (input: {
+  commodity: string;
+  quantityKg: number;
+  qualityGrade: string;
+  currentOwner: string;
+  currentLocation: string;
+  season?: string;
+  source?: string;
+}): Promise<CommodityLot> =>
+  postJson('/lots', {
+    lotId: `LOT-${input.commodity.toUpperCase().replace(/[^A-Z0-9]+/g, '-')}-${Date.now()}`,
+    commodity: input.commodity,
+    season: input.season ?? 'Manual top-up',
+    quantityKg: input.quantityKg,
+    qualityGrade: input.qualityGrade,
+    source: input.source ?? 'Admin top-up',
+    currentOwner: input.currentOwner,
+    currentLocation: input.currentLocation
+  });
+
 export function buildApiUrl(path: string): string {
   return `${apiBaseUrl}${path}`;
 }

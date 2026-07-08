@@ -2,11 +2,132 @@ import { describe, expect, it } from 'vitest';
 import { AuthMode, AuthResult, AlertType, GrievanceType, RationCardType, EntitlementRuleStatus, StakeholderType, StakeholderStatus, TransferStatus } from '@pds/shared-types';
 import { PdsLedgerEngine } from '../src/index.js';
 
+const dispatchAndReceive = (
+  engine: PdsLedgerEngine,
+  transferId: string,
+  lotId: string,
+  fromOrg: string,
+  toOrg: string,
+  quantityKg: number
+) => {
+  engine.dispatchLot({
+    transferId,
+    lotId,
+    fromOrg,
+    toOrg,
+    dispatchedQtyKg: quantityKg,
+    vehicleNo: 'KA01AB0001'
+  });
+  engine.receiveLot({ transferId, receivedQtyKg: quantityKg });
+};
+
+const moveSeedRiceToMiller = (engine: PdsLedgerEngine, prefix: string, quantityKg = 1000) => {
+  dispatchAndReceive(engine, `${prefix}-PROC-FCI`, 'LOT-RICE-2026-001', 'PROC-001', 'FCI-001', quantityKg);
+  dispatchAndReceive(engine, `${prefix}-FCI-BUF`, 'LOT-RICE-2026-001', 'FCI-001', 'FCI-BUF-001', quantityKg);
+  dispatchAndReceive(engine, `${prefix}-BUF-DEPOT`, 'LOT-RICE-2026-001', 'FCI-BUF-001', 'GODOWN-S-001', quantityKg);
+  dispatchAndReceive(engine, `${prefix}-DEPOT-MILLER`, 'LOT-RICE-2026-001', 'GODOWN-S-001', 'MLL-001', quantityKg);
+};
+
 describe('PdsLedgerEngine', () => {
   it('seeds the demo dataset', () => {
     const engine = new PdsLedgerEngine(true);
     expect(engine.snapshot().stakeholders.length).toBeGreaterThan(0);
     expect(engine.snapshot().lots[0]?.lotId).toBe('LOT-RICE-2026-001');
+    expect(engine.snapshot().lots.map((lot) => lot.commodity)).toEqual(
+      expect.arrayContaining(['Rice', 'Wheat', 'Dal', 'Sugar', 'Cooking Oil', 'Kerosene'])
+    );
+    expect(engine.listEntitlements().map((entitlement) => entitlement.commodity)).toEqual(
+      expect.arrayContaining(['Rice', 'Wheat', 'Dal', 'Sugar', 'Cooking Oil', 'Kerosene'])
+    );
+    expect(engine.exportState().stock).toEqual(
+      expect.arrayContaining([
+        ['PROC-001:Rice', 10000],
+        ['PROC-001:Wheat', 7000],
+        ['PROC-001:Dal', 2000],
+        ['PROC-001:Sugar', 2000],
+        ['PROC-001:Cooking Oil', 1000],
+        ['PROC-001:Kerosene', 1000]
+      ])
+    );
+  });
+
+  it('reseeds all initial commodity lots after transactional reset', () => {
+    const engine = new PdsLedgerEngine(true);
+    engine.resetTransactionalData();
+
+    expect(engine.snapshot().lots.map((lot) => lot.commodity)).toEqual(
+      expect.arrayContaining(['Rice', 'Wheat', 'Dal', 'Sugar', 'Cooking Oil', 'Kerosene'])
+    );
+    expect(engine.exportState().stock).toEqual(
+      expect.arrayContaining([
+        ['PROC-001:Rice', 10000],
+        ['PROC-001:Wheat', 7000],
+        ['PROC-001:Dal', 2000],
+        ['PROC-001:Sugar', 2000],
+        ['PROC-001:Cooking Oil', 1000],
+        ['PROC-001:Kerosene', 1000]
+      ])
+    );
+    expect(engine.exportState().events.map((event) => event.eventType)).toEqual(['ResetTransactionalData']);
+  });
+
+  it('records a non-rice distribution when stock and entitlement exist', () => {
+    const engine = new PdsLedgerEngine(true);
+    engine.addStockForTest('FPS-101', 'Wheat', 10);
+    const auth = engine.simulateAuthentication({
+      authTxnId: 'AUTH-WHEAT-1',
+      beneficiaryRefHash: 'beneficiary-hash',
+      rationCardHash: 'demo-ration-card-hash',
+      authMode: AuthMode.MOCK_OTP,
+      authResult: AuthResult.SUCCESS
+    });
+
+    const distribution = engine.recordDistribution({
+      distributionId: 'DIST-WHEAT-1',
+      fpsId: 'FPS-101',
+      rationCardHash: 'demo-ration-card-hash',
+      beneficiaryRefHash: 'beneficiary-hash',
+      commodity: 'Wheat',
+      deliveredKg: 5,
+      authMode: auth.authMode,
+      authResult: auth.authResult,
+      authTxnRefHash: auth.authTxnRefHash,
+      dealerId: 'FPS-DEALER-101',
+      timestamp: '2026-06-15T10:00:00.000Z'
+    });
+
+    expect(distribution.commodity).toBe('Wheat');
+    expect(engine.getEntitlement('demo-ration-card-hash', 'Wheat', '2026-06').availableBalanceKg).toBe(5);
+  });
+
+  it('rejects commodity movements outside the configured route template', () => {
+    const engine = new PdsLedgerEngine(true);
+
+    expect(() =>
+      engine.dispatchLot({
+        transferId: 'TR-KEROSENE-MILLER-BLOCK',
+        lotId: 'LOT-KEROSENE-2026-001',
+        fromOrg: 'PROC-001',
+        toOrg: 'MLL-001',
+        dispatchedQtyKg: 100,
+        vehicleNo: 'KA01AB8001'
+      })
+    ).toThrow(/Kerosene route does not allow movement/);
+  });
+
+  it('rejects transformation for commodities with direct routes', () => {
+    const engine = new PdsLedgerEngine(true);
+
+    expect(() =>
+      engine.transformLot({
+        parentLotId: 'LOT-COOKING-OIL-2026-001',
+        childLotId: 'LOT-COOKING-OIL-2026-CHILD',
+        transformedBy: 'PROC-001',
+        commodity: 'Cooking Oil',
+        quantityKg: 100,
+        qualityGrade: 'A'
+      })
+    ).toThrow(/Cooking Oil does not require transformation/);
   });
 
   it('lists seeded lots and distributions in sorted order', () => {
@@ -14,25 +135,19 @@ describe('PdsLedgerEngine', () => {
     const lots = engine.listLots();
     const distributions = engine.listDistributions();
 
-    expect(lots[0]?.lotId).toBe('LOT-RICE-2026-001');
+    expect(lots.map((lot) => lot.lotId)).toEqual(
+      expect.arrayContaining(['LOT-RICE-2026-001', 'LOT-WHEAT-2026-001'])
+    );
     expect(distributions).toHaveLength(0);
   });
 
   it('transforms a parent lot into a child lot and traces both directions', () => {
     const engine = new PdsLedgerEngine(true);
-    engine.dispatchLot({
-      transferId: 'TR-TRANSFORM-SETUP',
-      lotId: 'LOT-RICE-2026-001',
-      fromOrg: 'PROC-001',
-      toOrg: 'MLL-001',
-      dispatchedQtyKg: 1000,
-      vehicleNo: 'KA01AB0101'
-    });
-    engine.receiveLot({ transferId: 'TR-TRANSFORM-SETUP', receivedQtyKg: 1000 });
+    moveSeedRiceToMiller(engine, 'TR-TRANSFORM-SETUP');
 
     const child = engine.transformLot({
       parentLotId: 'LOT-RICE-2026-001',
-      childLotId: 'LOT-RICE-2026-CHILD',
+      childLotId: 'LOT-RICE-2026-002',
       transformedBy: 'MLL-001',
       commodity: 'Rice',
       quantityKg: 850,
@@ -40,60 +155,14 @@ describe('PdsLedgerEngine', () => {
     });
 
     expect(child.transformedFromLotId).toBe('LOT-RICE-2026-001');
-    expect(engine.getLotHistory('LOT-RICE-2026-CHILD').some((event) => event.eventType === 'TransformLot')).toBe(true);
-    expect(engine.getLotHistory('LOT-RICE-2026-001').some((event) => event.entityId === 'LOT-RICE-2026-CHILD')).toBe(true);
+    expect(engine.getLotHistory('LOT-RICE-2026-002').some((event) => event.eventType === 'TransformLot')).toBe(true);
+    expect(engine.getLotHistory('LOT-RICE-2026-001').some((event) => event.entityId === 'LOT-RICE-2026-002')).toBe(true);
   });
 
   it('returns direct lot, transfer, and allocation lookups', () => {
     const engine = new PdsLedgerEngine(true);
-    engine.dispatchLot({
-      transferId: 'TR-LOOKUP-000',
-      lotId: 'LOT-RICE-2026-001',
-      fromOrg: 'PROC-001',
-      toOrg: 'MLL-001',
-      dispatchedQtyKg: 1000,
-      vehicleNo: 'KA01AB0001'
-    });
-    engine.receiveLot({
-      transferId: 'TR-LOOKUP-000',
-      receivedQtyKg: 1000
-    });
-    engine.dispatchLot({
-      transferId: 'TR-LOOKUP-000-2',
-      lotId: 'LOT-RICE-2026-001',
-      fromOrg: 'MLL-001',
-      toOrg: 'GODOWN-S-001',
-      dispatchedQtyKg: 1000,
-      vehicleNo: 'KA01AB0002'
-    });
-    engine.receiveLot({
-      transferId: 'TR-LOOKUP-000-2',
-      receivedQtyKg: 1000
-    });
-    engine.dispatchLot({
-      transferId: 'TR-LOOKUP-000-3',
-      lotId: 'LOT-RICE-2026-001',
-      fromOrg: 'GODOWN-S-001',
-      toOrg: 'GODOWN-B-001',
-      dispatchedQtyKg: 1000,
-      vehicleNo: 'KA01AB0003'
-    });
-    engine.receiveLot({
-      transferId: 'TR-LOOKUP-000-3',
-      receivedQtyKg: 1000
-    });
-    engine.dispatchLot({
-      transferId: 'TR-LOOKUP-001',
-      lotId: 'LOT-RICE-2026-001',
-      fromOrg: 'GODOWN-B-001',
-      toOrg: 'FPS-101',
-      dispatchedQtyKg: 100,
-      vehicleNo: 'KA01AB0004'
-    });
-    engine.receiveLot({
-      transferId: 'TR-LOOKUP-001',
-      receivedQtyKg: 100
-    });
+    dispatchAndReceive(engine, 'TR-LOOKUP-001', 'LOT-RICE-2026-001', 'PROC-001', 'FCI-001', 100);
+    engine.addStockForTest('GODOWN-B-001', 'Rice', 100);
     engine.allocateToFps({
       allocationId: 'ALLOC-LOOKUP-001',
       fpsId: 'FPS-101',
@@ -119,42 +188,7 @@ describe('PdsLedgerEngine', () => {
 
   it('records a happy-path distribution', () => {
     const engine = new PdsLedgerEngine(true);
-    engine.dispatchLot({
-      transferId: 'TR-001',
-      lotId: 'LOT-RICE-2026-001',
-      fromOrg: 'PROC-001',
-      toOrg: 'MLL-001',
-      dispatchedQtyKg: 1000,
-      vehicleNo: 'KA01AB1234'
-    });
-    engine.receiveLot({
-      transferId: 'TR-001',
-      receivedQtyKg: 1000
-    });
-    engine.dispatchLot({
-      transferId: 'TR-002',
-      lotId: 'LOT-RICE-2026-001',
-      fromOrg: 'MLL-001',
-      toOrg: 'GODOWN-S-001',
-      dispatchedQtyKg: 1000,
-      vehicleNo: 'KA01AB5678'
-    });
-    engine.receiveLot({
-      transferId: 'TR-002',
-      receivedQtyKg: 1000
-    });
-    engine.dispatchLot({
-      transferId: 'TR-003',
-      lotId: 'LOT-RICE-2026-001',
-      fromOrg: 'GODOWN-S-001',
-      toOrg: 'GODOWN-B-001',
-      dispatchedQtyKg: 1000,
-      vehicleNo: 'KA01AB9012'
-    });
-    engine.receiveLot({
-      transferId: 'TR-003',
-      receivedQtyKg: 1000
-    });
+    engine.addStockForTest('GODOWN-B-001', 'Rice', 200);
     engine.allocateToFps({
       allocationId: 'ALLOC-001',
       fpsId: 'FPS-101',
@@ -198,7 +232,7 @@ describe('PdsLedgerEngine', () => {
       transferId: 'TR-002',
       lotId: 'LOT-RICE-2026-001',
       fromOrg: 'PROC-001',
-      toOrg: 'MLL-001',
+      toOrg: 'FCI-001',
       dispatchedQtyKg: 1000,
       vehicleNo: 'KA01AB5678'
     });
@@ -222,7 +256,7 @@ describe('PdsLedgerEngine', () => {
     });
     engine.createCommodityLot({
       lotId: 'LOT-DUP-1',
-      commodity: 'Rice',
+      commodity: 'Test Grain',
       season: 'Kharif',
       quantityKg: 100,
       qualityGrade: 'A',
@@ -325,7 +359,7 @@ describe('PdsLedgerEngine', () => {
     });
     engine.createCommodityLot({
       lotId: 'LOT-CONSERVE',
-      commodity: 'Wheat',
+      commodity: 'Test Grain',
       season: 'Kharif',
       quantityKg: 100,
       qualityGrade: 'A',
@@ -337,8 +371,8 @@ describe('PdsLedgerEngine', () => {
     const stockOf = (org: string, commodity: string): number =>
       engine.exportState().stock.find(([key]) => key === `${org}:${commodity}`)?.[1] ?? 0;
 
-    expect(stockOf('PROC-001', 'Wheat')).toBe(100);
-    expect(stockOf('MLL-001', 'Wheat')).toBe(0);
+    expect(stockOf('PROC-001', 'Test Grain')).toBe(100);
+    expect(stockOf('MLL-001', 'Test Grain')).toBe(0);
 
     engine.dispatchLot({
       transferId: 'TR-CONSERVE-1',
@@ -349,14 +383,14 @@ describe('PdsLedgerEngine', () => {
       vehicleNo: 'KA01AB0001'
     });
     // Sender stock deducted; receiver not yet credited (in-transit model).
-    expect(stockOf('PROC-001', 'Wheat')).toBe(40);
-    expect(stockOf('MLL-001', 'Wheat')).toBe(0);
+    expect(stockOf('PROC-001', 'Test Grain')).toBe(40);
+    expect(stockOf('MLL-001', 'Test Grain')).toBe(0);
 
     engine.receiveLot({ transferId: 'TR-CONSERVE-1', receivedQtyKg: 60 });
-    expect(stockOf('PROC-001', 'Wheat')).toBe(40);
-    expect(stockOf('MLL-001', 'Wheat')).toBe(60);
+    expect(stockOf('PROC-001', 'Test Grain')).toBe(40);
+    expect(stockOf('MLL-001', 'Test Grain')).toBe(60);
     // Total conserved across both orgs.
-    expect(stockOf('PROC-001', 'Wheat') + stockOf('MLL-001', 'Wheat')).toBe(100);
+    expect(stockOf('PROC-001', 'Test Grain') + stockOf('MLL-001', 'Test Grain')).toBe(100);
 
     // The remaining stock can still be dispatched by the holder even after a
     // partial receipt moved the lot's currentOwner to the receiving org.
@@ -368,7 +402,7 @@ describe('PdsLedgerEngine', () => {
       dispatchedQtyKg: 40,
       vehicleNo: 'KA01AB0002'
     });
-    expect(stockOf('PROC-001', 'Wheat')).toBe(0);
+    expect(stockOf('PROC-001', 'Test Grain')).toBe(0);
     engine.receiveLot({ transferId: 'TR-CONSERVE-2', receivedQtyKg: 40 });
 
     // Dispatch beyond the sender's remaining stock must still be rejected.
@@ -404,7 +438,7 @@ describe('PdsLedgerEngine', () => {
     });
     engine.createCommodityLot({
       lotId: 'LOT-RECEIPT-QTY',
-      commodity: 'Rice',
+      commodity: 'Test Grain',
       season: 'Kharif',
       quantityKg: 100,
       qualityGrade: 'A',
@@ -427,13 +461,13 @@ describe('PdsLedgerEngine', () => {
 
     expect(() => engine.receiveLot({ transferId: 'TR-RECEIPT-QTY-OVER', receivedQtyKg: 0 })).toThrow(/must be positive/);
     expect(() => engine.receiveLot({ transferId: 'TR-RECEIPT-QTY-OVER', receivedQtyKg: 61 })).toThrow(/cannot exceed dispatchedQtyKg/);
-    expect(stockOf('PROC-001', 'Rice')).toBe(40);
-    expect(stockOf('MLL-001', 'Rice')).toBe(0);
+    expect(stockOf('PROC-001', 'Test Grain')).toBe(40);
+    expect(stockOf('MLL-001', 'Test Grain')).toBe(0);
 
     const received = engine.receiveLot({ transferId: 'TR-RECEIPT-QTY-OVER', receivedQtyKg: 50 });
     expect(received.status).toBe(TransferStatus.RECEIVED_WITH_SHORTAGE);
     expect(received.shortageQtyKg).toBe(10);
-    expect(stockOf('PROC-001', 'Rice') + stockOf('MLL-001', 'Rice')).toBe(90);
+    expect(stockOf('PROC-001', 'Test Grain') + stockOf('MLL-001', 'Test Grain')).toBe(90);
   });
 
   it('rejects dispatch with non-positive or over-stock dispatchedQtyKg (T1.3)', () => {
@@ -456,7 +490,7 @@ describe('PdsLedgerEngine', () => {
     });
     engine.createCommodityLot({
       lotId: 'LOT-QTY',
-      commodity: 'Rice',
+      commodity: 'Test Grain',
       season: 'Kharif',
       quantityKg: 50,
       qualityGrade: 'A',
@@ -495,7 +529,7 @@ describe('PdsLedgerEngine', () => {
       transferId: 'TR-DUP-1',
       lotId: 'LOT-RICE-2026-001',
       fromOrg: 'PROC-001',
-      toOrg: 'MLL-001',
+      toOrg: 'FCI-001',
       dispatchedQtyKg: 100,
       vehicleNo: 'KA01AB0001'
     });
@@ -510,25 +544,7 @@ describe('PdsLedgerEngine', () => {
       })
     ).toThrow(/already exists/);
 
-    engine.receiveLot({ transferId: 'TR-DUP-1', receivedQtyKg: 100 });
-    engine.dispatchLot({
-      transferId: 'TR-DUP-2',
-      lotId: 'LOT-RICE-2026-001',
-      fromOrg: 'MLL-001',
-      toOrg: 'GODOWN-S-001',
-      dispatchedQtyKg: 100,
-      vehicleNo: 'KA01AB0003'
-    });
-    engine.receiveLot({ transferId: 'TR-DUP-2', receivedQtyKg: 100 });
-    engine.dispatchLot({
-      transferId: 'TR-DUP-3',
-      lotId: 'LOT-RICE-2026-001',
-      fromOrg: 'GODOWN-S-001',
-      toOrg: 'GODOWN-B-001',
-      dispatchedQtyKg: 100,
-      vehicleNo: 'KA01AB0004'
-    });
-    engine.receiveLot({ transferId: 'TR-DUP-3', receivedQtyKg: 100 });
+    engine.addStockForTest('GODOWN-B-001', 'Rice', 100);
 
     engine.allocateToFps({
       allocationId: 'ALLOC-DUP-1',
@@ -989,5 +1005,104 @@ describe('Quota rollover', () => {
         timestamp: '2026-06-15T10:00:00.000Z'
       })
     ).toThrow(/deliveredKg must be positive/);
+  });
+});
+
+describe('resetTransactionalData', () => {
+  it('clears movement/quantity data but keeps stakeholders, ration cards, and entitlement rules', () => {
+    const engine = new PdsLedgerEngine(true);
+    engine.dispatchLot({
+      transferId: 'TR-RESET-SETUP',
+      lotId: 'LOT-RICE-2026-001',
+      fromOrg: 'PROC-001',
+      toOrg: 'FCI-001',
+      dispatchedQtyKg: 1000,
+      vehicleNo: 'KA01AB0101'
+    });
+    engine.createOrUpdateEntitlement({
+      rationCardHash: 'demo-ration-card-hash',
+      commodity: 'Rice',
+      month: '2026-06',
+      monthlyEntitlementKg: 25,
+      alreadyLiftedKg: 25,
+      availableBalanceKg: 0,
+      active: true
+    });
+
+    const stakeholderCountBefore = engine.snapshot().stakeholders.length;
+    const rationCardCountBefore = engine.snapshot().rationCards.length;
+
+    const result = engine.resetTransactionalData();
+
+    expect(result.ledgerTxId).toMatch(/^TX-/);
+    const state = engine.exportState();
+    // The demo's starting lots are recreated so the scripted rice workflow can
+    // be replayed and the rest of the commodity catalog remains available.
+    expect(state.lots).toHaveLength(6);
+    expect(state.lots.map((lot) => lot.commodity)).toEqual(
+      expect.arrayContaining(['Rice', 'Wheat', 'Dal', 'Sugar', 'Cooking Oil', 'Kerosene'])
+    );
+    expect(state.transfers).toHaveLength(0);
+    expect(state.allocations).toHaveLength(0);
+    expect(state.distributions).toHaveLength(0);
+    expect(state.alerts).toHaveLength(0);
+    expect(new Map(state.stock).get('PROC-001:Rice')).toBe(10000);
+    expect(new Map(state.stock).get('PROC-001:Wheat')).toBe(7000);
+    expect(state.events).toHaveLength(1);
+    expect(state.events[0]?.eventType).toBe('ResetTransactionalData');
+
+    const entitlement = state.entitlements.find((item) => item.rationCardHash === 'demo-ration-card-hash');
+    expect(entitlement?.alreadyLiftedKg).toBe(0);
+    expect(entitlement?.availableBalanceKg).toBe(entitlement?.monthlyEntitlementKg);
+
+    expect(state.stakeholders.length).toBe(stakeholderCountBefore);
+    expect(state.rationCards.length).toBe(rationCardCountBefore);
+
+    engine.createCommodityLot({
+      lotId: 'LOT-RICE-2026-999',
+      commodity: 'Rice',
+      season: 'Kharif 2026',
+      quantityKg: 5000,
+      qualityGrade: 'A',
+      source: 'Manual top-up',
+      currentOwner: 'PROC-001',
+      currentLocation: 'Procurement Yard'
+    });
+    const stockAfterTopUp = new Map(engine.exportState().stock);
+    expect(stockAfterTopUp.get('PROC-001:Rice')).toBe(15000);
+  });
+
+  // Regression: the fabric-chaincode-runtime persistence path replays every
+  // mutation through applyLedgerEvent -> projectEventToState on a freshly
+  // loaded engine (see PdsChaincodeInvoker.submitLedgerEvent). If a new event
+  // type is added to ALLOWED_LEDGER_EVENT_TYPES without a matching projection
+  // case, that replay throws and crashes the API process.
+  it('replays via applyLedgerEvent without throwing (chaincode-runtime persistence path)', () => {
+    const source = new PdsLedgerEngine(true);
+    source.dispatchLot({
+      transferId: 'TR-RESET-REPLAY',
+      lotId: 'LOT-RICE-2026-001',
+      fromOrg: 'PROC-001',
+      toOrg: 'FCI-001',
+      dispatchedQtyKg: 1000,
+      vehicleNo: 'KA01AB0102'
+    });
+    source.resetTransactionalData();
+    const resetEvent = source.exportState().events[0];
+    expect(resetEvent?.eventType).toBe('ResetTransactionalData');
+
+    const replayTarget = new PdsLedgerEngine(true);
+    expect(() => replayTarget.applyLedgerEvent(resetEvent!)).not.toThrow();
+
+    const replayedState = replayTarget.exportState();
+    expect(replayedState.lots).toHaveLength(6);
+    expect(replayedState.lots.map((lot) => lot.commodity)).toEqual(
+      expect.arrayContaining(['Rice', 'Wheat', 'Dal', 'Sugar', 'Cooking Oil', 'Kerosene'])
+    );
+    expect(new Map(replayedState.stock).get('PROC-001:Rice')).toBe(10000);
+    expect(new Map(replayedState.stock).get('PROC-001:Wheat')).toBe(7000);
+    expect(replayedState.events).toHaveLength(1);
+    expect(replayedState.events[0]?.eventType).toBe('ResetTransactionalData');
+    expect(replayedState.stakeholders.length).toBeGreaterThan(0);
   });
 });

@@ -16,7 +16,7 @@ describe('AuditModule', () => {
       transferId: 'TR-AUDIT-001',
       lotId: 'LOT-RICE-2026-001',
       fromOrg: 'PROC-001',
-      toOrg: 'MLL-001',
+      toOrg: 'FCI-001',
       dispatchedQtyKg: 500,
       vehicleNo: 'KA01AU0001'
     });

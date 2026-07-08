@@ -60,5 +60,19 @@ describe('AdminModule', () => {
 
     const stakeholders = controller.stakeholdersSummary();
     expect(stakeholders.byType.length).toBeGreaterThan(0);
+
+    const beforeReset = controller.overview();
+    expect(beforeReset.metrics.lots).toBeGreaterThan(0);
+
+    const resetResult = controller.reset();
+    expect(resetResult.ledgerTxId).toMatch(/^TX-/);
+
+    const afterReset = controller.overview();
+    // The demo's starting lots are recreated by the reset so the scripted rice
+    // workflow can be replayed while the commodity catalog remains visible.
+    expect(afterReset.metrics.lots).toBe(6);
+    expect(afterReset.stock.map((position) => position.commodity)).toEqual(
+      expect.arrayContaining(['Rice', 'Wheat', 'Dal', 'Sugar', 'Cooking Oil', 'Kerosene'])
+    );
   });
 });

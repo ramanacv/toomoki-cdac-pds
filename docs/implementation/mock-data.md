@@ -44,8 +44,8 @@ Minimal bootstrap payload shared by:
 
 Contains:
 
-- `initialLot` — starting rice lot at procurement
-- `initialEntitlement` — unrationed monthly balance for the demo ration card
+- `initialLots` — starting procurement lots for Rice, Wheat, Dal, Sugar, Cooking Oil, and Kerosene
+- `initialEntitlements` — monthly demo ration-card balances for all supported commodities
 - `rationCard` and `beneficiaryRegistry` — off-chain mock registry rows
 
 Stakeholders for backend seed come from `mock/entities/stakeholders.json`.

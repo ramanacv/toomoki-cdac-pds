@@ -26,6 +26,8 @@ import {
   TransferOrder,
   TransferStatus,
   AuditAlert,
+  getCommodityRouteTemplate,
+  isCommodityRouteEdgeAllowed,
   hashReference,
   makeTimestamp
 } from '@pds/shared-types';
@@ -86,7 +88,8 @@ const ALLOWED_LEDGER_EVENT_TYPES = new Set([
   'EscalateOverdueGrievances',
   'ProposeEntitlementRule',
   'ApproveEntitlementRule',
-  'RolloverUnclaimedQuota'
+  'RolloverUnclaimedQuota',
+  'ResetTransactionalData'
 ]);
 
 const assertAllowedLedgerEventType = (eventType: string): void => {
@@ -205,17 +208,75 @@ export class PdsLedgerEngine {
     // Lazy-load demo fixtures so the Fabric runtime path (which never seeds)
     // does not require @pds/fixtures at module load — keeps the chaincode
     // bundle lean (T6.5) and avoids a hard dep on the fixtures package.
-    const require = createRequire(import.meta.url);
-    const { backendSeed, stakeholders: fixtureStakeholders } = require('@pds/fixtures') as typeof import('@pds/fixtures');
+    const { stakeholders: fixtureStakeholders } = this.loadFixtures();
 
     fixtureStakeholders.forEach((stakeholder) =>
       this.stakeholders.set(stakeholder.stakeholderId, { ...stakeholder })
     );
 
-    this.createCommodityLot({ ...backendSeed.initialLot });
-    this.createOrUpdateEntitlement({ ...backendSeed.initialEntitlement });
+    const { backendSeed } = this.loadFixtures();
+    backendSeed.initialLots.forEach((lot) => this.createCommodityLot({ ...lot }));
+    backendSeed.initialEntitlements.forEach((entitlement) =>
+      this.createOrUpdateEntitlement({ ...entitlement })
+    );
 
     return this.snapshot();
+  }
+
+  private loadFixtures(): typeof import('@pds/fixtures') {
+    const require = createRequire(import.meta.url);
+    return require('@pds/fixtures') as typeof import('@pds/fixtures');
+  }
+
+  /**
+   * Recreate the demo's starting lots without emitting their own ledger events —
+   * ResetTransactionalData is meant to be the sole history entry left behind
+   * by a reset (see the replay projection below), so this mutates state
+   * directly rather than going through createCommodityLot(). The frontend's
+   * scripted workflow (apps/web/src/workflow-actions.ts) hardcodes the rice
+   * lot id, so it must exist again after the lot map is cleared —
+   * otherwise every scripted dispatch/transform 404s with "Lot ... not found".
+   */
+  private reseedInitialLots(): void {
+    const { backendSeed } = this.loadFixtures();
+    for (const seedLot of backendSeed.initialLots) {
+      const lot: CommodityLot = { ...seedLot, status: LotStatus.CREATED };
+      this.lots.set(lot.lotId, lot);
+      this.addStock(lot.currentOwner, lot.commodity, lot.quantityKg);
+    }
+  }
+
+  /**
+   * Wipe all movement/quantity data (lots, transfers, allocations, auth
+   * transactions, distributions, audit alerts, stock, and event history) so
+   * testing can restart from a clean slate after a calculation bug produced
+   * bad figures downstream. Stakeholders, ration cards, grievances, and
+   * entitlement rule definitions (policy config, not accumulated quantities)
+   * are left intact — only lifted/available balances on entitlements reset.
+   * The demo's starting lots are recreated afterwards so the scripted
+   * frontend workflow can be replayed from its first step.
+   */
+  resetTransactionalData(): { ledgerTxId: string } {
+    this.lots.clear();
+    this.transfers.clear();
+    this.allocations.clear();
+    this.authTransactions.clear();
+    this.distributions.clear();
+    this.alerts.clear();
+    this.stock.clear();
+    this.events = [];
+
+    for (const entitlement of this.entitlements.values()) {
+      entitlement.alreadyLiftedKg = 0;
+      entitlement.availableBalanceKg = entitlement.monthlyEntitlementKg;
+    }
+
+    this.reseedInitialLots();
+
+    const { ledgerTxId } = this.recordEvent('workflow', 'ledger', 'ResetTransactionalData', {
+      resetAt: makeTimestamp()
+    });
+    return { ledgerTxId };
   }
 
   snapshot(): DemoSnapshot {
@@ -279,6 +340,20 @@ export class PdsLedgerEngine {
     }
     const parent = this.mustGetLot(input.parentLotId);
     this.assertActiveStakeholder(input.transformedBy);
+    const route = getCommodityRouteTemplate(parent.commodity);
+    if (route && !route.requiresTransformation) {
+      throw new Error(`${parent.commodity} does not require transformation in the configured commodity route`);
+    }
+    if (route?.transformation) {
+      if (
+        route.transformation.parentLotId !== parent.lotId ||
+        route.transformation.childLotId !== input.childLotId ||
+        route.transformation.transformedBy !== input.transformedBy ||
+        route.transformation.outputCommodity !== input.commodity
+      ) {
+        throw new Error(`TransformLot does not match the configured ${parent.commodity} commodity route`);
+      }
+    }
     if (parent.currentOwner !== input.transformedBy) {
       throw new Error(`Lot ${parent.lotId} is owned by ${parent.currentOwner}, not ${input.transformedBy}`);
     }
@@ -329,12 +404,18 @@ export class PdsLedgerEngine {
     if (lot.status === LotStatus.DISPATCHED) {
       throw new Error(`Lot ${lot.lotId} is already in transit (DISPATCHED); cannot re-dispatch until received`);
     }
+    if (input.dispatchedQtyKg <= 0) {
+      throw new Error('dispatchedQtyKg must be positive');
+    }
+    const lotKind = lot.transformedFromLotId ? 'transformed' : 'source';
+    if (!isCommodityRouteEdgeAllowed(lot.commodity, input.fromOrg, input.toOrg, lotKind)) {
+      throw new Error(
+        `${lot.commodity} route does not allow movement from ${input.fromOrg} to ${input.toOrg}`
+      );
+    }
     const senderStock = this.stock.get(keyFor(input.fromOrg, lot.commodity)) ?? 0;
     if (lot.currentOwner !== input.fromOrg && senderStock < input.dispatchedQtyKg) {
       throw new Error(`Lot ${lot.lotId} is owned by ${lot.currentOwner}, not ${input.fromOrg}`);
-    }
-    if (input.dispatchedQtyKg <= 0) {
-      throw new Error('dispatchedQtyKg must be positive');
     }
     const priorAuthorization = this.events.find(
       (event) =>
@@ -1383,6 +1464,24 @@ export class PdsLedgerEngine {
       case 'RolloverUnclaimedQuota':
         // Rollover updates multiple entitlements; projection not applicable for replay.
         break;
+      case 'ResetTransactionalData': {
+        this.lots.clear();
+        this.transfers.clear();
+        this.allocations.clear();
+        this.authTransactions.clear();
+        this.distributions.clear();
+        this.alerts.clear();
+        this.stock.clear();
+        for (const entitlement of this.entitlements.values()) {
+          entitlement.alreadyLiftedKg = 0;
+          entitlement.availableBalanceKg = entitlement.monthlyEntitlementKg;
+        }
+        this.reseedInitialLots();
+        // Mirror resetTransactionalData()'s end state: this replay event becomes
+        // the sole history entry (push already happened in applyLedgerEvent).
+        this.events = [event];
+        break;
+      }
       default:
         // applyLedgerEvent pre-validates against the allowlist, so reaching here
         // means an internal inconsistency — fail loudly rather than silently drop.

@@ -157,6 +157,13 @@ export class PdsRuntime extends PdsLedgerEngine {
     return result;
   }
 
+  override resetTransactionalData(...args: Parameters<PdsLedgerEngine['resetTransactionalData']>) {
+    const result = super.resetTransactionalData(...args);
+    this.persistedEventCount = 0;
+    void this.persist();
+    return result;
+  }
+
   override getLotHistory(lotId: string) {
     return this.chainQuery?.getLotHistory(lotId) ?? super.getLotHistory(lotId);
   }

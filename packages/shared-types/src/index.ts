@@ -1,5 +1,266 @@
 export type UUID = string;
 
+export type CommodityName = 'Rice' | 'Wheat' | 'Dal' | 'Sugar' | 'Cooking Oil' | 'Kerosene';
+
+export type CommodityDefinition = {
+  name: CommodityName;
+  slug: string;
+  defaultQualityGrade: string;
+  defaultTopUpQuantityKg: number;
+  defaultMonthlyEntitlementKg: number;
+};
+
+export type CommodityRouteLeg = {
+  id: string;
+  fromOrg: string;
+  toOrg: string;
+  stage: 'I' | 'II';
+  lot: 'source' | 'transformed';
+  requiresAuthorization?: boolean;
+  endpoint?: 'fps' | 'welfareInstitute' | 'shivBhojan';
+};
+
+export type CommodityRouteTemplate = {
+  commodity: CommodityName;
+  sourceLotId: string;
+  activeLotId: string;
+  requiresTransformation: boolean;
+  transformation?: {
+    transformedBy: string;
+    parentLotId: string;
+    childLotId: string;
+    outputCommodity: CommodityName;
+  };
+  legs: CommodityRouteLeg[];
+};
+
+export const COMMODITIES: CommodityDefinition[] = [
+  {
+    name: 'Rice',
+    slug: 'RICE',
+    defaultQualityGrade: 'A',
+    defaultTopUpQuantityKg: 10000,
+    defaultMonthlyEntitlementKg: 25
+  },
+  {
+    name: 'Wheat',
+    slug: 'WHEAT',
+    defaultQualityGrade: 'A',
+    defaultTopUpQuantityKg: 7000,
+    defaultMonthlyEntitlementKg: 10
+  },
+  {
+    name: 'Dal',
+    slug: 'DAL',
+    defaultQualityGrade: 'A',
+    defaultTopUpQuantityKg: 2000,
+    defaultMonthlyEntitlementKg: 2
+  },
+  {
+    name: 'Sugar',
+    slug: 'SUGAR',
+    defaultQualityGrade: 'A',
+    defaultTopUpQuantityKg: 2000,
+    defaultMonthlyEntitlementKg: 2
+  },
+  {
+    name: 'Cooking Oil',
+    slug: 'COOKING-OIL',
+    defaultQualityGrade: 'A',
+    defaultTopUpQuantityKg: 1000,
+    defaultMonthlyEntitlementKg: 1
+  },
+  {
+    name: 'Kerosene',
+    slug: 'KEROSENE',
+    defaultQualityGrade: 'A',
+    defaultTopUpQuantityKg: 1000,
+    defaultMonthlyEntitlementKg: 3
+  }
+];
+
+const directFpsRoute = (
+  commodity: CommodityName,
+  slug: string,
+  sourceLotId: string
+): CommodityRouteTemplate => ({
+  commodity,
+  sourceLotId,
+  activeLotId: sourceLotId,
+  requiresTransformation: false,
+  legs: [
+    {
+      id: `TR-POC-${slug}-PROC-DEPOT`,
+      fromOrg: 'PROC-001',
+      toOrg: 'GODOWN-S-001',
+      stage: 'I',
+      lot: 'source'
+    },
+    {
+      id: `TR-POC-${slug}-DEPOT-ISSUE`,
+      fromOrg: 'GODOWN-S-001',
+      toOrg: 'ISSUE-001',
+      stage: 'II',
+      lot: 'source',
+      requiresAuthorization: true
+    },
+    {
+      id: `TR-POC-${slug}-ISSUE-FPS`,
+      fromOrg: 'ISSUE-001',
+      toOrg: 'FPS-101',
+      stage: 'II',
+      lot: 'source',
+      requiresAuthorization: true,
+      endpoint: 'fps'
+    }
+  ]
+});
+
+export const COMMODITY_ROUTE_TEMPLATES: CommodityRouteTemplate[] = [
+  {
+    commodity: 'Rice',
+    sourceLotId: 'LOT-RICE-2026-001',
+    activeLotId: 'LOT-RICE-2026-002',
+    requiresTransformation: true,
+    transformation: {
+      transformedBy: 'MLL-001',
+      parentLotId: 'LOT-RICE-2026-001',
+      childLotId: 'LOT-RICE-2026-002',
+      outputCommodity: 'Rice'
+    },
+    legs: [
+      {
+        id: 'TR-POC-PROC-FCI',
+        fromOrg: 'PROC-001',
+        toOrg: 'FCI-001',
+        stage: 'I',
+        lot: 'source'
+      },
+      {
+        id: 'TR-POC-FCI-BUF',
+        fromOrg: 'FCI-001',
+        toOrg: 'FCI-BUF-001',
+        stage: 'I',
+        lot: 'source'
+      },
+      {
+        id: 'TR-POC-BUF-DEPOT',
+        fromOrg: 'FCI-BUF-001',
+        toOrg: 'GODOWN-S-001',
+        stage: 'I',
+        lot: 'source'
+      },
+      {
+        id: 'TR-POC-DEPOT-MILLER',
+        fromOrg: 'GODOWN-S-001',
+        toOrg: 'MLL-001',
+        stage: 'I',
+        lot: 'source'
+      },
+      {
+        id: 'TR-POC-MILLER-ISSUE',
+        fromOrg: 'MLL-001',
+        toOrg: 'ISSUE-001',
+        stage: 'II',
+        lot: 'transformed',
+        requiresAuthorization: true
+      },
+      {
+        id: 'TR-POC-ISSUE-FPS',
+        fromOrg: 'ISSUE-001',
+        toOrg: 'FPS-101',
+        stage: 'II',
+        lot: 'transformed',
+        requiresAuthorization: true,
+        endpoint: 'fps'
+      },
+      {
+        id: 'TR-POC-ISSUE-WI',
+        fromOrg: 'ISSUE-001',
+        toOrg: 'WI-101',
+        stage: 'II',
+        lot: 'transformed',
+        requiresAuthorization: true,
+        endpoint: 'welfareInstitute'
+      },
+      {
+        id: 'TR-POC-ISSUE-SBE',
+        fromOrg: 'ISSUE-001',
+        toOrg: 'SBE-101',
+        stage: 'II',
+        lot: 'transformed',
+        requiresAuthorization: true,
+        endpoint: 'shivBhojan'
+      }
+    ]
+  },
+  {
+    commodity: 'Wheat',
+    sourceLotId: 'LOT-WHEAT-2026-001',
+    activeLotId: 'LOT-WHEAT-2026-001',
+    requiresTransformation: false,
+    legs: [
+      {
+        id: 'TR-POC-WHEAT-PROC-FCI',
+        fromOrg: 'PROC-001',
+        toOrg: 'FCI-001',
+        stage: 'I',
+        lot: 'source'
+      },
+      {
+        id: 'TR-POC-WHEAT-FCI-BUF',
+        fromOrg: 'FCI-001',
+        toOrg: 'FCI-BUF-001',
+        stage: 'I',
+        lot: 'source'
+      },
+      {
+        id: 'TR-POC-WHEAT-BUF-DEPOT',
+        fromOrg: 'FCI-BUF-001',
+        toOrg: 'GODOWN-S-001',
+        stage: 'I',
+        lot: 'source'
+      },
+      {
+        id: 'TR-POC-WHEAT-DEPOT-ISSUE',
+        fromOrg: 'GODOWN-S-001',
+        toOrg: 'ISSUE-001',
+        stage: 'II',
+        lot: 'source',
+        requiresAuthorization: true
+      },
+      {
+        id: 'TR-POC-WHEAT-ISSUE-FPS',
+        fromOrg: 'ISSUE-001',
+        toOrg: 'FPS-101',
+        stage: 'II',
+        lot: 'source',
+        requiresAuthorization: true,
+        endpoint: 'fps'
+      }
+    ]
+  },
+  directFpsRoute('Dal', 'DAL', 'LOT-DAL-2026-001'),
+  directFpsRoute('Sugar', 'SUGAR', 'LOT-SUGAR-2026-001'),
+  directFpsRoute('Cooking Oil', 'COOKING-OIL', 'LOT-COOKING-OIL-2026-001'),
+  directFpsRoute('Kerosene', 'KEROSENE', 'LOT-KEROSENE-2026-001')
+];
+
+export const getCommodityRouteTemplate = (commodity: string): CommodityRouteTemplate | undefined =>
+  COMMODITY_ROUTE_TEMPLATES.find((template) => template.commodity === commodity);
+
+export const isCommodityRouteEdgeAllowed = (
+  commodity: string,
+  fromOrg: string,
+  toOrg: string,
+  lotKind: CommodityRouteLeg['lot']
+): boolean => {
+  const template = getCommodityRouteTemplate(commodity);
+  return template
+    ? template.legs.some((leg) => leg.fromOrg === fromOrg && leg.toOrg === toOrg && leg.lot === lotKind)
+    : true;
+};
+
 export enum StakeholderType {
   DFPD = 'DFPD',
   FCI = 'FCI',

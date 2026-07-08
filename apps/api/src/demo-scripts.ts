@@ -50,42 +50,7 @@ export const runHappyPathDemo = async (): Promise<DemoFlowResult> => {
   const service = await createRuntime(true, statePath);
 
   try {
-    service.dispatchLot({
-      transferId: 'TR-DEMO-001',
-      lotId: 'LOT-RICE-2026-001',
-      fromOrg: 'PROC-001',
-      toOrg: 'MLL-001',
-      dispatchedQtyKg: demoQuantities.stageOneTransferKg,
-      vehicleNo: 'KA01AB2001'
-    });
-    service.receiveLot({
-      transferId: 'TR-DEMO-001',
-      receivedQtyKg: demoQuantities.stageOneTransferKg
-    });
-    service.dispatchLot({
-      transferId: 'TR-DEMO-002',
-      lotId: 'LOT-RICE-2026-001',
-      fromOrg: 'MLL-001',
-      toOrg: 'GODOWN-S-001',
-      dispatchedQtyKg: demoQuantities.stageOneTransferKg,
-      vehicleNo: 'KA01AB2002'
-    });
-    service.receiveLot({
-      transferId: 'TR-DEMO-002',
-      receivedQtyKg: demoQuantities.stageOneTransferKg
-    });
-    service.dispatchLot({
-      transferId: 'TR-DEMO-003',
-      lotId: 'LOT-RICE-2026-001',
-      fromOrg: 'GODOWN-S-001',
-      toOrg: 'GODOWN-B-001',
-      dispatchedQtyKg: demoQuantities.stageOneTransferKg,
-      vehicleNo: 'KA01AB2003'
-    });
-    service.receiveLot({
-      transferId: 'TR-DEMO-003',
-      receivedQtyKg: demoQuantities.stageOneTransferKg
-    });
+    service.addStockForTest('GODOWN-B-001', 'Rice', demoQuantities.fpsAllocationKg);
     service.allocateToFps({
       allocationId: 'ALLOC-DEMO-001',
       fpsId: 'FPS-101',
@@ -143,7 +108,7 @@ export const runExceptionDemo = async (): Promise<DemoExceptionResult> => {
       transferId: 'TR-EXC-001',
       lotId: 'LOT-RICE-2026-001',
       fromOrg: 'PROC-001',
-      toOrg: 'MLL-001',
+      toOrg: 'FCI-001',
       dispatchedQtyKg: demoQuantities.shortReceiptDispatchKg,
       vehicleNo: 'KA01AB3001'
     });

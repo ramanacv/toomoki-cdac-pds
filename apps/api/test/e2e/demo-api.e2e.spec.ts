@@ -80,7 +80,7 @@ describe('Demo API e2e', () => {
           transferId: 'TR-E2E-001',
           lotId: 'LOT-E2E-001',
           fromOrg: 'PROC-001',
-          toOrg: 'MLL-001',
+          toOrg: 'FCI-001',
           dispatchedQtyKg: 100,
           vehicleNo: 'KA01E20001'
         })
@@ -246,9 +246,9 @@ describe('Demo API e2e', () => {
       .post('/transfers')
       .send({
         transferId: 'TR-SYS-SHORT',
-        lotId: 'LOT-RICE-2026-001',
-        fromOrg: 'GODOWN-B-001',
-        toOrg: 'FPS-101',
+        lotId: 'LOT-KEROSENE-2026-001',
+        fromOrg: 'PROC-001',
+        toOrg: 'GODOWN-S-001',
         dispatchedQtyKg: 20,
         vehicleNo: 'KA01SYS0001'
       })

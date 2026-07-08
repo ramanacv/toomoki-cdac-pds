@@ -87,6 +87,11 @@ export type AdminActivityFeed = {
   eventCount: number;
 };
 
+export type AdminResetResult = {
+  ledgerTxId: string;
+  message: string;
+};
+
 export type AdminOverview = {
   generatedAt: string;
   readOnly: true;

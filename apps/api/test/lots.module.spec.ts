@@ -35,22 +35,27 @@ describe('LotsModule', () => {
     fixture = await createDemoLedgerFixture();
     controller = await createControllerWithFacade(LotsController, fixture.facade);
 
-    fixture.facade.dispatchLot({
-      transferId: 'TR-LOT-TRANSFORM-SETUP',
-      lotId: 'LOT-RICE-2026-001',
-      fromOrg: 'PROC-001',
-      toOrg: 'MLL-001',
-      dispatchedQtyKg: demoQuantities.stageOneTransferKg,
-      vehicleNo: 'KA01LOT0001'
-    });
-    fixture.facade.receiveLot({
-      transferId: 'TR-LOT-TRANSFORM-SETUP',
-      receivedQtyKg: demoQuantities.stageOneTransferKg
-    });
+    const setupLegs = [
+      ['TR-LOT-TRANSFORM-PROC-FCI', 'PROC-001', 'FCI-001'],
+      ['TR-LOT-TRANSFORM-FCI-BUF', 'FCI-001', 'FCI-BUF-001'],
+      ['TR-LOT-TRANSFORM-BUF-DEPOT', 'FCI-BUF-001', 'GODOWN-S-001'],
+      ['TR-LOT-TRANSFORM-DEPOT-MILLER', 'GODOWN-S-001', 'MLL-001']
+    ] as const;
+    for (const [transferId, fromOrg, toOrg] of setupLegs) {
+      fixture.facade.dispatchLot({
+        transferId,
+        lotId: 'LOT-RICE-2026-001',
+        fromOrg,
+        toOrg,
+        dispatchedQtyKg: demoQuantities.stageOneTransferKg,
+        vehicleNo: 'KA01LOT0001'
+      });
+      fixture.facade.receiveLot({ transferId, receivedQtyKg: demoQuantities.stageOneTransferKg });
+    }
 
     const child = controller.transformLot({
       parentLotId: 'LOT-RICE-2026-001',
-      childLotId: 'LOT-RICE-2026-MILLED',
+      childLotId: 'LOT-RICE-2026-002',
       transformedBy: 'MLL-001',
       commodity: 'Rice',
       quantityKg: demoQuantities.millerToIssueKg,
@@ -59,8 +64,8 @@ describe('LotsModule', () => {
     });
 
     expect(child.transformedFromLotId).toBe('LOT-RICE-2026-001');
-    expect(controller.lot('LOT-RICE-2026-MILLED').currentOwner).toBe('MLL-001');
-    expect(controller.lotHistory('LOT-RICE-2026-MILLED').some((event) => event.eventType === 'TransformLot')).toBe(true);
-    expect(controller.lotHistory('LOT-RICE-2026-001').some((event) => event.entityId === 'LOT-RICE-2026-MILLED')).toBe(true);
+    expect(controller.lot('LOT-RICE-2026-002').currentOwner).toBe('MLL-001');
+    expect(controller.lotHistory('LOT-RICE-2026-002').some((event) => event.eventType === 'TransformLot')).toBe(true);
+    expect(controller.lotHistory('LOT-RICE-2026-001').some((event) => event.entityId === 'LOT-RICE-2026-002')).toBe(true);
   });
 });

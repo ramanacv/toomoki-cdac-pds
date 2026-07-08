@@ -28,6 +28,11 @@ export const workflowRoles = new Set<DemoRole>([
 export const roleCategory = (role: DemoRole): 'workflow' | 'optional' =>
   workflowRoles.has(role) ? 'workflow' : 'optional';
 
+export const stageHints: Record<'I' | 'II', string> = {
+  I: 'Stage-I: government movement before the issue point (procurement to FCI to depot/miller).',
+  II: 'Stage-II: RO-authorized movement from the issue point to the FPS/institution.'
+};
+
 export const scenarioOptions: Array<{ id: DemoScenario; label: string; short: string }> = [
   { id: 'happy-path', label: 'Happy path', short: 'All custody checkpoints clear.' },
   { id: 'short-receipt', label: 'Short receipt', short: 'Receipt mismatch raises alert.' },

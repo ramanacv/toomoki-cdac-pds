@@ -9,6 +9,51 @@
     "active": true
   },
   {
+    "rationCardHash": "demo-ration-card-hash",
+    "commodity": "Wheat",
+    "month": "2026-06",
+    "monthlyEntitlementKg": 10,
+    "alreadyLiftedKg": 0,
+    "availableBalanceKg": 10,
+    "active": true
+  },
+  {
+    "rationCardHash": "demo-ration-card-hash",
+    "commodity": "Dal",
+    "month": "2026-06",
+    "monthlyEntitlementKg": 2,
+    "alreadyLiftedKg": 0,
+    "availableBalanceKg": 2,
+    "active": true
+  },
+  {
+    "rationCardHash": "demo-ration-card-hash",
+    "commodity": "Sugar",
+    "month": "2026-06",
+    "monthlyEntitlementKg": 2,
+    "alreadyLiftedKg": 0,
+    "availableBalanceKg": 2,
+    "active": true
+  },
+  {
+    "rationCardHash": "demo-ration-card-hash",
+    "commodity": "Cooking Oil",
+    "month": "2026-06",
+    "monthlyEntitlementKg": 1,
+    "alreadyLiftedKg": 0,
+    "availableBalanceKg": 1,
+    "active": true
+  },
+  {
+    "rationCardHash": "demo-ration-card-hash",
+    "commodity": "Kerosene",
+    "month": "2026-06",
+    "monthlyEntitlementKg": 3,
+    "alreadyLiftedKg": 0,
+    "availableBalanceKg": 3,
+    "active": true
+  },
+  {
     "rationCardHash": "exception-ration-card-hash",
     "commodity": "Rice",
     "month": "2026-06",

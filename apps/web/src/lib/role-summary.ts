@@ -13,7 +13,7 @@ import type {
 import { StakeholderStatus, TransferStatus } from '@pds/shared-types';
 import type { DemoRole } from '@/demo-model.js';
 import { getRoleQueue } from '@/workflow-actions.js';
-import { summaryCardData } from '@/lib/constants.js';
+import { stageHints, summaryCardData } from '@/lib/constants.js';
 
 export type RoleSummaryInput = {
   lots: CommodityLot[];
@@ -58,7 +58,7 @@ export function roleSummaryCards(
   role: DemoRole,
   data: RoleSummaryInput,
   liveSummary: DashboardSummary
-): Array<[string, string]> {
+): Array<[string, string, string?]> {
   const orgs = roleOrgs[role] ?? [];
   const queue = getRoleQueue(data, role);
   const queued = queue.filter((action) => action.status !== 'blocked').length;
@@ -88,7 +88,7 @@ export function roleSummaryCards(
       const stageTwo = data.transfers.filter((t) => t.stage === 'II');
       return [
         ['Queued approvals', queued.toString()],
-        ['Stage-II movements', stageTwo.length.toString()],
+        ['Stage-II movements', stageTwo.length.toString(), stageHints.II],
         ['Approved movements', stageTwo.filter((t) => t.approvalStatus === 'APPROVED' || Boolean(t.authorizedBy)).length.toString()],
         ['Blocked dispatches', data.transfers.filter((t) => t.approvalStatus === 'BLOCKED').length.toString()]
       ];

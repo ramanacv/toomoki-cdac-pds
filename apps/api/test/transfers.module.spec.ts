@@ -15,9 +15,9 @@ describe('TransfersModule', () => {
 
     const transfer = controller.dispatch({
       transferId: 'TR-MOD-001',
-      lotId: 'LOT-RICE-2026-001',
+      lotId: 'LOT-KEROSENE-2026-001',
       fromOrg: 'PROC-001',
-      toOrg: 'MLL-001',
+      toOrg: 'GODOWN-S-001',
       dispatchedQtyKg: 250,
       vehicleNo: 'KA01TR0001'
     });
@@ -42,12 +42,13 @@ describe('TransfersModule', () => {
 
     expect(approval.ledgerTxId).toMatch(/^TX-/);
     expect(controller.ledgerEvents().some((event) => event.eventType === 'AuthorizeMovement')).toBe(true);
+    fixture.facade.addStockForTest('GODOWN-S-001', 'Wheat', 250);
 
     const transfer = controller.dispatch({
       transferId: 'TR-MOD-STAGE-II',
-      lotId: 'LOT-RICE-2026-001',
-      fromOrg: 'PROC-001',
-      toOrg: 'MLL-001',
+      lotId: 'LOT-WHEAT-2026-001',
+      fromOrg: 'GODOWN-S-001',
+      toOrg: 'ISSUE-001',
       dispatchedQtyKg: 250,
       vehicleNo: 'KA01TR0002',
       stage: 'II',
@@ -63,13 +64,14 @@ describe('TransfersModule', () => {
   it('rejects Stage-II dispatch without RO-lite authorization', async () => {
     fixture = await createDemoLedgerFixture();
     controller = await createControllerWithFacade(TransfersController, fixture.facade);
+    fixture.facade.addStockForTest('GODOWN-S-001', 'Wheat', 250);
 
     expect(() =>
       controller.dispatch({
         transferId: 'TR-MOD-STAGE-II-BLOCK',
-        lotId: 'LOT-RICE-2026-001',
-        fromOrg: 'PROC-001',
-        toOrg: 'MLL-001',
+        lotId: 'LOT-WHEAT-2026-001',
+        fromOrg: 'GODOWN-S-001',
+        toOrg: 'ISSUE-001',
         dispatchedQtyKg: 250,
         vehicleNo: 'KA01TR0003',
         stage: 'II'

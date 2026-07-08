@@ -8,11 +8,23 @@ import type {
   MonthlyEntitlement,
   TransferOrder
 } from '@pds/shared-types';
-import { AlertType, AuthMode, AuthResult, LotStatus, TransferStatus } from '@pds/shared-types';
+import {
+  COMMODITIES,
+  type CommodityName,
+  type CommodityRouteLeg,
+  type CommodityRouteTemplate,
+  AlertType,
+  AuthMode,
+  AuthResult,
+  LotStatus,
+	  TransferStatus,
+	  getCommodityRouteTemplate,
+	  isCommodityRouteEdgeAllowed
+	} from '@pds/shared-types';
 import { demoQuantities } from '@pds/fixtures';
 import type { DemoRole } from './demo-model.js';
 
-const DEMO_LOT_ID = 'LOT-RICE-2026-002';
+const DEFAULT_WORKFLOW_COMMODITY: CommodityName = 'Rice';
 const DEMO_RATION_CARD_HASH = 'demo-ration-card-hash';
 const DEMO_BENEFICIARY_HASH = 'beneficiary-hash';
 const now = () => new Date('2026-06-30T10:00:00.000Z').toISOString();
@@ -128,6 +140,7 @@ export type MockWorkflowResult = {
 type PlannedLeg = {
   id: string;
   lotId: string;
+  commodity: string;
   fromOrg: string;
   toOrg: string;
   label: string;
@@ -142,121 +155,104 @@ type PlannedLeg = {
   transformedFromLotId?: string;
 };
 
-const plannedLegs: PlannedLeg[] = [
-  {
-    id: 'TR-POC-PROC-FCI',
-    lotId: 'LOT-RICE-2026-001',
-    fromOrg: 'PROC-001',
-    toOrg: 'FCI-001',
-    label: 'Dispatch procurement stock to FCI',
-    detail: 'Procurement centre hands the seeded lot to FCI before central buffer movement.',
-    roles: ['PROCUREMENT'],
-    qtyKg: demoQuantities.stageOneTransferKg,
-    vehicleNo: 'KA01AB1999',
-    stage: 'I',
-    transporterId: 'TRANS-001'
-  },
-  {
-    id: 'TR-POC-FCI-BUF',
-    lotId: 'LOT-RICE-2026-001',
-    fromOrg: 'FCI-001',
-    toOrg: 'FCI-BUF-001',
-    label: 'Dispatch FCI stock to buffer godown',
-    detail: 'FCI records central reserve movement before state lifting.',
-    roles: ['FCI_DEPOT'],
-    qtyKg: demoQuantities.stageOneTransferKg,
-    vehicleNo: 'FCI01AB2001',
-    stage: 'I',
-    transporterId: 'TRANS-001'
-  },
-  {
-    id: 'TR-POC-BUF-DEPOT',
-    lotId: 'LOT-RICE-2026-001',
-    fromOrg: 'FCI-BUF-001',
-    toOrg: 'GODOWN-S-001',
-    label: 'Stage-I dispatch to state depot',
-    detail: 'Move lifted stock from FCI buffer godown to the state depot.',
-    roles: ['FCI_DEPOT'],
-    qtyKg: demoQuantities.stageOneTransferKg,
-    vehicleNo: 'KA01AB2002',
-    stage: 'I',
-    transporterId: 'TRANS-001'
-  },
-  {
-    id: 'TR-POC-DEPOT-MILLER',
-    lotId: 'LOT-RICE-2026-001',
-    fromOrg: 'GODOWN-S-001',
-    toOrg: 'MLL-001',
-    label: 'Dispatch paddy to miller',
-    detail: 'Send stock for the POC milling transformation leg.',
-    roles: ['DEPOT'],
-    qtyKg: demoQuantities.stageOneTransferKg,
-    vehicleNo: 'KA01AB2003',
-    stage: 'I',
-    transporterId: 'TRANS-001'
-  },
-  {
-    id: 'TR-POC-MILLER-ISSUE',
-    lotId: DEMO_LOT_ID,
-    fromOrg: 'MLL-001',
-    toOrg: 'ISSUE-001',
-    label: 'Stage-II dispatch to issue point',
-    detail: 'RO-lite approval is required before this movement can dispatch.',
-    roles: ['DEPOT'],
-    qtyKg: demoQuantities.millerToIssueKg,
-    vehicleNo: 'KA01AB2004',
-    stage: 'II',
-    roRef: 'RO-DSO-POC-001',
-    authorizedBy: 'DSO-001',
-    transporterId: 'TRANS-001',
-    transformedFromLotId: 'LOT-RICE-2026-001'
-  },
-  {
-    id: 'TR-POC-ISSUE-FPS',
-    lotId: DEMO_LOT_ID,
-    fromOrg: 'ISSUE-001',
-    toOrg: 'FPS-101',
-    label: 'Dispatch to FPS',
-    detail: 'Issue point sends stock to the fair price shop endpoint.',
-    roles: ['DEPOT'],
-    qtyKg: demoQuantities.endpointDispatchKg.fps,
-    vehicleNo: 'KA01AB2005',
-    stage: 'II',
-    roRef: 'RO-DSO-POC-FPS',
-    authorizedBy: 'DSO-001',
-    transporterId: 'TRANS-001'
-  },
-  {
-    id: 'TR-POC-ISSUE-WI',
-    lotId: DEMO_LOT_ID,
-    fromOrg: 'ISSUE-001',
-    toOrg: 'WI-101',
-    label: 'Dispatch to welfare institute',
-    detail: 'Issue point sends hostel allocation to the welfare endpoint.',
-    roles: ['DEPOT'],
-    qtyKg: demoQuantities.endpointDispatchKg.welfareInstitute,
-    vehicleNo: 'KA01AB2006',
-    stage: 'II',
-    roRef: 'RO-DSO-POC-WI',
-    authorizedBy: 'DSO-001',
-    transporterId: 'TRANS-001'
-  },
-  {
-    id: 'TR-POC-ISSUE-SBE',
-    lotId: DEMO_LOT_ID,
-    fromOrg: 'ISSUE-001',
-    toOrg: 'SBE-101',
-    label: 'Dispatch to Shiv Bhojan eatery',
-    detail: 'Issue point sends meal-scheme stock to the eatery endpoint.',
-    roles: ['DEPOT'],
-    qtyKg: demoQuantities.endpointDispatchKg.shivBhojan,
-    vehicleNo: 'KA01AB2007',
-    stage: 'II',
-    roRef: 'RO-DSO-POC-SBE',
-    authorizedBy: 'DSO-001',
-    transporterId: 'TRANS-001'
+const commodityDefinition = (commodity: string) =>
+  COMMODITIES.find((item) => item.name === commodity) ?? COMMODITIES[0];
+
+const roleForSender = (fromOrg: string): DemoRole[] => {
+  if (fromOrg === 'PROC-001') return ['PROCUREMENT'];
+  if (fromOrg === 'FCI-001' || fromOrg === 'FCI-BUF-001') return ['FCI_DEPOT'];
+  if (fromOrg === 'ISSUE-001' || fromOrg === 'GODOWN-S-001' || fromOrg === 'MLL-001') return ['DEPOT'];
+  return ['GODOWN'];
+};
+
+const vehicleForLeg = (leg: CommodityRouteLeg, index: number): string =>
+  leg.id === 'TR-POC-PROC-FCI'
+    ? 'KA01AB1999'
+    : leg.id === 'TR-POC-FCI-BUF'
+      ? 'FCI01AB2001'
+      : `KA01AB${String(2000 + index).padStart(4, '0')}`;
+
+const quantityForLeg = (template: CommodityRouteTemplate, leg: CommodityRouteLeg): number => {
+  if (leg.endpoint) {
+    return demoQuantities.endpointDispatchKg[leg.endpoint];
   }
-];
+  if (template.requiresTransformation && leg.lot === 'transformed') {
+    return demoQuantities.millerToIssueKg;
+  }
+  return Math.min(commodityDefinition(template.commodity).defaultTopUpQuantityKg, demoQuantities.stageOneTransferKg);
+};
+
+const labelForLeg = (template: CommodityRouteTemplate, leg: CommodityRouteLeg): string => {
+  if (template.commodity === 'Rice') {
+    const labels: Record<string, string> = {
+      'TR-POC-PROC-FCI': 'Dispatch procurement stock to FCI',
+      'TR-POC-FCI-BUF': 'Dispatch FCI stock to buffer godown',
+      'TR-POC-BUF-DEPOT': 'Stage-I dispatch to state depot',
+      'TR-POC-DEPOT-MILLER': 'Dispatch paddy to miller',
+      'TR-POC-MILLER-ISSUE': 'Stage-II dispatch to issue point',
+      'TR-POC-ISSUE-FPS': 'Dispatch to FPS',
+      'TR-POC-ISSUE-WI': 'Dispatch to welfare institute',
+      'TR-POC-ISSUE-SBE': 'Dispatch to Shiv Bhojan eatery'
+    };
+    return labels[leg.id] ?? `Dispatch ${template.commodity}`;
+  }
+  if (leg.endpoint === 'fps') return `Dispatch ${template.commodity} to FPS`;
+  if (leg.toOrg === 'ISSUE-001') return `Dispatch ${template.commodity} to issue point`;
+  if (leg.toOrg === 'GODOWN-S-001') return `Dispatch ${template.commodity} to state depot`;
+  if (leg.toOrg === 'FCI-001') return `Dispatch ${template.commodity} to FCI`;
+  if (leg.toOrg === 'FCI-BUF-001') return `Dispatch ${template.commodity} to buffer godown`;
+  return `Dispatch ${template.commodity}`;
+};
+
+const detailForLeg = (template: CommodityRouteTemplate, leg: CommodityRouteLeg): string => {
+  if (template.commodity === 'Rice') {
+    const details: Record<string, string> = {
+      'TR-POC-PROC-FCI': 'Procurement centre hands the seeded lot to FCI before central buffer movement.',
+      'TR-POC-FCI-BUF': 'FCI records central reserve movement before state lifting.',
+      'TR-POC-BUF-DEPOT': 'Move lifted stock from FCI buffer godown to the state depot.',
+      'TR-POC-DEPOT-MILLER': 'Send stock for the POC milling transformation leg.',
+      'TR-POC-MILLER-ISSUE': 'RO-lite approval is required before this movement can dispatch.',
+      'TR-POC-ISSUE-FPS': 'Issue point sends stock to the fair price shop endpoint.',
+      'TR-POC-ISSUE-WI': 'Issue point sends hostel allocation to the welfare endpoint.',
+      'TR-POC-ISSUE-SBE': 'Issue point sends meal-scheme stock to the eatery endpoint.'
+    };
+    return details[leg.id] ?? `Move ${template.commodity} stock through the configured route.`;
+  }
+  return leg.requiresAuthorization
+    ? `${template.commodity} follows a direct non-milling route; RO-lite approval is required before this Stage-II movement.`
+    : `${template.commodity} follows a direct non-milling route for this custody handoff.`;
+};
+
+export const getWorkflowRoute = (commodity: string = DEFAULT_WORKFLOW_COMMODITY): CommodityRouteTemplate =>
+  getCommodityRouteTemplate(commodity) ?? getCommodityRouteTemplate(DEFAULT_WORKFLOW_COMMODITY)!;
+
+export const getPlannedLegs = (commodity: string = DEFAULT_WORKFLOW_COMMODITY): PlannedLeg[] => {
+  const template = getWorkflowRoute(commodity);
+  return template.legs.map((leg, index) => ({
+    id: leg.id,
+    lotId: leg.lot === 'transformed' ? template.activeLotId : template.sourceLotId,
+    commodity: template.commodity,
+    fromOrg: leg.fromOrg,
+    toOrg: leg.toOrg,
+    label: labelForLeg(template, leg),
+    detail: detailForLeg(template, leg),
+    roles: roleForSender(leg.fromOrg),
+    qtyKg: quantityForLeg(template, leg),
+    vehicleNo: vehicleForLeg(leg, index),
+    stage: leg.stage,
+    ...(leg.requiresAuthorization
+      ? {
+          roRef:
+            leg.id === 'TR-POC-MILLER-ISSUE'
+              ? 'RO-DSO-POC-001'
+              : `RO-DSO-${leg.id.replace(/^TR-/, '')}`,
+          authorizedBy: 'DSO-001'
+        }
+      : {}),
+    transporterId: 'TRANS-001',
+    ...(leg.lot === 'transformed' ? { transformedFromLotId: template.sourceLotId } : {})
+  }));
+};
 
 const findTransfer = (transfers: TransferOrder[], transferId: string): TransferOrder | undefined =>
   transfers.find((transfer) => transfer.transferId === transferId);
@@ -274,6 +270,11 @@ const sumKg = (values: number[]): number => values.reduce((total, value) => tota
 const isSessionTransfer = (transfer: TransferOrder): boolean =>
   transfer.transferId.startsWith('TR-POC');
 
+const getTransferCommodity = (
+  context: Pick<WorkflowContext, 'lots'>,
+  transfer: Pick<TransferOrder, 'lotId'>
+): string | undefined => context.lots.find((lot) => lot.lotId === transfer.lotId)?.commodity;
+
 /**
  * Stock available to dispatch from an org within the interactive session,
  * mirroring the chaincode stock ledger: receipts flow in, dispatches flow
@@ -283,16 +284,27 @@ const isSessionTransfer = (transfer: TransferOrder): boolean =>
 export const getSessionStockKg = (
   context: Pick<WorkflowContext, 'transfers' | 'lots'>,
   org: string,
-  lotId?: string
+  lotId?: string,
+  commodity?: string
 ): number => {
+  const relevantCommodity = commodity ?? (lotId ? context.lots.find((lot) => lot.lotId === lotId)?.commodity : undefined);
   const session = context.transfers.filter(isSessionTransfer);
-  const inflow = sumKg(session.filter((t) => t.toOrg === org).map((t) => t.receivedQtyKg ?? 0));
-  const outflow = sumKg(session.filter((t) => t.fromOrg === org).map((t) => t.dispatchedQtyKg));
+  const sameCommoditySession = relevantCommodity
+    ? session.filter((transfer) => getTransferCommodity(context, transfer) === relevantCommodity)
+    : session;
+  const inflow = sumKg(sameCommoditySession.filter((t) => t.toOrg === org).map((t) => t.receivedQtyKg ?? 0));
+  const outflow = sumKg(sameCommoditySession.filter((t) => t.fromOrg === org).map((t) => t.dispatchedQtyKg));
   if (inflow > 0) {
     return inflow - outflow;
   }
-  const rootLot = context.lots.find((lot) => lot.lotId === lotId && !lot.transformedFromLotId);
-  return (rootLot?.quantityKg ?? 0) - outflow;
+  const rootLots = context.lots.filter(
+    (lot) =>
+      !lot.transformedFromLotId &&
+      (!relevantCommodity || lot.commodity === relevantCommodity) &&
+      (lot.currentOwner === org || lot.lotId === lotId)
+  );
+  const registered = sumKg(rootLots.map((lot) => lot.quantityKg));
+  return registered - outflow;
 };
 
 const getEntitlementForDistribution = (
@@ -327,68 +339,99 @@ const evidence = (
   timestamp: now()
 });
 
-export function getRoleQueue(context: WorkflowContext, role: DemoRole): WorkflowActionSpec[] {
-  return getWorkflowActions(context).filter((action) => action.roles.includes(role));
+export function getRoleQueue(context: WorkflowContext, role: DemoRole, commodity = DEFAULT_WORKFLOW_COMMODITY): WorkflowActionSpec[] {
+  return getWorkflowActions(context, commodity).filter((action) => action.roles.includes(role));
 }
 
-export function getWorkflowActions(context: WorkflowContext): WorkflowActionSpec[] {
+export function getWorkflowActions(context: WorkflowContext, commodity = DEFAULT_WORKFLOW_COMMODITY): WorkflowActionSpec[] {
+  const route = getWorkflowRoute(commodity);
+  const plannedLegs = getPlannedLegs(route.commodity);
+  const authorizationLeg = plannedLegs.find((leg) => leg.roRef);
+  const transform = route.transformation;
   const actions: WorkflowActionSpec[] = [];
-  const stageTwo = findTransfer(context.transfers, 'TR-POC-MILLER-ISSUE');
-  const stageTwoApproved = context.ledgerEvents?.some((event) => event.entityId === 'TR-POC-MILLER-ISSUE' && isAuthorizationEvent(event.eventType));
-  const millingReceived = isReceived(findTransfer(context.transfers, 'TR-POC-DEPOT-MILLER'));
-  const transformed = context.ledgerEvents?.some((event) => event.eventType === 'TransformLot' && event.entityId === DEMO_LOT_ID);
-  if (millingReceived && !transformed) {
-    actions.push({
-      id: 'LOT-POC-TRANSFORM',
-      label: 'Transform paddy to rice at miller',
-      detail: 'Create the child rice lot with parent-lot provenance before Stage-II dispatch.',
-      roles: ['DEPOT'],
-      status: 'pending',
-      request: {
-        kind: 'transform-lot',
-        payload: {
-          parentLotId: 'LOT-RICE-2026-001',
-          childLotId: DEMO_LOT_ID,
-          transformedBy: 'MLL-001',
-          commodity: 'Rice',
-          quantityKg: demoQuantities.millerToIssueKg,
-          qualityGrade: 'A',
-          source: 'Miller 01'
+  const authorized = authorizationLeg
+    ? context.ledgerEvents?.some((event) => event.entityId === authorizationLeg.id && isAuthorizationEvent(event.eventType))
+    : true;
+
+  if (route.requiresTransformation && transform) {
+    const inboundToTransformer = [...plannedLegs]
+      .reverse()
+      .find((leg) => leg.toOrg === transform.transformedBy && leg.lotId === transform.parentLotId);
+    const transformerReceived = isReceived(inboundToTransformer ? findTransfer(context.transfers, inboundToTransformer.id) : undefined);
+    const transformed = context.ledgerEvents?.some(
+      (event) => event.eventType === 'TransformLot' && event.entityId === transform.childLotId
+    );
+    if (transformerReceived && !transformed) {
+      const qtyKg = demoQuantities.millerToIssueKg;
+      const label =
+        route.commodity === 'Rice' ? 'Transform paddy to rice at miller' : `Transform ${route.commodity} at processor`;
+      const detail =
+        route.commodity === 'Rice'
+          ? 'Create the child rice lot with parent-lot provenance before Stage-II dispatch.'
+          : `Create the transformed ${route.commodity} lot with parent-lot provenance before downstream dispatch.`;
+      actions.push({
+        id: `LOT-POC-${commodityDefinition(route.commodity).slug}-TRANSFORM`,
+        label,
+        detail,
+        roles: ['DEPOT'],
+        status: 'pending',
+        request: {
+          kind: 'transform-lot',
+          payload: {
+            parentLotId: transform.parentLotId,
+            childLotId: transform.childLotId,
+            transformedBy: transform.transformedBy,
+            commodity: transform.outputCommodity,
+            quantityKg: qtyKg,
+            qualityGrade: commodityDefinition(route.commodity).defaultQualityGrade,
+            source: transform.transformedBy
+          }
         }
-      }
-    });
-    return actions;
+      });
+      return actions;
+    }
   }
-  if (!stageTwo && !stageTwoApproved) {
+
+  if (authorizationLeg && !findTransfer(context.transfers, authorizationLeg.id) && !authorized) {
     actions.push({
-      id: 'RO-DSO-POC-001',
-      label: 'Approve Stage-II RO-lite movement',
-      detail: 'Stamp RO-DSO-POC-001 before the miller can dispatch rice to the issue point.',
+      id: authorizationLeg.roRef ?? `RO-DSO-${authorizationLeg.id}`,
+      label:
+        route.commodity === 'Rice'
+          ? 'Approve Stage-II RO-lite movement'
+          : `Approve ${route.commodity} Stage-II movement`,
+      detail:
+        route.commodity === 'Rice'
+          ? 'Stamp RO-DSO-POC-001 before the miller can dispatch rice to the issue point.'
+          : `Approve the configured ${route.commodity} Stage-II route before dispatch.`,
       roles: ['CONTROL_OFFICE'],
       status: 'pending',
       request: {
         kind: 'authorize-movement',
-        transferId: 'TR-POC-MILLER-ISSUE',
+        transferId: authorizationLeg.id,
         authorizedBy: 'DSO-001',
-        roRef: 'RO-DSO-POC-001'
+        roRef: authorizationLeg.roRef
       }
     });
   }
 
   for (const leg of plannedLegs) {
     const transfer = findTransfer(context.transfers, leg.id);
-    const stageTwoMissingApproval =
-      leg.stage === 'II' &&
-      leg.id === 'TR-POC-MILLER-ISSUE' &&
-      !stageTwoApproved;
+    const missingApproval = Boolean(leg.roRef && !authorized);
 
     if (!transfer) {
+      const availableStock = getSessionStockKg(context, leg.fromOrg, leg.lotId, leg.commodity);
+      const insufficientStock = !missingApproval && availableStock < leg.qtyKg;
+      const blocked = missingApproval || insufficientStock;
       actions.push({
         id: leg.id,
         label: leg.label,
-        detail: stageTwoMissingApproval ? `${leg.detail} Approval is still missing.` : leg.detail,
+        detail: missingApproval
+          ? `${leg.detail} Approval is still missing.`
+          : insufficientStock
+            ? `${leg.detail} Insufficient stock at ${leg.fromOrg} (${availableStock} kg available, ${leg.qtyKg} kg required).`
+            : leg.detail,
         roles: leg.roles,
-        status: stageTwoMissingApproval ? 'blocked' : 'pending',
+        status: blocked ? 'blocked' : 'pending',
         request: {
           kind: 'dispatch',
           payload: {
@@ -400,7 +443,7 @@ export function getWorkflowActions(context: WorkflowContext): WorkflowActionSpec
             vehicleNo: leg.vehicleNo,
             stage: leg.stage,
             ...(leg.roRef ? { roRef: leg.roRef } : {}),
-            ...(!stageTwoMissingApproval && leg.authorizedBy ? { authorizedBy: leg.authorizedBy } : {}),
+            ...(!missingApproval && leg.authorizedBy ? { authorizedBy: leg.authorizedBy } : {}),
             ...(leg.transporterId ? { transporterId: leg.transporterId } : {}),
             ...(leg.transformedFromLotId ? { transformedFromLotId: leg.transformedFromLotId } : {})
           }
@@ -422,27 +465,32 @@ export function getWorkflowActions(context: WorkflowContext): WorkflowActionSpec
     }
   }
 
-  const endpointReceipts = ['TR-POC-ISSUE-FPS', 'TR-POC-ISSUE-WI', 'TR-POC-ISSUE-SBE'].every((id) =>
-    isReceived(findTransfer(context.transfers, id))
-  );
+  const endpointReceipts = plannedLegs
+    .filter((leg) => ['FPS-101', 'WI-101', 'SBE-101'].includes(leg.toOrg))
+    .every((leg) => isReceived(findTransfer(context.transfers, leg.id)));
 
-  if (endpointReceipts && !context.distributions.some((item) => item.distributionId === 'DIST-POC-001')) {
-    const timestamp = getDistributionTimestamp(context, DEMO_RATION_CARD_HASH, 'Rice');
+  const distributionId = route.commodity === 'Rice' ? 'DIST-POC-001' : `DIST-POC-${commodityDefinition(route.commodity).slug}-001`;
+  const duplicateDistributionId = route.commodity === 'Rice' ? 'DIST-POC-002' : `DIST-POC-${commodityDefinition(route.commodity).slug}-002`;
+  const exceptionDistributionId =
+    route.commodity === 'Rice' ? 'DIST-POC-EXCEPTION' : `DIST-POC-${commodityDefinition(route.commodity).slug}-EXCEPTION`;
+
+  if (endpointReceipts && !context.distributions.some((item) => item.distributionId === distributionId)) {
+    const timestamp = getDistributionTimestamp(context, DEMO_RATION_CARD_HASH, route.commodity);
     actions.push({
-      id: 'DIST-POC-001',
-      label: 'Authenticate and issue beneficiary ration',
+      id: distributionId,
+      label: `Authenticate and issue ${route.commodity} ration`,
       detail: 'FPS operator verifies the ration-card holder with mock OTP/biometric auth, records the household delivery, and writes the citizen receipt proof.',
       roles: ['FPS'],
       status: 'pending',
       request: {
         kind: 'distribute',
         payload: {
-          distributionId: 'DIST-POC-001',
+          distributionId,
           fpsId: 'FPS-101',
           rationCardHash: DEMO_RATION_CARD_HASH,
           beneficiaryRefHash: DEMO_BENEFICIARY_HASH,
-          commodity: 'Rice',
-          deliveredKg: demoQuantities.citizenDistributionKg,
+          commodity: route.commodity,
+          deliveredKg: Math.min(demoQuantities.citizenDistributionKg, commodityDefinition(route.commodity).defaultMonthlyEntitlementKg),
           authMode: AuthMode.MOCK_OTP,
           authResult: AuthResult.SUCCESS,
           authTxnRefHash: 'auth-ref-poc-001',
@@ -453,11 +501,13 @@ export function getWorkflowActions(context: WorkflowContext): WorkflowActionSpec
     });
   }
 
-  if (context.distributions.some((item) => item.distributionId === 'DIST-POC-001')) {
-    if (!context.alerts?.some((alert) => alert.alertId === 'ALERT-POC-DUPLICATE')) {
-      const timestamp = getDistributionTimestamp(context, DEMO_RATION_CARD_HASH, 'Rice');
+  if (context.distributions.some((item) => item.distributionId === distributionId)) {
+    const duplicateAlertId =
+      route.commodity === 'Rice' ? 'ALERT-POC-DUPLICATE' : `ALERT-POC-${commodityDefinition(route.commodity).slug}-DUPLICATE`;
+    if (!context.alerts?.some((alert) => alert.alertId === duplicateAlertId)) {
+      const timestamp = getDistributionTimestamp(context, DEMO_RATION_CARD_HASH, route.commodity);
       actions.push({
-        id: 'DIST-POC-002',
+        id: duplicateDistributionId,
         label: 'Attempt duplicate claim',
         detail: 'Try a second issue for the same beneficiary-month and block it with audit evidence.',
         roles: ['FPS', 'AUDITOR'],
@@ -465,12 +515,12 @@ export function getWorkflowActions(context: WorkflowContext): WorkflowActionSpec
         request: {
           kind: 'duplicate-distribute',
           payload: {
-            distributionId: 'DIST-POC-002',
+            distributionId: duplicateDistributionId,
             fpsId: 'FPS-101',
             rationCardHash: DEMO_RATION_CARD_HASH,
             beneficiaryRefHash: DEMO_BENEFICIARY_HASH,
-            commodity: 'Rice',
-            deliveredKg: demoQuantities.citizenDistributionKg,
+            commodity: route.commodity,
+            deliveredKg: Math.min(demoQuantities.citizenDistributionKg, commodityDefinition(route.commodity).defaultMonthlyEntitlementKg),
             authMode: AuthMode.MOCK_OTP,
             authResult: AuthResult.SUCCESS,
             authTxnRefHash: 'auth-ref-poc-duplicate',
@@ -481,10 +531,10 @@ export function getWorkflowActions(context: WorkflowContext): WorkflowActionSpec
       });
     }
 
-    if (!context.distributions.some((item) => item.distributionId === 'DIST-POC-EXCEPTION')) {
-      const timestamp = getDistributionTimestamp(context, 'exception-ration-card-hash', 'Rice');
+    if (route.commodity === 'Rice' && !context.distributions.some((item) => item.distributionId === exceptionDistributionId)) {
+      const timestamp = getDistributionTimestamp(context, 'exception-ration-card-hash', route.commodity);
       actions.push({
-        id: 'DIST-POC-EXCEPTION',
+        id: exceptionDistributionId,
         label: 'Approve supervisor exception issue',
         detail: 'Record an exception-approved distribution with supervisor identity and reason.',
         roles: ['FPS'],
@@ -492,11 +542,11 @@ export function getWorkflowActions(context: WorkflowContext): WorkflowActionSpec
         request: {
           kind: 'supervisor-exception-distribute',
           payload: {
-            distributionId: 'DIST-POC-EXCEPTION',
+            distributionId: exceptionDistributionId,
             fpsId: 'FPS-101',
             rationCardHash: 'exception-ration-card-hash',
             beneficiaryRefHash: 'exception-beneficiary-hash',
-            commodity: 'Rice',
+            commodity: route.commodity,
             deliveredKg: 10,
             authMode: AuthMode.SUPERVISOR_EXCEPTION,
             authResult: AuthResult.EXCEPTION_APPROVED,
@@ -516,9 +566,9 @@ export function getWorkflowActions(context: WorkflowContext): WorkflowActionSpec
 
 export const getNextWorkflowAction = (
   context: WorkflowContext,
-  options?: { receiveQtyKg?: number; allowDuplicateClaim?: boolean }
+  options?: { receiveQtyKg?: number; allowDuplicateClaim?: boolean; commodity?: string }
 ): WorkflowActionSpec | null => {
-  const actions = getWorkflowActions(context);
+  const actions = getWorkflowActions(context, options?.commodity);
   const action = actions.find((item) => item.status !== 'blocked') ?? actions[0] ?? null;
   if (action?.request.kind === 'receive' && options?.receiveQtyKg) {
     return { ...action, request: { ...action.request, receivedQtyKg: options.receiveQtyKg } };
@@ -544,9 +594,9 @@ export function applyMockWorkflowAction(context: WorkflowContext, request: Workf
   if (request.kind === 'authorize-movement') {
     event = evidence('RO_LITE_APPROVED', 'workflow', request.transferId, request);
     message = `RO-lite movement approved by ${request.authorizedBy}.`;
-  } else if (request.kind === 'dispatch') {
-    if (request.payload.stage === 'II' && (!request.payload.roRef || !request.payload.authorizedBy)) {
-      event = evidence('DISPATCH_BLOCKED', 'audit', request.payload.transferId, request.payload);
+	  } else if (request.kind === 'dispatch') {
+	    if (request.payload.stage === 'II' && (!request.payload.roRef || !request.payload.authorizedBy)) {
+	      event = evidence('DISPATCH_BLOCKED', 'audit', request.payload.transferId, request.payload);
       current.alerts.push({
         alertId: `ALERT-${request.payload.transferId}`,
         alertType: AlertType.UNAUTHORIZED_TRANSACTION,
@@ -558,13 +608,23 @@ export function applyMockWorkflowAction(context: WorkflowContext, request: Workf
         createdAt: now()
       });
       message = 'Unauthorized Stage-II dispatch blocked.';
-    } else {
-      if (request.payload.dispatchedQtyKg <= 0) {
-        throw new Error('dispatchedQtyKg must be positive');
-      }
-      const available = getSessionStockKg(current, request.payload.fromOrg, request.payload.lotId);
-      if (request.payload.dispatchedQtyKg > available) {
-        throw new Error(
+	    } else {
+	      if (request.payload.dispatchedQtyKg <= 0) {
+	        throw new Error('dispatchedQtyKg must be positive');
+	      }
+	      const lot = current.lots.find((item) => item.lotId === request.payload.lotId);
+	      if (!lot) {
+	        throw new Error(`Lot ${request.payload.lotId} not found`);
+	      }
+	      const lotKind: CommodityRouteLeg['lot'] = lot.transformedFromLotId ? 'transformed' : 'source';
+	      if (!isCommodityRouteEdgeAllowed(lot.commodity, request.payload.fromOrg, request.payload.toOrg, lotKind)) {
+	        throw new Error(
+	          `${lot.commodity} route does not allow movement from ${request.payload.fromOrg} to ${request.payload.toOrg}`
+	        );
+	      }
+	      const available = getSessionStockKg(current, request.payload.fromOrg, request.payload.lotId);
+	      if (request.payload.dispatchedQtyKg > available) {
+	        throw new Error(
           `Insufficient stock for ${request.payload.fromOrg}: ${available} kg available, ${request.payload.dispatchedQtyKg} kg requested`
         );
       }
@@ -582,13 +642,34 @@ export function applyMockWorkflowAction(context: WorkflowContext, request: Workf
     if (request.payload.quantityKg <= 0) {
       throw new Error('quantityKg must be positive');
     }
-    const transformerStock = getSessionStockKg(current, request.payload.transformedBy);
+	    const parent = current.lots.find((lot) => lot.lotId === request.payload.parentLotId);
+	    if (!parent) {
+	      throw new Error(`Lot ${request.payload.parentLotId} not found`);
+	    }
+	    const route = getCommodityRouteTemplate(parent.commodity);
+	    if (route && !route.requiresTransformation) {
+	      throw new Error(`${parent.commodity} does not require transformation in the configured commodity route`);
+	    }
+	    if (
+	      route?.transformation &&
+	      (route.transformation.parentLotId !== parent.lotId ||
+	        route.transformation.childLotId !== request.payload.childLotId ||
+	        route.transformation.transformedBy !== request.payload.transformedBy ||
+	        route.transformation.outputCommodity !== request.payload.commodity)
+	    ) {
+	      throw new Error(`TransformLot does not match the configured ${parent.commodity} commodity route`);
+	    }
+	    const transformerStock = getSessionStockKg(
+	      current,
+	      request.payload.transformedBy,
+      request.payload.parentLotId,
+      parent?.commodity
+    );
     if (request.payload.quantityKg > transformerStock) {
       throw new Error(
         `Insufficient stock for ${request.payload.transformedBy}: ${transformerStock} kg available, ${request.payload.quantityKg} kg requested`
       );
     }
-    const parent = current.lots.find((lot) => lot.lotId === request.payload.parentLotId);
     const existingChild = current.lots.find((lot) => lot.lotId === request.payload.childLotId);
     const child: CommodityLot = {
       lotId: request.payload.childLotId,
@@ -642,9 +723,13 @@ export function applyMockWorkflowAction(context: WorkflowContext, request: Workf
     message = `${transfer.transferId} receipt recorded.`;
   } else if (request.kind === 'duplicate-distribute') {
     const timestamp = request.payload.timestamp ?? getDistributionTimestamp(current, request.payload.rationCardHash, request.payload.commodity) ?? now();
+    const duplicateAlertId =
+      request.payload.commodity === 'Rice'
+        ? 'ALERT-POC-DUPLICATE'
+        : `ALERT-POC-${commodityDefinition(request.payload.commodity).slug}-DUPLICATE`;
     event = evidence('DUPLICATE_CLAIM_BLOCKED', 'audit', request.payload.distributionId, request.payload);
     current.alerts.push({
-      alertId: 'ALERT-POC-DUPLICATE',
+      alertId: duplicateAlertId,
       alertType: AlertType.DUPLICATE_CLAIM,
       entityId: request.payload.rationCardHash,
       riskLevel: 'HIGH',
@@ -740,14 +825,25 @@ export function applyMockWorkflowAction(context: WorkflowContext, request: Workf
   return { context: current, message, evidence: event };
 }
 
-export const getWorkflowProgress = (context: WorkflowContext): { completed: number; total: number } => {
+export const getWorkflowProgress = (context: WorkflowContext, commodity = DEFAULT_WORKFLOW_COMMODITY): { completed: number; total: number } => {
+  const route = getWorkflowRoute(commodity);
+  const plannedLegs = getPlannedLegs(route.commodity);
+  const authorizationLeg = plannedLegs.find((leg) => leg.roRef);
+  const transform = route.transformation;
+  const distributionId = route.commodity === 'Rice' ? 'DIST-POC-001' : `DIST-POC-${commodityDefinition(route.commodity).slug}-001`;
+  const duplicateAlertId =
+    route.commodity === 'Rice' ? 'ALERT-POC-DUPLICATE' : `ALERT-POC-${commodityDefinition(route.commodity).slug}-DUPLICATE`;
+  const exceptionDistributionId =
+    route.commodity === 'Rice' ? 'DIST-POC-EXCEPTION' : `DIST-POC-${commodityDefinition(route.commodity).slug}-EXCEPTION`;
   const checkpoints = [
-    context.ledgerEvents?.some((event) => isAuthorizationEvent(event.eventType)) ?? false,
+    ...(authorizationLeg ? [context.ledgerEvents?.some((event) => event.entityId === authorizationLeg.id && isAuthorizationEvent(event.eventType)) ?? false] : []),
     ...plannedLegs.map((leg) => isReceived(findTransfer(context.transfers, leg.id))),
-    context.ledgerEvents?.some((event) => event.eventType === 'TransformLot' && event.entityId === DEMO_LOT_ID) ?? false,
-    context.distributions.some((item) => item.distributionId === 'DIST-POC-001'),
-    context.alerts?.some((alert) => alert.alertId === 'ALERT-POC-DUPLICATE') ?? false,
-    context.distributions.some((item) => item.distributionId === 'DIST-POC-EXCEPTION')
+    ...(route.requiresTransformation && transform
+      ? [context.ledgerEvents?.some((event) => event.eventType === 'TransformLot' && event.entityId === transform.childLotId) ?? false]
+      : []),
+    context.distributions.some((item) => item.distributionId === distributionId),
+    context.alerts?.some((alert) => alert.alertId === duplicateAlertId) ?? false,
+    ...(route.commodity === 'Rice' ? [context.distributions.some((item) => item.distributionId === exceptionDistributionId)] : [])
   ];
 
   return {

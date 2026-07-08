@@ -1,6 +1,7 @@
 import type {
   AuditAlert,
   AuthTransaction,
+  CommodityLot,
   DistributionTransaction,
   FPSAllocation,
   MonthlyEntitlement,
@@ -9,7 +10,16 @@ import type {
 } from '@pds/shared-types';
 import { Panel } from '@/components/Panel';
 import { CardTopline, DefinitionList, EntityCard } from '@/components/Entity';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from '@/components/ui/table';
 import { formatDateTime } from '@/lib/constants';
+import { cn } from '@/lib/utils';
 
 const alertTone: Record<AuditAlert['riskLevel'], 'low' | 'medium' | 'high'> = {
   LOW: 'low',
@@ -38,28 +48,60 @@ export function StakeholdersPanel({ stakeholders }: { stakeholders: Stakeholder[
   );
 }
 
-export function TransfersPanel({ transfers }: { transfers: TransferOrder[] }) {
+export function TransfersPanel({
+  transfers,
+  lots = []
+}: {
+  transfers: TransferOrder[];
+  lots?: CommodityLot[];
+}) {
+  const commodityByLotId = new Map(lots.map((lot) => [lot.lotId, lot.commodity]));
+
   return (
     <Panel eyebrow="Transfers" title="Operational movement log" pill={`${transfers.length} records`}>
-      <div className="grid gap-3 md:grid-cols-2">
-        {transfers.map((transfer) => (
-          <EntityCard key={transfer.transferId}>
-            <CardTopline left={transfer.transferId} right={transfer.status} />
-            <p className="text-muted-foreground">
-              {transfer.fromOrg} → {transfer.toOrg}
-            </p>
-            <DefinitionList
-              entries={[
-                { label: 'Dispatched', value: `${transfer.dispatchedQtyKg} kg` },
-                { label: 'Received', value: transfer.receivedQtyKg == null ? 'Pending' : `${transfer.receivedQtyKg} kg` },
-                { label: 'Dispatch time', value: formatDateTime(transfer.dispatchTimestamp) },
-                { label: 'Receive time', value: formatDateTime(transfer.receiveTimestamp) },
-                ...(transfer.authorizedAt ? [{ label: 'Authorized', value: formatDateTime(transfer.authorizedAt) }] : [])
-              ]}
-            />
-          </EntityCard>
-        ))}
-      </div>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead scope="col">Transfer ID</TableHead>
+            <TableHead scope="col">Commodity</TableHead>
+            <TableHead scope="col">Route</TableHead>
+            <TableHead scope="col">Dispatched</TableHead>
+            <TableHead scope="col">Received</TableHead>
+            <TableHead scope="col">Dispatch time</TableHead>
+            <TableHead scope="col">Receive time</TableHead>
+            <TableHead scope="col">Status</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {transfers.map((transfer) => (
+            <TableRow key={transfer.transferId}>
+              <TableCell className="font-semibold">{transfer.transferId}</TableCell>
+              <TableCell>{commodityByLotId.get(transfer.lotId) ?? '—'}</TableCell>
+              <TableCell className="text-muted-foreground">
+                {transfer.fromOrg} → {transfer.toOrg}
+              </TableCell>
+              <TableCell>{transfer.dispatchedQtyKg} kg</TableCell>
+              <TableCell>
+                {transfer.receivedQtyKg == null ? 'Pending' : `${transfer.receivedQtyKg} kg`}
+              </TableCell>
+              <TableCell>{formatDateTime(transfer.dispatchTimestamp)}</TableCell>
+              <TableCell>{formatDateTime(transfer.receiveTimestamp)}</TableCell>
+              <TableCell>
+                <span
+                  className={cn(
+                    'rounded-full px-2 py-0.5 text-xs font-semibold',
+                    transfer.status === 'RECEIVED_WITH_SHORTAGE'
+                      ? 'bg-warning/15 text-warning'
+                      : 'bg-secondary/10 text-secondary'
+                  )}
+                >
+                  {transfer.status}
+                </span>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     </Panel>
   );
 }

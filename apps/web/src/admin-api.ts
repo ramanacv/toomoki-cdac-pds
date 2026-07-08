@@ -96,6 +96,11 @@ export type AdminOverview = {
   links: Record<string, string>;
 };
 
+export type AdminResetResult = {
+  ledgerTxId: string;
+  message: string;
+};
+
 export const getStoredAdminToken = (): string => {
   if (typeof window === 'undefined') {
     return import.meta.env.VITE_ADMIN_TOKEN ?? '';
@@ -121,6 +126,18 @@ async function fetchAdminJson<T>(path: string): Promise<T> {
   return (await response.json()) as T;
 }
 
+async function postAdminJson<T>(path: string): Promise<T> {
+  const response = await fetch(buildApiUrl(path), {
+    method: 'POST',
+    headers: adminHeaders()
+  });
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || `Admin request failed for ${path}`);
+  }
+  return (await response.json()) as T;
+}
+
 export const loadAdminOverview = (): Promise<AdminOverview> => fetchAdminJson('/admin/overview');
 
 export const loadAdminNetwork = (): Promise<AdminNetworkInfo> => fetchAdminJson('/admin/network');
@@ -129,3 +146,5 @@ export const loadAdminActivity = (): Promise<AdminOverview['activity']> => fetch
 
 export const loadAdminStakeholderSummary = (): Promise<AdminOverview['stakeholders']> =>
   fetchAdminJson('/admin/stakeholders/summary');
+
+export const resetAdminLedger = (): Promise<AdminResetResult> => postAdminJson('/admin/reset');

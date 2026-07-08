@@ -1,3 +1,4 @@
+import { COMMODITIES, type CommodityDefinition } from '@pds/shared-types';
 import type {
   AuditAlert,
   AuthTransaction,
@@ -25,6 +26,8 @@ import duplicateClaimScenarioJson from '../../../mock/scenarios/duplicate-claim.
 export type DemoScenario = 'happy-path' | 'short-receipt' | 'duplicate-claim';
 
 export type BackendSeed = {
+  initialLots: Array<Omit<CommodityLot, 'status'>>;
+  initialEntitlements: MonthlyEntitlement[];
   initialLot: Omit<CommodityLot, 'status'>;
   initialEntitlement: MonthlyEntitlement;
   beneficiaryRegistry: {
@@ -57,7 +60,16 @@ export const allocations = allocationsJson as FPSAllocation[];
 export const distributions = distributionsJson as DistributionTransaction[];
 export const authTransactions = authTransactionsJson as AuthTransaction[];
 export const entitlements = entitlementsJson as MonthlyEntitlement[];
-export const backendSeed = backendSeedJson as BackendSeed;
+const rawBackendSeed = backendSeedJson as Omit<BackendSeed, 'initialLot' | 'initialEntitlement'>;
+if (!rawBackendSeed.initialLots[0] || !rawBackendSeed.initialEntitlements[0]) {
+  throw new Error('Backend seed must define at least one initial lot and entitlement');
+}
+export const commodities: CommodityDefinition[] = COMMODITIES;
+export const backendSeed: BackendSeed = {
+  ...rawBackendSeed,
+  initialLot: rawBackendSeed.initialLots[0],
+  initialEntitlement: rawBackendSeed.initialEntitlements[0]
+};
 export const dashboardSummary = dashboardSummaryJson as DashboardSummary;
 
 const scenarioFixtures: Record<DemoScenario, ScenarioFixture> = {

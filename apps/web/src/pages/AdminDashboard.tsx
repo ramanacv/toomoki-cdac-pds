@@ -1,18 +1,36 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { AuditAlert } from '@pds/shared-types';
+import { toast } from 'sonner';
+import { COMMODITIES, type AuditAlert, type Stakeholder } from '@pds/shared-types';
 import {
   getStoredAdminToken,
   loadAdminOverview,
+  resetAdminLedger,
   setStoredAdminToken,
   type AdminOverview
 } from '@/admin-api.js';
-import { probeApi } from '@/api.js';
+import { createStockLot, loadStakeholders, probeApi } from '@/api.js';
 import { RuntimeCard } from '@/components/RuntimeCard.js';
 import { Panel } from '@/components/Panel.js';
 import { Button } from '@/components/ui/button.js';
 import { Input } from '@/components/ui/input.js';
 import { Label } from '@/components/ui/label.js';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert.js';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/select.js';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger
+} from '@/components/ui/dialog.js';
 import {
   Table,
   TableBody,
@@ -45,12 +63,27 @@ const metricCards = (overview: AdminOverview): Array<[string, string]> => [
   ['Open alerts', overview.metrics.openAuditAlerts.toString()]
 ];
 
+const getCommodityDefaults = (commodity: string) =>
+  COMMODITIES.find((item) => item.name === commodity) ?? COMMODITIES[0];
+
 export function AdminDashboard() {
   const [overview, setOverview] = useState<AdminOverview | null>(null);
   const [tokenInput, setTokenInput] = useState(getStoredAdminToken());
   const [apiOnline, setApiOnline] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [stakeholders, setStakeholders] = useState<Stakeholder[]>([]);
+  const [stockCommodity, setStockCommodity] = useState('Rice');
+  const [stockQuantityKg, setStockQuantityKg] = useState('10000');
+  const [stockQualityGrade, setStockQualityGrade] = useState('A');
+  const [stockOwner, setStockOwner] = useState('PROC-001');
+  const [stockLocation, setStockLocation] = useState('Procurement Yard');
+  const [stockSubmitting, setStockSubmitting] = useState(false);
+  const [stockMessage, setStockMessage] = useState<string | null>(null);
+  const [stockError, setStockError] = useState<string | null>(null);
+  const [resetSubmitting, setResetSubmitting] = useState(false);
+  const [resetMessage, setResetMessage] = useState<string | null>(null);
+  const [resetError, setResetError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -66,8 +99,9 @@ export function AdminDashboard() {
     }
 
     try {
-      const payload = await loadAdminOverview();
+      const [payload, stakeholderList] = await Promise.all([loadAdminOverview(), loadStakeholders(online)]);
       setOverview(payload);
+      setStakeholders(stakeholderList);
     } catch (caught) {
       setOverview(null);
       setError(caught instanceof Error ? caught.message : 'Failed to load admin overview');
@@ -85,6 +119,60 @@ export function AdminDashboard() {
     void refresh();
   };
 
+  const selectCommodity = (commodity: string) => {
+    const defaults = getCommodityDefaults(commodity);
+    setStockCommodity(defaults.name);
+    setStockQuantityKg(String(defaults.defaultTopUpQuantityKg));
+    setStockQualityGrade(defaults.defaultQualityGrade);
+  };
+
+  const addStock = async () => {
+    setStockSubmitting(true);
+    setStockMessage(null);
+    setStockError(null);
+    try {
+      const quantityKg = Number(stockQuantityKg);
+      if (!Number.isFinite(quantityKg) || quantityKg <= 0) {
+        throw new Error('Quantity must be a positive number');
+      }
+      const lot = await createStockLot({
+        commodity: stockCommodity.trim(),
+        quantityKg,
+        qualityGrade: stockQualityGrade.trim(),
+        currentOwner: stockOwner,
+        currentLocation: stockLocation.trim()
+      });
+      const message = `Created ${lot.lotId} — ${lot.quantityKg.toLocaleString()} kg of ${lot.commodity} at ${lot.currentOwner}.`;
+      setStockMessage(message);
+      toast.success('Stock added', { description: message });
+      await refresh();
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : 'Failed to add stock';
+      setStockError(message);
+      toast.error('Failed to add stock', { description: message });
+    } finally {
+      setStockSubmitting(false);
+    }
+  };
+
+  const resetLedger = async () => {
+    setResetSubmitting(true);
+    setResetMessage(null);
+    setResetError(null);
+    try {
+      const result = await resetAdminLedger();
+      setResetMessage(result.message);
+      toast.success('Ledger reset', { description: result.message });
+      await refresh();
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : 'Failed to reset ledger';
+      setResetError(message);
+      toast.error('Reset failed', { description: message });
+    } finally {
+      setResetSubmitting(false);
+    }
+  };
+
   return (
     <main className="mx-auto w-full max-w-[1240px] px-4 py-10">
       <a href="#admin-main" className="skip-link">
@@ -97,8 +185,9 @@ export function AdminDashboard() {
             Monitor ledger health, network status, and recent activity.
           </h1>
           <p className="mt-4 max-w-[66ch] leading-relaxed text-muted-foreground">
-            Read-only admin view for demo and Fabric deployments. Protected endpoints require an
-            admin token when configured on the API.
+            Admin view for demo and Fabric deployments, with test-data controls for topping up
+            stock and resetting the ledger. Protected endpoints require an admin token when
+            configured on the API.
           </p>
           <div className="mt-5 flex flex-wrap justify-start gap-3">
             <Button variant="secondary" asChild>
@@ -137,6 +226,125 @@ export function AdminDashboard() {
             </Button>
           </div>
         </div>
+      </Panel>
+
+      <Panel eyebrow="Test data" title="Add stock" wide className="mt-4">
+        <p className="mb-4 text-sm text-muted-foreground">
+          Creates a new commodity lot and credits its quantity to the owning stakeholder's stock
+          position — use this to keep testing once a lot has been fully issued downstream.
+        </p>
+        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-5">
+          <div className="grid gap-2">
+            <Label htmlFor="stock-commodity">Commodity</Label>
+            <Select value={stockCommodity} onValueChange={selectCommodity}>
+              <SelectTrigger id="stock-commodity">
+                <SelectValue placeholder="Select a commodity" />
+              </SelectTrigger>
+              <SelectContent>
+                {COMMODITIES.map((commodity) => (
+                  <SelectItem key={commodity.slug} value={commodity.name}>
+                    {commodity.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="stock-quantity">Quantity (kg)</Label>
+            <Input
+              id="stock-quantity"
+              type="number"
+              min={1}
+              value={stockQuantityKg}
+              onChange={(event) => setStockQuantityKg(event.target.value)}
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="stock-grade">Quality grade</Label>
+            <Input
+              id="stock-grade"
+              value={stockQualityGrade}
+              onChange={(event) => setStockQualityGrade(event.target.value)}
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="stock-owner">Owning stakeholder</Label>
+            <Select value={stockOwner} onValueChange={setStockOwner}>
+              <SelectTrigger id="stock-owner">
+                <SelectValue placeholder="Select a stakeholder" />
+              </SelectTrigger>
+              <SelectContent>
+                {stakeholders.map((stakeholder) => (
+                  <SelectItem key={stakeholder.stakeholderId} value={stakeholder.stakeholderId}>
+                    {stakeholder.stakeholderId} — {stakeholder.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="stock-location">Location</Label>
+            <Input
+              id="stock-location"
+              value={stockLocation}
+              onChange={(event) => setStockLocation(event.target.value)}
+            />
+          </div>
+        </div>
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <Button type="button" onClick={() => void addStock()} disabled={!apiOnline || stockSubmitting}>
+            {stockSubmitting ? 'Adding stock…' : 'Add stock'}
+          </Button>
+          {stockMessage && <p className="text-sm text-muted-foreground">{stockMessage}</p>}
+        </div>
+        {stockError && (
+          <Alert variant="destructive" className="mt-3">
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>{stockError}</AlertDescription>
+          </Alert>
+        )}
+      </Panel>
+
+      <Panel eyebrow="Danger zone" title="Reset ledger" wide className="mt-4">
+        <p className="mb-4 text-sm text-muted-foreground">
+          Clears movements, allocations, distributions, audit alerts, stock, and ledger events,
+          then reseeds the initial commodity lots and resets entitlement balances back to their
+          monthly limits. Stakeholders, ration cards, and entitlement rules are left untouched.
+          Use this to start a clean test run after bad quantities have propagated through the ledger.
+        </p>
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button type="button" variant="destructive" disabled={!apiOnline || resetSubmitting}>
+              {resetSubmitting ? 'Resetting…' : 'Reset ledger'}
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Reset ledger data?</DialogTitle>
+              <DialogDescription>
+                This clears movement data and stock positions on the running ledger, then reseeds
+                the initial commodity lots. This cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <DialogTrigger asChild>
+                <Button variant="secondary">Cancel</Button>
+              </DialogTrigger>
+              <DialogTrigger asChild>
+                <Button variant="destructive" onClick={() => void resetLedger()}>
+                  Confirm reset
+                </Button>
+              </DialogTrigger>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        {resetMessage && <p className="mt-3 text-sm text-muted-foreground">{resetMessage}</p>}
+        {resetError && (
+          <Alert variant="destructive" className="mt-3">
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>{resetError}</AlertDescription>
+          </Alert>
+        )}
       </Panel>
 
       {loading && (

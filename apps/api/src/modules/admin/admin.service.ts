@@ -15,6 +15,7 @@ import type {
   AdminMetrics,
   AdminNetworkInfo,
   AdminOverview,
+  AdminResetResult,
   AdminStakeholderSummary,
   AdminStockPosition
 } from './admin.types.js';
@@ -77,6 +78,15 @@ export class AdminService {
 
   getStakeholderSummary(): AdminStakeholderSummary {
     return this.buildStakeholderSummary();
+  }
+
+  resetLedger(): AdminResetResult {
+    const { ledgerTxId } = this.ledger.resetTransactionalData();
+    return {
+      ledgerTxId,
+      message:
+        'Movement data, allocations, distributions, audit alerts, stock, and ledger events were cleared. Initial commodity lots were reseeded and entitlement balances were reset to their monthly limits. Stakeholders, ration cards, and entitlement rules were left untouched.'
+    };
   }
 
   private buildMetrics(): AdminMetrics {

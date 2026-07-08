@@ -25,13 +25,19 @@ const baseProps = {
   onMockComplete: vi.fn()
 };
 
-const receivedTransfer = (transferId: string, fromOrg: string, toOrg: string, lotId = 'LOT-RICE-2026-002') => ({
+const receivedTransfer = (
+  transferId: string,
+  fromOrg: string,
+  toOrg: string,
+  lotId = 'LOT-RICE-2026-002',
+  qtyKg = demoQuantities.stageOneTransferKg
+) => ({
   transferId,
   lotId,
   fromOrg,
   toOrg,
-  dispatchedQtyKg: demoQuantities.stageOneTransferKg,
-  receivedQtyKg: demoQuantities.stageOneTransferKg,
+  dispatchedQtyKg: qtyKg,
+  receivedQtyKg: qtyKg,
   vehicleNo: 'KA01AB1000',
   status: TransferStatus.RECEIVED,
   dispatchTimestamp: '2026-06-30T10:00:00.000Z',
@@ -55,9 +61,9 @@ const contextBeforeShivBhojanDispatch = {
     receivedTransfer('TR-POC-FCI-BUF', 'FCI-001', 'FCI-BUF-001', 'LOT-RICE-2026-001'),
     receivedTransfer('TR-POC-BUF-DEPOT', 'FCI-BUF-001', 'GODOWN-S-001', 'LOT-RICE-2026-001'),
     receivedTransfer('TR-POC-DEPOT-MILLER', 'GODOWN-S-001', 'MLL-001', 'LOT-RICE-2026-001'),
-    receivedTransfer('TR-POC-MILLER-ISSUE', 'MLL-001', 'ISSUE-001'),
-    receivedTransfer('TR-POC-ISSUE-FPS', 'ISSUE-001', 'FPS-101'),
-    receivedTransfer('TR-POC-ISSUE-WI', 'ISSUE-001', 'WI-101')
+    receivedTransfer('TR-POC-MILLER-ISSUE', 'MLL-001', 'ISSUE-001', 'LOT-RICE-2026-002', demoQuantities.millerToIssueKg),
+    receivedTransfer('TR-POC-ISSUE-FPS', 'ISSUE-001', 'FPS-101', 'LOT-RICE-2026-002', demoQuantities.endpointDispatchKg.fps),
+    receivedTransfer('TR-POC-ISSUE-WI', 'ISSUE-001', 'WI-101', 'LOT-RICE-2026-002', demoQuantities.endpointDispatchKg.welfareInstitute)
   ],
   ledgerEvents: [
     {

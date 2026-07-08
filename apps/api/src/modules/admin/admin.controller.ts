@@ -1,5 +1,5 @@
 import { Plane } from '../../infrastructure/plane.decorator.js';
-import { Controller, Get, Inject, UseGuards } from '@nestjs/common';
+import { Controller, Get, HttpCode, Inject, Post, UseGuards } from '@nestjs/common';
 import { AdminGuard } from './admin.guard.js';
 import { AdminService } from './admin.service.js';
 
@@ -27,5 +27,11 @@ export class AdminController {
   @Get('stakeholders/summary')
   stakeholdersSummary() {
     return this.admin.getStakeholderSummary();
+  }
+
+  @Post('reset')
+  @HttpCode(200)
+  reset() {
+    return this.admin.resetLedger();
   }
 }

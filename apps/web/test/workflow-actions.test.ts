@@ -204,9 +204,9 @@ describe('workflow actions', () => {
     ).toThrow(/Insufficient stock/);
   });
 
-  it('rejects a non-positive dispatch quantity', () => {
-    expect(() =>
-      applyMockWorkflowAction(emptyContext, {
+	  it('rejects a non-positive dispatch quantity', () => {
+	    expect(() =>
+	      applyMockWorkflowAction(emptyContext, {
         kind: 'dispatch',
         payload: {
           transferId: 'TR-POC-PROC-FCI',
@@ -217,10 +217,42 @@ describe('workflow actions', () => {
           vehicleNo: 'KA01AB2000'
         }
       })
-    ).toThrow(/dispatchedQtyKg must be positive/);
-  });
-
-  it('caps dispatch quantity to what a downstream org actually received in-session', () => {
+	    ).toThrow(/dispatchedQtyKg must be positive/);
+	  });
+	
+	  it('rejects mock dispatches outside the configured commodity route', () => {
+	    expect(() =>
+	      applyMockWorkflowAction(emptyContext, {
+	        kind: 'dispatch',
+	        payload: {
+	          transferId: 'TR-POC-KEROSENE-MILLER-BLOCK',
+	          lotId: 'LOT-KEROSENE-2026-001',
+	          fromOrg: 'PROC-001',
+	          toOrg: 'MLL-001',
+	          dispatchedQtyKg: 100,
+	          vehicleNo: 'KA01AB8001'
+	        }
+	      })
+	    ).toThrow(/Kerosene route does not allow movement/);
+	  });
+	
+	  it('rejects mock transformations for direct-route commodities', () => {
+	    expect(() =>
+	      applyMockWorkflowAction(emptyContext, {
+	        kind: 'transform-lot',
+	        payload: {
+	          parentLotId: 'LOT-COOKING-OIL-2026-001',
+	          childLotId: 'LOT-COOKING-OIL-2026-CHILD',
+	          transformedBy: 'PROC-001',
+	          commodity: 'Cooking Oil',
+	          quantityKg: 100,
+	          qualityGrade: 'A'
+	        }
+	      })
+	    ).toThrow(/Cooking Oil does not require transformation/);
+	  });
+	
+	  it('caps dispatch quantity to what a downstream org actually received in-session', () => {
     const context: WorkflowContext = {
       ...emptyContext,
       transfers: [
@@ -317,6 +349,29 @@ describe('workflow actions', () => {
 
   it('tracks the full POC workflow progress', () => {
     expect(getWorkflowProgress(emptyContext)).toEqual({ completed: 0, total: 13 });
+  });
+
+  it('uses a direct non-milling workflow for kerosene', () => {
+    const actions = [];
+    let context: WorkflowContext = emptyContext;
+
+    for (let index = 0; index < 10; index += 1) {
+      const action = getNextWorkflowAction(context, { commodity: 'Kerosene' });
+      if (!action) break;
+      actions.push(action);
+      context = applyMockWorkflowAction(context, action.request).context;
+    }
+
+    expect(actions.some((action) => action.request.kind === 'transform-lot')).toBe(false);
+    expect(actions.some((action) => action.id.includes('MILLER'))).toBe(false);
+    expect(actions.map((action) => action.id)).toEqual(
+      expect.arrayContaining([
+        'TR-POC-KEROSENE-PROC-DEPOT',
+        'TR-POC-KEROSENE-DEPOT-ISSUE',
+        'TR-POC-KEROSENE-ISSUE-FPS',
+        'DIST-POC-KEROSENE-001'
+      ])
+    );
   });
 
   it('can replay the full mock role-workbench action graph to completion', () => {

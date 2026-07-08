@@ -44,24 +44,9 @@ export const createControllerWithFacade = async <T>(
 
 export const moveLotToGodownB = (
   facade: PdsLedgerFacade,
-  lotId = 'LOT-RICE-2026-001',
   quantityKg = 1000
 ): void => {
-  const legs = [
-    { transferId: 'TR-SETUP-1', fromOrg: 'PROC-001', toOrg: 'MLL-001' },
-    { transferId: 'TR-SETUP-2', fromOrg: 'MLL-001', toOrg: 'GODOWN-S-001' },
-    { transferId: 'TR-SETUP-3', fromOrg: 'GODOWN-S-001', toOrg: 'GODOWN-B-001' }
-  ];
-
-  for (const leg of legs) {
-    facade.dispatchLot({
-      ...leg,
-      lotId,
-      dispatchedQtyKg: quantityKg,
-      vehicleNo: 'KA01SETUP01'
-    });
-    facade.receiveLot({ transferId: leg.transferId, receivedQtyKg: quantityKg });
-  }
+  facade.addStockForTest('GODOWN-B-001', 'Rice', quantityKg);
 };
 
 export const prepareFpsStock = (facade: PdsLedgerFacade, allocationId: string, quantityKg = 100): void => {
