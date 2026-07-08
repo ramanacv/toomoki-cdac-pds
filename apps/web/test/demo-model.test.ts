@@ -43,7 +43,7 @@ describe('demo model', () => {
 
   it('includes auth and entitlement records for traceability', () => {
     expect(demoAuthTransactions).toHaveLength(1);
-    expect(demoEntitlements[0]?.availableBalanceKg).toBe(0);
+    expect(demoEntitlements[0]?.availableBalanceKg).toBe(25);
   });
 
   it('maps each role to a navigable screen set', () => {

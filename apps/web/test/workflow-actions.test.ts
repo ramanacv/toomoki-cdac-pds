@@ -121,7 +121,7 @@ describe('workflow actions', () => {
 
   it('offers and applies the milling transform after stock reaches the miller', () => {
     const millerReady = completedTransfers.slice(0, 4);
-    const action = getNextWorkflowAction({
+    const readyContext: WorkflowContext = {
       ...emptyContext,
       transfers: millerReady,
       ledgerEvents: [
@@ -134,10 +134,11 @@ describe('workflow actions', () => {
           timestamp: '2026-06-09T10:00:00.000Z'
         }
       ]
-    });
+    };
+    const action = getNextWorkflowAction(readyContext);
 
     expect(action?.request.kind).toBe('transform-lot');
-    const result = applyMockWorkflowAction(emptyContext, action!.request);
+    const result = applyMockWorkflowAction(readyContext, action!.request);
     expect(result.evidence.eventType).toBe('TransformLot');
     expect(result.context.lots.some((lot) => lot.transformedFromLotId === 'LOT-RICE-2026-001')).toBe(true);
   });
@@ -185,6 +186,133 @@ describe('workflow actions', () => {
 
     expect(action?.request.kind).toBe('duplicate-distribute');
     expect(action?.label).toContain('duplicate');
+  });
+
+  it('rejects a dispatch quantity greater than the org has on hand', () => {
+    expect(() =>
+      applyMockWorkflowAction(emptyContext, {
+        kind: 'dispatch',
+        payload: {
+          transferId: 'TR-POC-PROC-FCI',
+          lotId: 'LOT-RICE-2026-001',
+          fromOrg: 'PROC-001',
+          toOrg: 'FCI-001',
+          dispatchedQtyKg: 999999,
+          vehicleNo: 'KA01AB2000'
+        }
+      })
+    ).toThrow(/Insufficient stock/);
+  });
+
+  it('rejects a non-positive dispatch quantity', () => {
+    expect(() =>
+      applyMockWorkflowAction(emptyContext, {
+        kind: 'dispatch',
+        payload: {
+          transferId: 'TR-POC-PROC-FCI',
+          lotId: 'LOT-RICE-2026-001',
+          fromOrg: 'PROC-001',
+          toOrg: 'FCI-001',
+          dispatchedQtyKg: 0,
+          vehicleNo: 'KA01AB2000'
+        }
+      })
+    ).toThrow(/dispatchedQtyKg must be positive/);
+  });
+
+  it('caps dispatch quantity to what a downstream org actually received in-session', () => {
+    const context: WorkflowContext = {
+      ...emptyContext,
+      transfers: [
+        {
+          transferId: 'TR-POC-PROC-FCI',
+          lotId: 'LOT-RICE-2026-001',
+          fromOrg: 'PROC-001',
+          toOrg: 'FCI-001',
+          dispatchedQtyKg: 1000,
+          receivedQtyKg: 1000,
+          vehicleNo: 'KA01AB2000',
+          status: TransferStatus.RECEIVED,
+          dispatchTimestamp: '2026-06-09T10:00:00.000Z',
+          receiveTimestamp: '2026-06-09T10:30:00.000Z'
+        }
+      ]
+    };
+
+    expect(() =>
+      applyMockWorkflowAction(context, {
+        kind: 'dispatch',
+        payload: {
+          transferId: 'TR-POC-FCI-BUF',
+          lotId: 'LOT-RICE-2026-001',
+          fromOrg: 'FCI-001',
+          toOrg: 'FCI-BUF-001',
+          dispatchedQtyKg: 1500,
+          vehicleNo: 'KA01AB2001'
+        }
+      })
+    ).toThrow(/Insufficient stock/);
+
+    const result = applyMockWorkflowAction(context, {
+      kind: 'dispatch',
+      payload: {
+        transferId: 'TR-POC-FCI-BUF',
+        lotId: 'LOT-RICE-2026-001',
+        fromOrg: 'FCI-001',
+        toOrg: 'FCI-BUF-001',
+        dispatchedQtyKg: 700,
+        vehicleNo: 'KA01AB2001'
+      }
+    });
+    expect(result.evidence.eventType).toBe('DISPATCH_LOT');
+  });
+
+  it('blocks a distribution that exceeds the beneficiary monthly balance and raises an alert', () => {
+    const result = applyMockWorkflowAction(emptyContext, {
+      kind: 'distribute',
+      payload: {
+        distributionId: 'DIST-OVER-1',
+        fpsId: 'FPS-101',
+        rationCardHash: 'demo-ration-card-hash',
+        beneficiaryRefHash: 'beneficiary-hash',
+        commodity: 'Rice',
+        deliveredKg: 999,
+        authMode: AuthMode.MOCK_OTP,
+        authResult: AuthResult.SUCCESS,
+        authTxnRefHash: 'auth-ref-over',
+        dealerId: 'FPS-DEALER-101',
+        timestamp: '2026-06-15T10:00:00.000Z'
+      }
+    });
+
+    expect(result.context.distributions).toHaveLength(0);
+    expect(result.evidence.eventType).toBe('DUPLICATE_CLAIM_BLOCKED');
+    expect(result.context.alerts.some((alert) => alert.alertType === AlertType.DUPLICATE_CLAIM)).toBe(true);
+  });
+
+  it('decrements the entitlement balance as distributions are recorded', () => {
+    const result = applyMockWorkflowAction(emptyContext, {
+      kind: 'distribute',
+      payload: {
+        distributionId: 'DIST-PARTIAL-1',
+        fpsId: 'FPS-101',
+        rationCardHash: 'demo-ration-card-hash',
+        beneficiaryRefHash: 'beneficiary-hash',
+        commodity: 'Rice',
+        deliveredKg: 10,
+        authMode: AuthMode.MOCK_OTP,
+        authResult: AuthResult.SUCCESS,
+        authTxnRefHash: 'auth-ref-partial',
+        dealerId: 'FPS-DEALER-101',
+        timestamp: '2026-06-15T10:00:00.000Z'
+      }
+    });
+
+    const entitlement = result.context.entitlements.find(
+      (item) => item.rationCardHash === 'demo-ration-card-hash' && item.month === '2026-06'
+    );
+    expect(entitlement?.availableBalanceKg).toBe(15);
+    expect(entitlement?.alreadyLiftedKg).toBe(10);
   });
 
   it('tracks the full POC workflow progress', () => {

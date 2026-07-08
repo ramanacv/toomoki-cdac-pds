@@ -4,8 +4,17 @@
     "commodity": "Rice",
     "month": "2026-06",
     "monthlyEntitlementKg": 25,
-    "alreadyLiftedKg": 25,
-    "availableBalanceKg": 0,
+    "alreadyLiftedKg": 0,
+    "availableBalanceKg": 25,
+    "active": true
+  },
+  {
+    "rationCardHash": "exception-ration-card-hash",
+    "commodity": "Rice",
+    "month": "2026-06",
+    "monthlyEntitlementKg": 15,
+    "alreadyLiftedKg": 0,
+    "availableBalanceKg": 15,
     "active": true
   }
 ]

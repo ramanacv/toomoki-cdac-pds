@@ -269,6 +269,32 @@ const isAuthorizationEvent = (eventType: string): boolean =>
 
 const txId = (prefix: string, id: string) => `MOCK-${prefix}-${id}`;
 
+const sumKg = (values: number[]): number => values.reduce((total, value) => total + value, 0);
+
+const isSessionTransfer = (transfer: TransferOrder): boolean =>
+  transfer.transferId.startsWith('TR-POC');
+
+/**
+ * Stock available to dispatch from an org within the interactive session,
+ * mirroring the chaincode stock ledger: receipts flow in, dispatches flow
+ * out, and the chain origin draws down the source lot. Seeded history
+ * (TR-SEED-*) is display data and stays out of the session balance.
+ */
+export const getSessionStockKg = (
+  context: Pick<WorkflowContext, 'transfers' | 'lots'>,
+  org: string,
+  lotId?: string
+): number => {
+  const session = context.transfers.filter(isSessionTransfer);
+  const inflow = sumKg(session.filter((t) => t.toOrg === org).map((t) => t.receivedQtyKg ?? 0));
+  const outflow = sumKg(session.filter((t) => t.fromOrg === org).map((t) => t.dispatchedQtyKg));
+  if (inflow > 0) {
+    return inflow - outflow;
+  }
+  const rootLot = context.lots.find((lot) => lot.lotId === lotId && !lot.transformedFromLotId);
+  return (rootLot?.quantityKg ?? 0) - outflow;
+};
+
 const getEntitlementForDistribution = (
   entitlements: MonthlyEntitlement[] | undefined,
   rationCardHash: string,
@@ -533,6 +559,15 @@ export function applyMockWorkflowAction(context: WorkflowContext, request: Workf
       });
       message = 'Unauthorized Stage-II dispatch blocked.';
     } else {
+      if (request.payload.dispatchedQtyKg <= 0) {
+        throw new Error('dispatchedQtyKg must be positive');
+      }
+      const available = getSessionStockKg(current, request.payload.fromOrg, request.payload.lotId);
+      if (request.payload.dispatchedQtyKg > available) {
+        throw new Error(
+          `Insufficient stock for ${request.payload.fromOrg}: ${available} kg available, ${request.payload.dispatchedQtyKg} kg requested`
+        );
+      }
       const transfer: TransferOrder = {
         ...request.payload,
         status: TransferStatus.DISPATCHED,
@@ -544,6 +579,15 @@ export function applyMockWorkflowAction(context: WorkflowContext, request: Workf
       message = `${transfer.transferId} dispatched with transporter evidence.`;
     }
   } else if (request.kind === 'transform-lot') {
+    if (request.payload.quantityKg <= 0) {
+      throw new Error('quantityKg must be positive');
+    }
+    const transformerStock = getSessionStockKg(current, request.payload.transformedBy);
+    if (request.payload.quantityKg > transformerStock) {
+      throw new Error(
+        `Insufficient stock for ${request.payload.transformedBy}: ${transformerStock} kg available, ${request.payload.quantityKg} kg requested`
+      );
+    }
     const parent = current.lots.find((lot) => lot.lotId === request.payload.parentLotId);
     const existingChild = current.lots.find((lot) => lot.lotId === request.payload.childLotId);
     const child: CommodityLot = {
@@ -612,6 +656,50 @@ export function applyMockWorkflowAction(context: WorkflowContext, request: Workf
     message = 'Duplicate claim blocked and written to the auditor queue.';
   } else if (request.kind === 'distribute' || request.kind === 'supervisor-exception-distribute') {
     const timestamp = request.payload.timestamp ?? getDistributionTimestamp(current, request.payload.rationCardHash, request.payload.commodity) ?? now();
+    if (request.payload.deliveredKg <= 0) {
+      throw new Error('deliveredKg must be positive');
+    }
+    const month = monthKey(timestamp);
+    const entitlementIndex = current.entitlements.findIndex(
+      (item) =>
+        item.rationCardHash === request.payload.rationCardHash &&
+        item.commodity === request.payload.commodity &&
+        item.month === month
+    );
+    const entitlement = current.entitlements[entitlementIndex];
+    if (!entitlement || !entitlement.active) {
+      throw new Error(`No active entitlement for ${request.payload.rationCardHash} in ${month}`);
+    }
+    if (entitlement.availableBalanceKg < request.payload.deliveredKg) {
+      // Mirror the ledger: block the claim, raise the audit signal, record nothing.
+      event = evidence('DUPLICATE_CLAIM_BLOCKED', 'audit', request.payload.distributionId, request.payload);
+      current.alerts.push({
+        alertId: `ALERT-${request.payload.distributionId}-ENTITLEMENT`,
+        alertType: AlertType.DUPLICATE_CLAIM,
+        entityId: request.payload.rationCardHash,
+        riskLevel: 'HIGH',
+        message: 'Over-entitlement claim blocked before distribution.',
+        status: 'OPEN',
+        evidence: {
+          rationCardHash: request.payload.rationCardHash,
+          month,
+          requestedQtyKg: request.payload.deliveredKg,
+          availableBalanceKg: entitlement.availableBalanceKg
+        },
+        createdAt: timestamp
+      });
+      current.ledgerEvents.push(event);
+      return {
+        context: current,
+        message: `Claim blocked: ${request.payload.deliveredKg} kg requested, only ${entitlement.availableBalanceKg} kg available this month.`,
+        evidence: event
+      };
+    }
+    current.entitlements[entitlementIndex] = {
+      ...entitlement,
+      alreadyLiftedKg: entitlement.alreadyLiftedKg + request.payload.deliveredKg,
+      availableBalanceKg: entitlement.availableBalanceKg - request.payload.deliveredKg
+    };
     const distribution: DistributionTransaction = {
       ...request.payload,
       timestamp,
