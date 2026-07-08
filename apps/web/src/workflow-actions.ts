@@ -343,6 +343,17 @@ export function getRoleQueue(context: WorkflowContext, role: DemoRole, commodity
   return getWorkflowActions(context, commodity).filter((action) => action.roles.includes(role));
 }
 
+export type CommodityActionGroup = { commodity: CommodityName; actions: WorkflowActionSpec[] };
+
+export function getAllCommoditiesWorkflowActions(context: WorkflowContext): CommodityActionGroup[] {
+  return COMMODITIES.map((def) => ({ commodity: def.name, actions: getWorkflowActions(context, def.name) }));
+}
+
+export function getAllCommoditiesRoleQueue(context: WorkflowContext, role: DemoRole): CommodityActionGroup[] {
+  return COMMODITIES.map((def) => ({ commodity: def.name, actions: getRoleQueue(context, role, def.name) }))
+    .filter((group) => group.actions.length > 0);
+}
+
 export function getWorkflowActions(context: WorkflowContext, commodity = DEFAULT_WORKFLOW_COMMODITY): WorkflowActionSpec[] {
   const route = getWorkflowRoute(commodity);
   const plannedLegs = getPlannedLegs(route.commodity);
@@ -825,7 +836,7 @@ export function applyMockWorkflowAction(context: WorkflowContext, request: Workf
   return { context: current, message, evidence: event };
 }
 
-export const getWorkflowProgress = (context: WorkflowContext, commodity = DEFAULT_WORKFLOW_COMMODITY): { completed: number; total: number } => {
+export const getWorkflowProgress = (context: WorkflowContext, commodity: CommodityName = DEFAULT_WORKFLOW_COMMODITY): { completed: number; total: number } => {
   const route = getWorkflowRoute(commodity);
   const plannedLegs = getPlannedLegs(route.commodity);
   const authorizationLeg = plannedLegs.find((leg) => leg.roRef);
@@ -851,3 +862,7 @@ export const getWorkflowProgress = (context: WorkflowContext, commodity = DEFAUL
     total: checkpoints.length
   };
 };
+
+export function getAllCommoditiesWorkflowProgress(context: WorkflowContext): Array<{ commodity: CommodityName; completed: number; total: number }> {
+  return COMMODITIES.map((def) => ({ commodity: def.name, ...getWorkflowProgress(context, def.name) }));
+}

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type {
   AuditAlert,
   AuthTransaction,
@@ -8,6 +9,7 @@ import type {
   Stakeholder,
   TransferOrder
 } from '@pds/shared-types';
+import { LotStatus } from '@pds/shared-types';
 import { Panel } from '@/components/Panel';
 import { CardTopline, DefinitionList, EntityCard } from '@/components/Entity';
 import {
@@ -18,6 +20,8 @@ import {
   TableHeader,
   TableRow
 } from '@/components/ui/table';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
 import { formatDateTime } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 
@@ -44,6 +48,86 @@ export function StakeholdersPanel({ stakeholders }: { stakeholders: Stakeholder[
           </EntityCard>
         ))}
       </div>
+    </Panel>
+  );
+}
+
+type LotStatusFilter = 'ALL' | 'PENDING' | 'RECEIVED' | 'SHORTAGE';
+
+const isPendingLot = (lot: CommodityLot) => lot.status === LotStatus.CREATED || lot.status === LotStatus.DISPATCHED;
+const isShortageLot = (lot: CommodityLot) => lot.status === LotStatus.RECEIVED_WITH_SHORTAGE;
+const isReceivedLot = (lot: CommodityLot) => lot.status === LotStatus.RECEIVED || isShortageLot(lot);
+
+export function LotsPanel({
+  lots,
+  onSelectLot
+}: {
+  lots: CommodityLot[];
+  onSelectLot?: (lotId: string) => void;
+}) {
+  const [statusFilter, setStatusFilter] = useState<LotStatusFilter>('ALL');
+
+  const counts = {
+    ALL: lots.length,
+    PENDING: lots.filter(isPendingLot).length,
+    RECEIVED: lots.filter(isReceivedLot).length,
+    SHORTAGE: lots.filter(isShortageLot).length
+  };
+
+  const visibleLots = lots.filter((lot) => {
+    if (statusFilter === 'PENDING') return isPendingLot(lot);
+    if (statusFilter === 'RECEIVED') return isReceivedLot(lot);
+    if (statusFilter === 'SHORTAGE') return isShortageLot(lot);
+    return true;
+  });
+
+  return (
+    <Panel eyebrow="Lots" title="Commodity lots overview" pill={`${lots.length} lots`}>
+      <Tabs value={statusFilter} onValueChange={(value) => setStatusFilter(value as LotStatusFilter)} className="mb-4">
+        <TabsList>
+          <TabsTrigger value="ALL">All ({counts.ALL})</TabsTrigger>
+          <TabsTrigger value="PENDING">Pending ({counts.PENDING})</TabsTrigger>
+          <TabsTrigger value="RECEIVED">Received ({counts.RECEIVED})</TabsTrigger>
+          <TabsTrigger value="SHORTAGE">Shortage ({counts.SHORTAGE})</TabsTrigger>
+        </TabsList>
+      </Tabs>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead scope="col">Lot ID</TableHead>
+            <TableHead scope="col">Commodity</TableHead>
+            <TableHead scope="col">Status</TableHead>
+            <TableHead scope="col">Quantity</TableHead>
+            <TableHead scope="col">Current owner</TableHead>
+            <TableHead scope="col">Current location</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {visibleLots.map((lot) => (
+            <TableRow
+              key={lot.lotId}
+              onClick={onSelectLot ? () => onSelectLot(lot.lotId) : undefined}
+              className={onSelectLot ? 'cursor-pointer' : undefined}
+            >
+              <TableCell className="font-semibold">{lot.lotId}</TableCell>
+              <TableCell>{lot.commodity}</TableCell>
+              <TableCell>
+                <Badge variant={isShortageLot(lot) ? 'warning' : 'secondary'}>{lot.status}</Badge>
+              </TableCell>
+              <TableCell>{lot.quantityKg} kg</TableCell>
+              <TableCell>{lot.currentOwner}</TableCell>
+              <TableCell>{lot.currentLocation}</TableCell>
+            </TableRow>
+          ))}
+          {visibleLots.length === 0 && (
+            <TableRow>
+              <TableCell colSpan={6} className="text-center text-muted-foreground">
+                No lots match this filter.
+              </TableCell>
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
     </Panel>
   );
 }

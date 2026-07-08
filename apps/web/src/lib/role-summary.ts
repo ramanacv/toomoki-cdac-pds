@@ -12,7 +12,7 @@ import type {
 } from '@pds/shared-types';
 import { StakeholderStatus, TransferStatus } from '@pds/shared-types';
 import type { DemoRole } from '@/demo-model.js';
-import { getRoleQueue } from '@/workflow-actions.js';
+import { getAllCommoditiesRoleQueue } from '@/workflow-actions.js';
 import { stageHints, summaryCardData } from '@/lib/constants.js';
 
 export type RoleSummaryInput = {
@@ -60,7 +60,7 @@ export function roleSummaryCards(
   liveSummary: DashboardSummary
 ): Array<[string, string, string?]> {
   const orgs = roleOrgs[role] ?? [];
-  const queue = getRoleQueue(data, role);
+  const queue = getAllCommoditiesRoleQueue(data, role).flatMap((g) => g.actions);
   const queued = queue.filter((action) => action.status !== 'blocked').length;
   const openAlerts = data.alerts.filter((alert) => alert.status === 'OPEN');
 

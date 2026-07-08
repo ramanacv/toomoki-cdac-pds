@@ -3,6 +3,7 @@ import {
   COMMODITIES,
   type AuthTransaction,
   type CommodityLot,
+  type CommodityName,
   type DistributionTransaction,
   type FPSAllocation,
   type AuditAlert,
@@ -14,9 +15,10 @@ import { executeWorkflowAction } from '@/api.js';
 import type { DemoRole } from '@/demo-model.js';
 import {
   applyMockWorkflowAction,
-  getRoleQueue,
-  getWorkflowActions,
-  getWorkflowProgress,
+  getAllCommoditiesRoleQueue,
+  getAllCommoditiesWorkflowActions,
+  getAllCommoditiesWorkflowProgress,
+  type CommodityActionGroup,
   type MockWorkflowResult,
   type WorkflowActionRequest,
   type WorkflowActionSpec
@@ -27,13 +29,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from '@/components/ui/select';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DefinitionList } from '@/components/Entity';
 import { formatDateTime, roleTitle } from '@/lib/constants';
 
@@ -94,6 +90,9 @@ type WorkflowActionPanelProps = {
   onMockComplete: (result: MockWorkflowResult) => void;
 };
 
+const nonBlockedCount = (actions: WorkflowActionSpec[]): number =>
+  actions.filter((action) => action.status !== 'blocked').length;
+
 export function WorkflowActionPanel({
   apiOnline,
   role,
@@ -113,26 +112,39 @@ export function WorkflowActionPanel({
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [completedActionId, setCompletedActionId] = useState<string | null>(null);
-  const [selectedCommodity, setSelectedCommodity] = useState('Rice');
+  const [commodityFilter, setCommodityFilter] = useState<CommodityName | 'ALL'>('ALL');
 
   const context = useMemo(
     () => ({ lots, transfers, allocations, authTransactions, distributions, entitlements, alerts, ledgerEvents }),
     [allocations, alerts, authTransactions, distributions, entitlements, ledgerEvents, lots, transfers]
   );
 
-  const progress = getWorkflowProgress(context, selectedCommodity);
-  const allActions = getWorkflowActions(context, selectedCommodity);
-  const roleQueue = getRoleQueue(context, role, selectedCommodity);
-  const nextAction = roleQueue.find((action) => action.status !== 'blocked') ?? roleQueue[0] ?? allActions[0] ?? null;
-  const displayedActions = role === 'MANAGEMENT' ? allActions : roleQueue.length > 0 ? roleQueue : nextAction ? [nextAction] : [];
-  const nextActionAllowed = nextAction ? nextAction.roles.includes(role) : false;
+  const strictGroups: CommodityActionGroup[] =
+    role === 'MANAGEMENT' ? getAllCommoditiesWorkflowActions(context) : getAllCommoditiesRoleQueue(context, role);
+  // When a role has nothing of its own queued in any commodity, fall back to
+  // showing the next pending action per commodity anyway (read-only "waiting
+  // for" view) so operators can see what's blocking the pipeline instead of
+  // an empty screen that looks like the whole journey finished.
+  const groupsForRole: CommodityActionGroup[] =
+    role !== 'MANAGEMENT' && strictGroups.length === 0
+      ? getAllCommoditiesWorkflowActions(context)
+          .map((group) => ({ commodity: group.commodity, actions: group.actions.slice(0, 1) }))
+          .filter((group) => group.actions.length > 0)
+      : strictGroups;
+  const visibleGroups =
+    commodityFilter === 'ALL' ? groupsForRole : groupsForRole.filter((group) => group.commodity === commodityFilter);
+  const aggregateProgress = getAllCommoditiesWorkflowProgress(context).reduce(
+    (totals, entry) => ({ completed: totals.completed + entry.completed, total: totals.total + entry.total }),
+    { completed: 0, total: 0 }
+  );
+  const totalPending = groupsForRole.reduce((sum, group) => sum + nonBlockedCount(group.actions), 0);
 
   useEffect(() => {
     setMessage(null);
     setError(null);
     setCompletedActionId(null);
     setQuantityInputs({});
-  }, [role, selectedCommodity]);
+  }, [role, commodityFilter]);
 
   const runAction = async (action: WorkflowActionSpec) => {
     if (!action || !action.roles.includes(role) || completedActionId === action.id) {
@@ -204,7 +216,7 @@ export function WorkflowActionPanel({
     <Panel
       eyebrow={apiOnline ? 'Live workflow' : 'Mock workflow'}
       title={`${role === 'MANAGEMENT' ? 'Management inspection' : 'Role workbench'}`}
-      pill={`${progress.completed}/${progress.total} checkpoints`}
+      pill={`${aggregateProgress.completed}/${aggregateProgress.total} checkpoints`}
       wide
       lead={
         apiOnline
@@ -212,106 +224,128 @@ export function WorkflowActionPanel({
           : 'Actions mutate local demo state and append mock ledger evidence for click-through POC review.'
       }
     >
-      <div className="mb-4 max-w-xs">
-        <Label htmlFor="workflow-commodity">Commodity route</Label>
-        <Select value={selectedCommodity} onValueChange={setSelectedCommodity}>
-          <SelectTrigger id="workflow-commodity" className="mt-2">
-            <SelectValue placeholder="Select commodity" />
-          </SelectTrigger>
-          <SelectContent>
-            {COMMODITIES.map((commodity) => (
-              <SelectItem key={commodity.slug} value={commodity.name}>
+      <Tabs
+        value={commodityFilter}
+        onValueChange={(value) => setCommodityFilter(value as CommodityName | 'ALL')}
+        className="mb-4"
+      >
+        <TabsList>
+          <TabsTrigger value="ALL">
+            All{totalPending > 0 ? <Badge className="ml-2" variant="secondary">{totalPending}</Badge> : null}
+          </TabsTrigger>
+          {COMMODITIES.map((commodity) => {
+            const count = nonBlockedCount(
+              groupsForRole.find((group) => group.commodity === commodity.name)?.actions ?? []
+            );
+            return (
+              <TabsTrigger key={commodity.slug} value={commodity.name}>
                 {commodity.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      {nextAction ? (
-        <div className="flex flex-col gap-4">
-          <div className="grid gap-3 md:grid-cols-2">
-            {displayedActions.map((action) => {
-              const request = action.request;
-              const receiveTransfer =
-                request.kind === 'receive'
-                  ? transfers.find((transfer) => transfer.transferId === request.transferId)
-                  : undefined;
-              const actionAllowed = action.roles.includes(role);
-              const allowedRoles = action.roles.map(roleTitle).join(', ');
-              const editable = getEditableQuantity(request);
-              const canEdit = role !== 'MANAGEMENT' && actionAllowed && editable && completedActionId !== action.id;
-              const quantityValue = quantityInputs[action.id] ?? (editable ? String(editable.defaultValue) : '');
+                {count > 0 ? <Badge className="ml-2" variant="secondary">{count}</Badge> : null}
+              </TabsTrigger>
+            );
+          })}
+        </TabsList>
+      </Tabs>
 
-              return (
-                <div key={action.id} className="rounded-2xl border border-border bg-card/70 p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <strong className="block">{action.label}</strong>
-                    <Badge variant={action.status === 'blocked' ? 'destructive' : 'secondary'}>
-                      {completedActionId === action.id ? 'done' : actionAllowed || role === 'MANAGEMENT' ? action.status : 'upstream'}
-                    </Badge>
-                  </div>
-                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{action.detail}</p>
-                  {role !== 'MANAGEMENT' && !actionAllowed && (
-                    <DefinitionList
-                      className="mt-3"
-                      entries={[
-                        { label: 'Pending with', value: allowedRoles },
-                        { label: 'Selected role', value: roleTitle(role) }
-                      ]}
-                    />
-                  )}
-                  {receiveTransfer && (
-                    <DefinitionList
-                      className="mt-3"
-                      entries={[
-                        { label: 'From', value: receiveTransfer.fromOrg },
-                        { label: 'Dispatch time', value: formatDateTime(receiveTransfer.dispatchTimestamp) },
-                        { label: 'Receive time', value: formatDateTime(receiveTransfer.receiveTimestamp) }
-                      ]}
-                    />
-                  )}
-                  {editable && (
-                    <div className="mt-3 grid max-w-[220px] gap-2">
-                      <Label htmlFor={`qty-${action.id}`}>{editable.label}</Label>
-                      <Input
-                        id={`qty-${action.id}`}
-                        type="number"
-                        min={1}
-                        disabled={!canEdit}
-                        value={quantityValue}
-                        onChange={(event) =>
-                          setQuantityInputs((current) => ({ ...current, [action.id]: event.target.value }))
-                        }
-                      />
-                    </div>
-                  )}
-                  {role !== 'MANAGEMENT' && actionAllowed && (
-                    <Button
-                      type="button"
-                      className="mt-3"
-                      disabled={busy || action.status === 'blocked' || completedActionId === action.id}
-                      onClick={() => void runAction(action)}
-                    >
-                      {busy
-                        ? 'Submitting...'
-                        : completedActionId === action.id
-                          ? 'Done'
-                          : action.status === 'blocked'
-                            ? 'Blocked'
-                            : 'Run action'}
-                    </Button>
-                  )}
-                  {role !== 'MANAGEMENT' && !actionAllowed && (
-                    <Button type="button" variant="secondary" className="mt-3" disabled>
-                      Waiting for {allowedRoles}
-                    </Button>
-                  )}
+      {groupsForRole.length > 0 ? (
+        <div className="flex flex-col gap-6">
+          {visibleGroups.length > 0 ? (
+            visibleGroups.map((group) => (
+              <div key={group.commodity} data-testid={`commodity-group-${group.commodity}`}>
+                <div className="mb-2 flex items-center gap-2">
+                  <strong className="text-sm">{group.commodity}</strong>
+                  <span className="text-sm text-muted-foreground">
+                    {group.actions.length} action{group.actions.length === 1 ? '' : 's'}
+                  </span>
                 </div>
-              );
-            })}
-          </div>
+                <div className="grid gap-3 md:grid-cols-2">
+                  {group.actions.map((action) => {
+                    const request = action.request;
+                    const receiveTransfer =
+                      request.kind === 'receive'
+                        ? transfers.find((transfer) => transfer.transferId === request.transferId)
+                        : undefined;
+                    const actionAllowed = action.roles.includes(role);
+                    const allowedRoles = action.roles.map(roleTitle).join(', ');
+                    const editable = getEditableQuantity(request);
+                    const canEdit = role !== 'MANAGEMENT' && actionAllowed && editable && completedActionId !== action.id;
+                    const quantityValue = quantityInputs[action.id] ?? (editable ? String(editable.defaultValue) : '');
 
-          {!nextActionAllowed && role !== 'MANAGEMENT' && <Badge variant="secondary">Allowed: {nextAction.roles.map(roleTitle).join(', ')}</Badge>}
+                    return (
+                      <div key={action.id} className="rounded-2xl border border-border bg-card/70 p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <strong className="block">{action.label}</strong>
+                          <Badge variant={action.status === 'blocked' ? 'destructive' : 'secondary'}>
+                            {completedActionId === action.id ? 'done' : actionAllowed || role === 'MANAGEMENT' ? action.status : 'upstream'}
+                          </Badge>
+                        </div>
+                        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{action.detail}</p>
+                        {role !== 'MANAGEMENT' && !actionAllowed && (
+                          <DefinitionList
+                            className="mt-3"
+                            entries={[
+                              { label: 'Pending with', value: allowedRoles },
+                              { label: 'Selected role', value: roleTitle(role) }
+                            ]}
+                          />
+                        )}
+                        {receiveTransfer && (
+                          <DefinitionList
+                            className="mt-3"
+                            entries={[
+                              { label: 'From', value: receiveTransfer.fromOrg },
+                              { label: 'Dispatch time', value: formatDateTime(receiveTransfer.dispatchTimestamp) },
+                              { label: 'Receive time', value: formatDateTime(receiveTransfer.receiveTimestamp) }
+                            ]}
+                          />
+                        )}
+                        {editable && (
+                          <div className="mt-3 grid max-w-[220px] gap-2">
+                            <Label htmlFor={`qty-${action.id}`}>{editable.label}</Label>
+                            <Input
+                              id={`qty-${action.id}`}
+                              type="number"
+                              min={1}
+                              disabled={!canEdit}
+                              value={quantityValue}
+                              onChange={(event) =>
+                                setQuantityInputs((current) => ({ ...current, [action.id]: event.target.value }))
+                              }
+                            />
+                          </div>
+                        )}
+                        {role !== 'MANAGEMENT' && actionAllowed && (
+                          <Button
+                            type="button"
+                            className="mt-3"
+                            disabled={busy || action.status === 'blocked' || completedActionId === action.id}
+                            onClick={() => void runAction(action)}
+                          >
+                            {busy
+                              ? 'Submitting...'
+                              : completedActionId === action.id
+                                ? 'Done'
+                                : action.status === 'blocked'
+                                  ? 'Blocked'
+                                  : 'Run action'}
+                          </Button>
+                        )}
+                        {role !== 'MANAGEMENT' && !actionAllowed && (
+                          <Button type="button" variant="secondary" className="mt-3" disabled>
+                            Waiting for {allowedRoles}
+                          </Button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))
+          ) : (
+            <p className="leading-relaxed text-muted-foreground">
+              No pending actions for {commodityFilter}.
+            </p>
+          )}
         </div>
       ) : (
         <p className="leading-relaxed text-muted-foreground">

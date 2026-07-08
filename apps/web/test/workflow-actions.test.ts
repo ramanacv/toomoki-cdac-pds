@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { AlertType, AuthMode, AuthResult, TransferStatus } from '@pds/shared-types';
+import { AlertType, AuthMode, AuthResult, COMMODITIES, TransferStatus } from '@pds/shared-types';
 import { demoEntitlements, demoLots } from '../src/demo-model.js';
 import {
   applyMockWorkflowAction,
+  getAllCommoditiesRoleQueue,
+  getAllCommoditiesWorkflowActions,
   getNextWorkflowAction,
   getRoleQueue,
+  getWorkflowActions,
   getWorkflowProgress,
   type WorkflowContext
 } from '../src/workflow-actions.js';
@@ -396,5 +399,21 @@ describe('workflow actions', () => {
     expect(getNextWorkflowAction(context)).toBeNull();
     const progress = getWorkflowProgress(context);
     expect(progress.completed).toBe(progress.total);
+  });
+
+  it('aggregates workflow actions for all 6 commodities', () => {
+    const groups = getAllCommoditiesWorkflowActions(emptyContext);
+    expect(groups).toHaveLength(6);
+    expect(groups.map((group) => group.commodity)).toEqual(COMMODITIES.map((def) => def.name));
+    for (const group of groups) {
+      expect(group.actions).toEqual(getWorkflowActions(emptyContext, group.commodity));
+    }
+  });
+
+  it('drops empty commodity groups from the aggregated role queue', () => {
+    const groups = getAllCommoditiesRoleQueue(emptyContext, 'CONTROL_OFFICE');
+    expect(groups.every((group) => group.actions.length > 0)).toBe(true);
+    expect(groups.some((group) => group.commodity === 'Rice')).toBe(true);
+    expect(groups.some((group) => group.commodity === 'Kerosene')).toBe(true);
   });
 });

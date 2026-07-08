@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { WorkflowActionPanel } from '@/components/WorkflowActionPanel.js';
 
@@ -113,7 +113,8 @@ describe('WorkflowActionPanel', () => {
       />
     );
 
-    await user.click(screen.getByRole('button', { name: 'Run action' }));
+    const riceGroup = within(screen.getByTestId('commodity-group-Rice'));
+    await user.click(riceGroup.getByRole('button', { name: 'Run action' }));
 
     expect(baseProps.onMockComplete).toHaveBeenCalledTimes(1);
     expect(screen.getByText(/Ledger event MOCK-RO_LITE_APPROVED/)).toBeInTheDocument();
@@ -131,7 +132,8 @@ describe('WorkflowActionPanel', () => {
       />
     );
 
-    await user.click(screen.getByRole('button', { name: 'Run action' }));
+    const riceGroup = within(screen.getByTestId('commodity-group-Rice'));
+    await user.click(riceGroup.getByRole('button', { name: 'Run action' }));
 
     expect(executeWorkflowAction).toHaveBeenCalledTimes(1);
     expect(onComplete).toHaveBeenCalled();
@@ -149,9 +151,10 @@ describe('WorkflowActionPanel', () => {
       />
     );
 
-    await user.click(screen.getByRole('button', { name: 'Run action' }));
+    const riceGroup = within(screen.getByTestId('commodity-group-Rice'));
+    await user.click(riceGroup.getByRole('button', { name: 'Run action' }));
 
-    expect(await screen.findByRole('button', { name: 'Done' })).toBeDisabled();
+    expect(await riceGroup.findByRole('button', { name: 'Done' })).toBeDisabled();
     expect(screen.getByText(/completed and persisted through the API/)).toBeInTheDocument();
   });
 
@@ -178,11 +181,12 @@ describe('WorkflowActionPanel', () => {
       />
     );
 
-    expect(screen.getByText('Dispatch to Shiv Bhojan eatery')).toBeInTheDocument();
-    expect(screen.getByText('upstream')).toBeInTheDocument();
-    expect(screen.getByText('Pending with')).toBeInTheDocument();
-    expect(screen.getAllByText('Depot / Issue Point').length).toBeGreaterThan(0);
-    expect(screen.getByRole('button', { name: 'Waiting for Depot / Issue Point' })).toBeDisabled();
+    const riceGroup = within(screen.getByTestId('commodity-group-Rice'));
+    expect(riceGroup.getByText('Dispatch to Shiv Bhojan eatery')).toBeInTheDocument();
+    expect(riceGroup.getByText('upstream')).toBeInTheDocument();
+    expect(riceGroup.getByText('Pending with')).toBeInTheDocument();
+    expect(riceGroup.getAllByText('Depot / Issue Point').length).toBeGreaterThan(0);
+    expect(riceGroup.getByRole('button', { name: 'Waiting for Depot / Issue Point' })).toBeDisabled();
     expect(screen.queryByRole('button', { name: 'Run action' })).not.toBeInTheDocument();
   });
 
@@ -232,7 +236,8 @@ describe('WorkflowActionPanel', () => {
       />
     );
 
-    expect(screen.getByLabelText('Dispatch quantity (kg)')).toHaveValue(demoQuantities.stageOneTransferKg);
+    const riceGroup = within(screen.getByTestId('commodity-group-Rice'));
+    expect(riceGroup.getByLabelText('Dispatch quantity (kg)')).toHaveValue(demoQuantities.stageOneTransferKg);
   });
 
   it('lets an operator edit the dispatch quantity and applies the edited amount', async () => {
@@ -245,10 +250,11 @@ describe('WorkflowActionPanel', () => {
       />
     );
 
-    const input = screen.getByLabelText('Dispatch quantity (kg)');
+    const riceGroup = within(screen.getByTestId('commodity-group-Rice'));
+    const input = riceGroup.getByLabelText('Dispatch quantity (kg)');
     await user.clear(input);
     await user.type(input, '250');
-    await user.click(screen.getByRole('button', { name: 'Run action' }));
+    await user.click(riceGroup.getByRole('button', { name: 'Run action' }));
 
     expect(baseProps.onMockComplete).toHaveBeenCalledTimes(1);
     const [result] = baseProps.onMockComplete.mock.calls[0] as [{ context: { transfers: Array<{ dispatchedQtyKg: number }> } }];
@@ -265,9 +271,10 @@ describe('WorkflowActionPanel', () => {
       />
     );
 
-    const input = screen.getByLabelText('Dispatch quantity (kg)');
+    const riceGroup = within(screen.getByTestId('commodity-group-Rice'));
+    const input = riceGroup.getByLabelText('Dispatch quantity (kg)');
     await user.clear(input);
-    await user.click(screen.getByRole('button', { name: 'Run action' }));
+    await user.click(riceGroup.getByRole('button', { name: 'Run action' }));
 
     expect(screen.getByText(/Enter a quantity greater than zero/)).toBeInTheDocument();
     expect(baseProps.onMockComplete).not.toHaveBeenCalled();
@@ -283,12 +290,52 @@ describe('WorkflowActionPanel', () => {
       />
     );
 
-    const input = screen.getByLabelText('Dispatch quantity (kg)');
+    const riceGroup = within(screen.getByTestId('commodity-group-Rice'));
+    const input = riceGroup.getByLabelText('Dispatch quantity (kg)');
     await user.clear(input);
     await user.type(input, '999999');
-    await user.click(screen.getByRole('button', { name: 'Run action' }));
+    await user.click(riceGroup.getByRole('button', { name: 'Run action' }));
 
     expect(await screen.findByText(/Insufficient stock/)).toBeInTheDocument();
     expect(baseProps.onMockComplete).not.toHaveBeenCalled();
+  });
+
+  it('removes the old single commodity-route dropdown', () => {
+    render(
+      <WorkflowActionPanel
+        {...baseProps}
+        apiOnline={false}
+        role="PROCUREMENT"
+      />
+    );
+
+    expect(screen.queryByLabelText('Commodity route')).not.toBeInTheDocument();
+  });
+
+  it('renders multiple commodity groups simultaneously without any tab interaction', () => {
+    render(
+      <WorkflowActionPanel
+        {...baseProps}
+        apiOnline={false}
+        role="PROCUREMENT"
+      />
+    );
+
+    expect(screen.getByTestId('commodity-group-Rice')).toBeInTheDocument();
+    expect(screen.getByTestId('commodity-group-Wheat')).toBeInTheDocument();
+  });
+
+  it('renders all 6 commodity groups for management', () => {
+    render(
+      <WorkflowActionPanel
+        {...baseProps}
+        apiOnline={false}
+        role="MANAGEMENT"
+      />
+    );
+
+    for (const commodity of ['Rice', 'Wheat', 'Dal', 'Sugar', 'Cooking Oil', 'Kerosene']) {
+      expect(screen.getByTestId(`commodity-group-${commodity}`)).toBeInTheDocument();
+    }
   });
 });
