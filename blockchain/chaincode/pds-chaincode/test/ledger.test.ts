@@ -902,4 +902,71 @@ describe('Quota rollover', () => {
     const engine = new PdsLedgerEngine(false);
     expect(() => engine.rolloverUnclaimedQuota({ fromMonth: '2026-06', toMonth: '2026-07', commodity: 'Rice', rolloverPct: 150 })).toThrow(/between 0 and 100/);
   });
+
+  it('rejects non-positive allocation quantities', () => {
+    const engine = new PdsLedgerEngine(true);
+    engine.addStockForTest('GODOWN-B-001', 'Rice', 500);
+    expect(() =>
+      engine.allocateToFps({
+        allocationId: 'ALLOC-NEG-1',
+        fpsId: 'FPS-101',
+        commodity: 'Rice',
+        allocatedQtyKg: 0,
+        month: '2026-06',
+        sourceGodownId: 'GODOWN-B-001'
+      })
+    ).toThrow(/allocatedQtyKg must be positive/);
+    expect(() =>
+      engine.allocateToFps({
+        allocationId: 'ALLOC-NEG-2',
+        fpsId: 'FPS-101',
+        commodity: 'Rice',
+        allocatedQtyKg: -50,
+        month: '2026-06',
+        sourceGodownId: 'GODOWN-B-001'
+      })
+    ).toThrow(/allocatedQtyKg must be positive/);
+  });
+
+  it('rejects fps receipt quantities outside the allocated amount', () => {
+    const engine = new PdsLedgerEngine(true);
+    engine.addStockForTest('GODOWN-B-001', 'Rice', 500);
+    engine.allocateToFps({
+      allocationId: 'ALLOC-RCPT-1',
+      fpsId: 'FPS-101',
+      commodity: 'Rice',
+      allocatedQtyKg: 200,
+      month: '2026-06',
+      sourceGodownId: 'GODOWN-B-001'
+    });
+    expect(() =>
+      engine.recordFpsReceipt({ allocationId: 'ALLOC-RCPT-1', receivedQtyKg: 0 })
+    ).toThrow(/receivedQtyKg must be positive/);
+    expect(() =>
+      engine.recordFpsReceipt({ allocationId: 'ALLOC-RCPT-1', receivedQtyKg: 250 })
+    ).toThrow(/cannot exceed allocatedQtyKg/);
+    const received = engine.recordFpsReceipt({ allocationId: 'ALLOC-RCPT-1', receivedQtyKg: 180 });
+    expect(received.status).toBe('RECEIVED');
+    expect(received.receivedQtyKg).toBe(180);
+  });
+
+  it('rejects non-positive distribution quantities', () => {
+    const engine = new PdsLedgerEngine(true);
+    engine.addStockForTest('FPS-101', 'Rice', 100);
+    expect(() =>
+      engine.recordDistribution({
+        distributionId: 'DIST-NEG-1',
+        fpsId: 'FPS-101',
+        rationCardHash: 'demo-ration-card-hash',
+        beneficiaryRefHash: 'beneficiary-hash',
+        commodity: 'Rice',
+        deliveredKg: -5,
+        authMode: AuthMode.MOCK_OTP,
+        authResult: AuthResult.SUCCESS,
+        authTxnRefHash: 'auth-ref-neg',
+        dealerId: 'FPS-DEALER-101',
+        timestamp: '2026-06-15T10:00:00.000Z'
+      })
+    ).toThrow(/deliveredKg must be positive/);
+  });
 });

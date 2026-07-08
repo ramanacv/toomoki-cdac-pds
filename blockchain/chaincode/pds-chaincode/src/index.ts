@@ -484,6 +484,9 @@ export class PdsLedgerEngine {
     if (this.allocations.has(input.allocationId)) {
       throw new Error(`Allocation ${input.allocationId} already exists`);
     }
+    if (input.allocatedQtyKg <= 0) {
+      throw new Error('allocatedQtyKg must be positive');
+    }
     this.assertActiveStakeholder(input.fpsId);
     this.assertActiveStakeholder(input.sourceGodownId);
     this.consumeStock(input.sourceGodownId, input.commodity, input.allocatedQtyKg);
@@ -497,6 +500,14 @@ export class PdsLedgerEngine {
     const allocation = this.mustGetAllocation(input.allocationId);
     if (allocation.status !== 'ALLOCATED') {
       throw new Error(`Allocation ${allocation.allocationId} already received`);
+    }
+    if (input.receivedQtyKg <= 0) {
+      throw new Error('receivedQtyKg must be positive');
+    }
+    if (input.receivedQtyKg > allocation.allocatedQtyKg) {
+      throw new Error(
+        `receivedQtyKg cannot exceed allocatedQtyKg for allocation ${allocation.allocationId}`
+      );
     }
 
     const updated: FPSAllocation = { ...allocation, receivedQtyKg: input.receivedQtyKg, status: 'RECEIVED' };
@@ -595,6 +606,9 @@ export class PdsLedgerEngine {
     }
     if (input.authResult === AuthResult.FAILURE) {
       throw new Error('Distribution cannot proceed after failed authentication');
+    }
+    if (input.deliveredKg <= 0) {
+      throw new Error('deliveredKg must be positive');
     }
     validateHashFormat(input.rationCardHash, 'rationCardHash');
     validateHashFormat(input.beneficiaryRefHash, 'beneficiaryRefHash');
