@@ -26,6 +26,7 @@ export function WorkspaceLayout() {
     return (
       <LoginPage
         apiOnline={workspace.apiOnline}
+        ledgerMode={workspace.ledgerMode}
         operatorName={operatorName}
         role={role}
         onOperatorNameChange={setOperatorName}

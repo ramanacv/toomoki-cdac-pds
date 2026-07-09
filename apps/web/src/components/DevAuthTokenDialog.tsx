@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getStoredDevAuthToken, setStoredDevAuthToken } from '@/auth-token.js';
+import { getStoredDevAuthToken, hasSavedDevAuthToken, setStoredDevAuthToken } from '@/auth-token.js';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,7 +23,7 @@ export function DevAuthTokenDialog({ ledgerMode, apiOnline }: DevAuthTokenDialog
     return null;
   }
 
-  const hasToken = token.trim().length > 0;
+  const hasToken = hasSavedDevAuthToken();
 
   return (
     <div className="border-b border-border bg-warning/10 px-4 py-3 md:px-8">

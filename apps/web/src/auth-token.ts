@@ -11,6 +11,8 @@ export const setStoredDevAuthToken = (token: string): void => {
   window.localStorage.setItem(DEV_AUTH_TOKEN_STORAGE_KEY, token);
 };
 
+export const hasSavedDevAuthToken = (): boolean => getStoredDevAuthToken().trim().length > 0;
+
 export const authHeaders = (): HeadersInit => {
   const token = getStoredDevAuthToken();
   return token ? { Authorization: `Bearer ${token}` } : {};

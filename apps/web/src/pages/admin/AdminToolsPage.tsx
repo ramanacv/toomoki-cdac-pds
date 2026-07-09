@@ -29,6 +29,7 @@ export function AdminToolsPage() {
   const { apiOnline, stakeholders, refresh } = useAdminContext();
 
   const [tokenInput, setTokenInput] = useState(getStoredAdminToken());
+  const [tokenSaved, setTokenSaved] = useState(false);
   const [stockCommodity, setStockCommodity] = useState('Rice');
   const [stockQuantityKg, setStockQuantityKg] = useState('10000');
   const [stockQualityGrade, setStockQualityGrade] = useState('A');
@@ -59,6 +60,10 @@ export function AdminToolsPage() {
 
   const saveToken = () => {
     setStoredAdminToken(tokenInput.trim());
+    setTokenSaved(true);
+    toast.success('Admin token saved', {
+      description: 'Used for /admin/* routes via X-Admin-Token (not workflow actions).'
+    });
     void refresh();
   };
 
@@ -128,6 +133,14 @@ export function AdminToolsPage() {
       </header>
 
       <Panel eyebrow="Access" title="Admin token" wide>
+        <p className="mb-4 text-sm text-muted-foreground">
+          Two tokens are used in Fabric mode. This field is the <strong>admin token</strong> for
+          read-only admin pages and ledger reset (<code className="text-xs">X-Admin-Token</code>,
+          default <code className="text-xs">admin-mvp-token</code>). Workflow actions in the main
+          workspace use a separate <strong>API bearer token</strong> in the yellow banner (
+          <code className="text-xs">Authorization: Bearer …</code>, default{' '}
+          <code className="text-xs">dev-mvp-token</code>).
+        </p>
         <div className="flex flex-col gap-3 md:flex-row md:items-end">
           <div className="grid flex-1 gap-2">
             <Label htmlFor="admin-token">X-Admin-Token</Label>
@@ -135,13 +148,16 @@ export function AdminToolsPage() {
               id="admin-token"
               type="password"
               value={tokenInput}
-              onChange={(event) => setTokenInput(event.target.value)}
-              placeholder="Optional in demo mode"
+              onChange={(event) => {
+                setTokenInput(event.target.value);
+                setTokenSaved(false);
+              }}
+              placeholder="admin-mvp-token"
             />
           </div>
           <div className="flex flex-wrap gap-3">
             <Button type="button" onClick={saveToken}>
-              Save token
+              {tokenSaved ? 'Saved' : 'Save token'}
             </Button>
             <Button type="button" variant="secondary" onClick={() => void refresh()}>
               Refresh

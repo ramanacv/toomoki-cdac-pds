@@ -26,6 +26,7 @@ const receivedTransfer = (transferId: string, fromOrg: string, toOrg: string, lo
 });
 
 const baseProps = {
+  ledgerMode: null as const,
   lots: demoLots,
   transfers: [],
   allocations: [],

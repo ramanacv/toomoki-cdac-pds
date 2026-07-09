@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import type { Stakeholder } from '@pds/shared-types';
 import { loadAdminOverview, type AdminOverview } from '@/admin-api.js';
-import { loadStakeholders, probeApi } from '@/api.js';
+import { fetchApiHealth, loadStakeholders, type LedgerMode } from '@/api.js';
 import { AdminShell } from '@/components/layout/AdminShell';
 import type { AdminOutletContext } from '@/hooks/use-admin-context.js';
 
@@ -10,14 +10,17 @@ export function AdminLayout() {
   const [overview, setOverview] = useState<AdminOverview | null>(null);
   const [stakeholders, setStakeholders] = useState<Stakeholder[]>([]);
   const [apiOnline, setApiOnline] = useState(false);
+  const [ledgerMode, setLedgerMode] = useState<LedgerMode | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
     setError(null);
-    const online = await probeApi();
+    const health = await fetchApiHealth();
+    const online = health.ok;
     setApiOnline(online);
+    setLedgerMode(online ? (health.ledgerMode ?? null) : null);
 
     if (!online) {
       setOverview(null);
@@ -45,7 +48,7 @@ export function AdminLayout() {
   const context: AdminOutletContext = { overview, stakeholders, apiOnline, loading, error, refresh };
 
   return (
-    <AdminShell apiOnline={apiOnline}>
+    <AdminShell apiOnline={apiOnline} ledgerMode={ledgerMode}>
       <Outlet context={context} />
     </AdminShell>
   );

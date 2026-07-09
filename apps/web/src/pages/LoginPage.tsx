@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { DemoRole } from '@/demo-model.js';
 import { roleProfiles, screenDefinitions, getRoleScreens } from '@/demo-model.js';
 import { RuntimeCard } from '@/components/RuntimeCard';
+import { DevAuthTokenDialog } from '@/components/DevAuthTokenDialog';
 import { Panel } from '@/components/Panel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,8 +10,11 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { roleOrder } from '@/lib/constants';
 
+import type { LedgerMode } from '@/api.js';
+
 type LoginPageProps = {
   apiOnline: boolean;
+  ledgerMode: LedgerMode | null;
   operatorName: string;
   role: DemoRole;
   onOperatorNameChange: (name: string) => void;
@@ -21,6 +25,7 @@ type LoginPageProps = {
 
 export function LoginPage({
   apiOnline,
+  ledgerMode,
   operatorName,
   role,
   onOperatorNameChange,
@@ -29,6 +34,7 @@ export function LoginPage({
   adminHref
 }: LoginPageProps) {
   const [localName, setLocalName] = useState(operatorName);
+  const fabricOnline = apiOnline && ledgerMode === 'fabric';
 
   return (
     <main className="mx-auto w-full min-h-screen max-w-[880px] px-4 py-10">
@@ -43,12 +49,18 @@ export function LoginPage({
         <RuntimeCard
           apiOnline={apiOnline}
           title="Runtime"
-          onlineLabel="Backend reachable"
+          onlineLabel={fabricOnline ? 'Fabric Backend reachable' : 'Backend reachable'}
           offlineLabel="Offline demo mode"
-          onlineDetail="Live API data will populate the workspace after sign in."
+          onlineDetail={
+            fabricOnline
+              ? 'Live Fabric ledger data will populate the workspace after sign in.'
+              : 'Live API data will populate the workspace after sign in.'
+          }
           offlineDetail="Seeded data will be used after sign in."
         />
       </section>
+
+      {fabricOnline ? <DevAuthTokenDialog ledgerMode="fabric" apiOnline /> : null}
 
       <Panel
         eyebrow="Operator"

@@ -6,6 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CHANNEL="${PDS_FABRIC_CHANNEL:-pdschannel}"
 
 echo "Generating channel block for ${CHANNEL}"
+rm -f "${ROOT}/channel-artifacts/${CHANNEL}.block"
 mkdir -p "${ROOT}/channel-artifacts"
 export FABRIC_CFG_PATH="${ROOT}/config"
 
@@ -18,7 +19,7 @@ run_configtxgen() {
       -v "${ROOT}:/work" \
       -w /work \
       -e FABRIC_CFG_PATH=/work/config \
-      "${FABRIC_TOOLS_IMAGE:-hyperledger/fabric-tools:2.5.13}" \
+      "${FABRIC_TOOLS_IMAGE:-hyperledger/fabric-tools:2.5.15}" \
       configtxgen -profile PdsChannel -outputBlock "/work/channel-artifacts/${CHANNEL}.block" -channelID "${CHANNEL}"
   else
     echo "ERROR: configtxgen not found and Docker is unavailable"

@@ -11,7 +11,8 @@ import {
   type MonthlyEntitlement,
   type TransferOrder
 } from '@pds/shared-types';
-import { executeWorkflowAction } from '@/api.js';
+import { executeWorkflowAction, type LedgerMode } from '@/api.js';
+import { hasSavedDevAuthToken } from '@/auth-token.js';
 import type { DemoRole } from '@/demo-model.js';
 import {
   applyMockWorkflowAction,
@@ -91,6 +92,7 @@ function getEditableQuantity(request: WorkflowActionRequest): EditableQuantity |
 
 type WorkflowActionPanelProps = {
   apiOnline: boolean;
+  ledgerMode: LedgerMode | null;
   role: DemoRole;
   lots: CommodityLot[];
   transfers: TransferOrder[];
@@ -110,6 +112,7 @@ const nonBlockedCount = (actions: WorkflowActionSpec[]): number =>
 
 export function WorkflowActionPanel({
   apiOnline,
+  ledgerMode,
   role,
   lots,
   transfers,
@@ -177,6 +180,13 @@ export function WorkflowActionPanel({
         return;
       }
       request = editable.apply(qtyKg);
+    }
+
+    if (apiOnline && ledgerMode === 'fabric' && !hasSavedDevAuthToken()) {
+      setError(
+        'Fabric mode requires a saved API bearer token. Enter dev-mvp-token in the banner at the top and click Save token.'
+      );
+      return;
     }
 
     setBusy(true);

@@ -23,7 +23,7 @@ run_osnadmin() {
       --add-host orderer.pds.example.com:host-gateway \
       -v "${ROOT}:/work" \
       -w /work \
-      "${FABRIC_TOOLS_IMAGE:-hyperledger/fabric-tools:2.5.13}" \
+      "${FABRIC_TOOLS_IMAGE:-hyperledger/fabric-tools:2.5.15}" \
       osnadmin channel join \
       --channelID "${CHANNEL}" \
       --config-block "/work/channel-artifacts/${CHANNEL}.block" \

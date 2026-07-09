@@ -52,10 +52,23 @@ const mockWorkspace = (scenario: DemoScenario): WorkspaceData => ({
   stockPositions: []
 });
 
+async function readApiError(response: Response, path: string): Promise<string> {
+  const text = await response.text();
+  try {
+    const body = JSON.parse(text) as { message?: string };
+    if (response.status === 401) {
+      return 'Fabric mode requires a saved API bearer token. Enter dev-mvp-token in the banner at the top and click Save token.';
+    }
+    return body.message ?? text ?? `Request failed for ${path}`;
+  } catch {
+    return text || `Request failed for ${path}`;
+  }
+}
+
 async function fetchJson<T>(path: string): Promise<T> {
   const response = await fetch(`${apiBaseUrl}${path}`, { headers: authHeaders() });
   if (!response.ok) {
-    throw new Error(`Request failed for ${path}`);
+    throw new Error(await readApiError(response, path));
   }
   return (await response.json()) as T;
 }
@@ -68,8 +81,7 @@ async function postJson<T>(path: string, body: unknown): Promise<T> {
   });
 
   if (!response.ok) {
-    const message = await response.text();
-    throw new Error(message || `Request failed for ${path}`);
+    throw new Error(await readApiError(response, path));
   }
 
   return (await response.json()) as T;

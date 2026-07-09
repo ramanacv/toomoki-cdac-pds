@@ -6,6 +6,7 @@ export function WorkflowActions() {
   return (
     <WorkflowActionPanel
       apiOnline={workspace.apiOnline}
+      ledgerMode={workspace.ledgerMode}
       role={role}
       lots={workspace.lots}
       transfers={workspace.transfers}

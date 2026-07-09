@@ -88,6 +88,7 @@ const adminOverview = vi.hoisted(() => ({
 
 vi.mock('@/api.js', () => ({
   probeApi: vi.fn().mockResolvedValue(true),
+  fetchApiHealth: vi.fn().mockResolvedValue({ ok: true, ledgerMode: 'demo' }),
   buildApiUrl: vi.fn((path: string) => `/api${path}`),
   loadStakeholders: vi.fn().mockResolvedValue([
     { stakeholderId: 'PROC-001', stakeholderType: 'PROCUREMENT_CENTER', name: 'Procurement Centre 01', district: 'Demo District', licenseNo: 'LIC-1', status: 'ACTIVE' }

@@ -8,6 +8,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 echo "Generating dev crypto material under ${CRYPTO_DIR}"
 mkdir -p "${CRYPTO_DIR}"
 
+# cryptogen does not safely refresh an existing tree; stale MSP files (e.g. a CA
+# cert left in admincerts/) break channel join with ECDSA verification errors.
+rm -rf "${CRYPTO_DIR}/ordererOrganizations" "${CRYPTO_DIR}/peerOrganizations"
+
 cat > "${ROOT}/crypto-config.yaml" <<'EOF'
 OrdererOrgs:
   - Name: Orderer
@@ -40,7 +44,7 @@ elif docker info >/dev/null 2>&1; then
     --user "$(id -u):$(id -g)" \
     -v "${ROOT}:/work" \
     -w /work \
-    "${FABRIC_TOOLS_IMAGE:-hyperledger/fabric-tools:2.5.13}" \
+    "${FABRIC_TOOLS_IMAGE:-hyperledger/fabric-tools:2.5.15}" \
     cryptogen generate --config=/work/crypto-config.yaml --output=/work/crypto
 else
   echo "ERROR: cryptogen not found and Docker is unavailable"
