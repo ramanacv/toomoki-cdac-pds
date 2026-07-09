@@ -1,12 +1,12 @@
 [
   {
-    "stakeholderId": "DFPD-001",
-    "stakeholderType": "DFPD",
-    "name": "Department of Food and Public Distribution",
-    "district": "Central",
-    "licenseNo": "DFPD-POC-001",
+    "stakeholderId": "PROC-001",
+    "stakeholderType": "PROCUREMENT_CENTER",
+    "name": "Procurement Centre 01",
+    "district": "Demo District",
+    "licenseNo": "PROC-LIC-001",
     "status": "ACTIVE",
-    "jurisdiction": "CENTRAL"
+    "jurisdiction": "STATE"
   },
   {
     "stakeholderId": "FCI-001",
@@ -18,66 +18,11 @@
     "jurisdiction": "CENTRAL"
   },
   {
-    "stakeholderId": "FCI-BUF-001",
-    "stakeholderType": "FCI_BUFFER_GODOWN",
-    "name": "FCI Buffer Godown 01",
-    "district": "Demo District",
-    "licenseNo": "FCI-BUF-LIC-001",
-    "status": "ACTIVE",
-    "jurisdiction": "CENTRAL",
-    "capacityKg": 50000
-  },
-  {
-    "stakeholderId": "FOOD-001",
-    "stakeholderType": "DEPARTMENT",
-    "name": "State Food Department",
-    "district": "Demo District",
-    "licenseNo": "FD-LIC-001",
-    "status": "ACTIVE",
-    "jurisdiction": "STATE"
-  },
-  {
-    "stakeholderId": "FDO-001",
-    "stakeholderType": "DIVISIONAL_OFFICE",
-    "name": "Divisional Food Office",
-    "district": "Demo Division",
-    "licenseNo": "FDO-LIC-001",
-    "status": "ACTIVE",
-    "jurisdiction": "STATE"
-  },
-  {
     "stakeholderId": "DSO-001",
     "stakeholderType": "DISTRICT_SUPPLY_OFFICE",
     "name": "District Supply Office",
     "district": "Demo District",
     "licenseNo": "DSO-LIC-001",
-    "status": "ACTIVE",
-    "jurisdiction": "STATE"
-  },
-  {
-    "stakeholderId": "TSO-001",
-    "stakeholderType": "TALUKA_SUPPLY_OFFICE",
-    "name": "Taluka Supply Office",
-    "district": "Demo Taluka",
-    "licenseNo": "TSO-LIC-001",
-    "status": "ACTIVE",
-    "jurisdiction": "STATE"
-  },
-  {
-    "stakeholderId": "PROC-001",
-    "stakeholderType": "PROCUREMENT_CENTER",
-    "name": "Procurement Centre 01",
-    "district": "Demo District",
-    "licenseNo": "PROC-LIC-001",
-    "status": "ACTIVE",
-    "jurisdiction": "STATE"
-  },
-  {
-    "stakeholderId": "MLL-001",
-    "stakeholderType": "MILLER",
-    "name": "Miller 01",
-    "district": "Demo District",
-    "licenseNo": "MLL-LIC-001",
     "status": "ACTIVE",
     "jurisdiction": "STATE"
   },
@@ -90,16 +35,6 @@
     "status": "ACTIVE",
     "jurisdiction": "STATE",
     "capacityKg": 25000
-  },
-  {
-    "stakeholderId": "GODOWN-B-001",
-    "stakeholderType": "BLOCK_GODOWN",
-    "name": "Block Godown 01",
-    "district": "Demo District",
-    "licenseNo": "BG-LIC-001",
-    "status": "ACTIVE",
-    "jurisdiction": "STATE",
-    "capacityKg": 8000
   },
   {
     "stakeholderId": "ISSUE-001",
@@ -126,24 +61,6 @@
     "name": "FPS 101",
     "district": "Demo District",
     "licenseNo": "FPS-LIC-101",
-    "status": "ACTIVE",
-    "jurisdiction": "STATE"
-  },
-  {
-    "stakeholderId": "WI-101",
-    "stakeholderType": "WELFARE_INSTITUTE",
-    "name": "Welfare Hostel 101",
-    "district": "Demo District",
-    "licenseNo": "WI-LIC-101",
-    "status": "ACTIVE",
-    "jurisdiction": "STATE"
-  },
-  {
-    "stakeholderId": "SBE-101",
-    "stakeholderType": "SHIV_BHOJAN_EATERY",
-    "name": "Shiv Bhojan Eatery 101",
-    "district": "Demo District",
-    "licenseNo": "SBE-LIC-101",
     "status": "ACTIVE",
     "jurisdiction": "STATE"
   },

@@ -3,7 +3,7 @@ import request from 'supertest';
 import { AuthMode, AuthResult, StakeholderStatus, StakeholderType } from '@pds/shared-types';
 import { PdsLedgerFacade } from '../../src/modules/core/pds-ledger.facade.js';
 import { createDemoHttpApp, type DemoHttpAppFixture } from '../helpers/demo-http-app.js';
-import { moveLotToGodownB } from '../helpers/demo-ledger.js';
+import { moveLotToIssuePoint } from '../helpers/demo-ledger.js';
 
 const expectSuccess = (status: number): void => {
   expect([200, 201]).toContain(status);
@@ -19,7 +19,10 @@ describe('Demo API e2e', () => {
   it('serves health, openapi, and dashboard summary', async () => {
     fixture = await createDemoHttpApp();
 
-    await request(fixture.app.getHttpServer()).get('/health').expect(200).expect({ ok: true });
+    await request(fixture.app.getHttpServer()).get('/health').expect(200);
+    const health = await request(fixture.app.getHttpServer()).get('/health');
+    expect(health.body.ok).toBe(true);
+    expect(health.body.ledgerMode).toBe('demo');
 
     const openapi = await request(fixture.app.getHttpServer()).get('/openapi.json').expect(200);
     expect(openapi.body.paths['/stakeholders']).toBeDefined();
@@ -46,8 +49,8 @@ describe('Demo API e2e', () => {
       .post('/stakeholders')
       .send({
         stakeholderId: 'E2E-STK-001',
-        stakeholderType: StakeholderType.DEPARTMENT,
-        name: 'E2E Department',
+        stakeholderType: StakeholderType.DISTRICT_SUPPLY_OFFICE,
+        name: 'E2E District Supply Office',
         district: 'Demo',
         licenseNo: 'LIC-E2E-001',
         status: StakeholderStatus.ACTIVE
@@ -100,7 +103,7 @@ describe('Demo API e2e', () => {
     fixture = await createDemoHttpApp();
     const server = fixture.app.getHttpServer();
 
-    moveLotToGodownB(fixture.app.get(PdsLedgerFacade));
+    moveLotToIssuePoint(fixture.app.get(PdsLedgerFacade));
 
     expectSuccess(
       (
@@ -110,7 +113,7 @@ describe('Demo API e2e', () => {
           commodity: 'Rice',
           allocatedQtyKg: 40,
           month: '2026-06',
-          sourceGodownId: 'GODOWN-B-001'
+          sourceGodownId: 'ISSUE-001'
         })
       ).status
     );
@@ -225,7 +228,7 @@ describe('Demo API e2e', () => {
     fixture = await createDemoHttpApp();
     const server = fixture.app.getHttpServer();
     const ledger = fixture.app.get(PdsLedgerFacade);
-    moveLotToGodownB(ledger);
+    moveLotToIssuePoint(ledger);
 
     // Allocation → FPS receipt.
     await request(server)
@@ -236,7 +239,7 @@ describe('Demo API e2e', () => {
         commodity: 'Rice',
         allocatedQtyKg: 50,
         month: '2026-06',
-        sourceGodownId: 'GODOWN-B-001'
+        sourceGodownId: 'ISSUE-001'
       })
       .expect(201);
     await request(server).post('/fps-allocations/ALLOC-SYS-001/receipt').send({ receivedQtyKg: 50 }).expect(201);
@@ -248,7 +251,7 @@ describe('Demo API e2e', () => {
         transferId: 'TR-SYS-SHORT',
         lotId: 'LOT-KEROSENE-2026-001',
         fromOrg: 'PROC-001',
-        toOrg: 'GODOWN-S-001',
+        toOrg: 'FCI-001',
         dispatchedQtyKg: 20,
         vehicleNo: 'KA01SYS0001'
       })

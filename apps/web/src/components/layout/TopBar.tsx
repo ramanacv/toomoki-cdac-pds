@@ -1,11 +1,13 @@
 import { Menu } from 'lucide-react';
-import type { DemoRole } from '@/demo-model.js';
+import type { DemoRole, DemoScenario } from '@/demo-model.js';
+import type { LedgerMode } from '@/api.js';
 import { ApiStatusBadge } from '@/components/ApiStatusBadge';
 import { UserMenu } from '@/components/layout/UserMenu';
 
 type TopBarProps = {
   screenLabel: string;
   apiOnline: boolean;
+  ledgerMode: LedgerMode | null;
   operatorName: string;
   role: DemoRole;
   onRoleChange: (role: DemoRole) => void;
@@ -16,6 +18,7 @@ type TopBarProps = {
 export function TopBar({
   screenLabel,
   apiOnline,
+  ledgerMode,
   operatorName,
   role,
   onRoleChange,
@@ -34,7 +37,7 @@ export function TopBar({
       </button>
       <h1 className="text-base font-semibold tracking-tight">{screenLabel}</h1>
       <div className="ml-auto flex items-center gap-3">
-        <ApiStatusBadge apiOnline={apiOnline} />
+        <ApiStatusBadge apiOnline={apiOnline} ledgerMode={ledgerMode} />
         <UserMenu
           operatorName={operatorName}
           role={role}

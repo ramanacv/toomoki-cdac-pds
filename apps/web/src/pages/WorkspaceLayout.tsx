@@ -50,6 +50,7 @@ export function WorkspaceLayout() {
       scenario={scenario}
       operatorName={operatorName}
       apiOnline={workspace.apiOnline}
+      ledgerMode={workspace.ledgerMode}
       onRoleChange={(next) => updateParam('role', next)}
       onScenarioChange={(next) => updateParam('scenario', next)}
       onLogout={() => setAuthenticated(false)}

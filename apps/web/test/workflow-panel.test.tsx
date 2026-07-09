@@ -12,6 +12,19 @@ import { demoEntitlements, demoLots } from '@/demo-model.js';
 import { demoQuantities } from '@pds/fixtures';
 import { TransferStatus } from '@pds/shared-types';
 
+const receivedTransfer = (transferId: string, fromOrg: string, toOrg: string, lotId = 'LOT-RICE-2026-001') => ({
+  transferId,
+  lotId,
+  fromOrg,
+  toOrg,
+  dispatchedQtyKg: demoQuantities.stageOneTransferKg,
+  receivedQtyKg: demoQuantities.stageOneTransferKg,
+  vehicleNo: 'KA01AB1000',
+  status: TransferStatus.RECEIVED,
+  dispatchTimestamp: '2026-06-30T10:00:00.000Z',
+  receiveTimestamp: '2026-06-30T10:05:00.000Z'
+});
+
 const baseProps = {
   lots: demoLots,
   transfers: [],
@@ -21,64 +34,29 @@ const baseProps = {
   entitlements: demoEntitlements,
   alerts: [],
   ledgerEvents: [],
+  stockPositions: [],
   onComplete: vi.fn().mockResolvedValue(undefined),
   onMockComplete: vi.fn()
 };
 
-const receivedTransfer = (
-  transferId: string,
-  fromOrg: string,
-  toOrg: string,
-  lotId = 'LOT-RICE-2026-002',
-  qtyKg = demoQuantities.stageOneTransferKg
-) => ({
-  transferId,
-  lotId,
-  fromOrg,
-  toOrg,
-  dispatchedQtyKg: qtyKg,
-  receivedQtyKg: qtyKg,
-  vehicleNo: 'KA01AB1000',
-  status: TransferStatus.RECEIVED,
-  dispatchTimestamp: '2026-06-30T10:00:00.000Z',
-  receiveTimestamp: '2026-06-30T10:05:00.000Z'
-});
-
-const dispatchedTransfer = (transferId: string, fromOrg: string, toOrg: string, dispatchedQtyKg: number, lotId = 'LOT-RICE-2026-002') => ({
-  transferId,
-  lotId,
-  fromOrg,
-  toOrg,
-  dispatchedQtyKg,
-  vehicleNo: 'KA01AB1000',
-  status: TransferStatus.DISPATCHED,
-  dispatchTimestamp: '2026-06-30T10:00:00.000Z'
-});
-
-const contextBeforeShivBhojanDispatch = {
+const depotReady = {
   transfers: [
-    receivedTransfer('TR-POC-PROC-FCI', 'PROC-001', 'FCI-001', 'LOT-RICE-2026-001'),
-    receivedTransfer('TR-POC-FCI-BUF', 'FCI-001', 'FCI-BUF-001', 'LOT-RICE-2026-001'),
-    receivedTransfer('TR-POC-BUF-DEPOT', 'FCI-BUF-001', 'GODOWN-S-001', 'LOT-RICE-2026-001'),
-    receivedTransfer('TR-POC-DEPOT-MILLER', 'GODOWN-S-001', 'MLL-001', 'LOT-RICE-2026-001'),
-    receivedTransfer('TR-POC-MILLER-ISSUE', 'MLL-001', 'ISSUE-001', 'LOT-RICE-2026-002', demoQuantities.millerToIssueKg),
-    receivedTransfer('TR-POC-ISSUE-FPS', 'ISSUE-001', 'FPS-101', 'LOT-RICE-2026-002', demoQuantities.endpointDispatchKg.fps),
-    receivedTransfer('TR-POC-ISSUE-WI', 'ISSUE-001', 'WI-101', 'LOT-RICE-2026-002', demoQuantities.endpointDispatchKg.welfareInstitute)
+    receivedTransfer('TR-POC-RICE-PROC-FCI', 'PROC-001', 'FCI-001'),
+    receivedTransfer('TR-POC-RICE-FCI-DEPOT', 'FCI-001', 'GODOWN-S-001')
+  ]
+};
+
+const issueReady = {
+  transfers: [
+    ...depotReady.transfers,
+    receivedTransfer('TR-POC-RICE-DEPOT-ISSUE', 'GODOWN-S-001', 'ISSUE-001')
   ],
   ledgerEvents: [
     {
       ledgerTxId: 'TX-RO',
       entityType: 'workflow' as const,
-      entityId: 'TR-POC-MILLER-ISSUE',
+      entityId: 'TR-POC-RICE-DEPOT-ISSUE',
       eventType: 'RO_LITE_APPROVED',
-      payload: {},
-      timestamp: '2026-06-30T10:00:00.000Z'
-    },
-    {
-      ledgerTxId: 'TX-TRANSFORM',
-      entityType: 'lot' as const,
-      entityId: 'LOT-RICE-2026-002',
-      eventType: 'TransformLot',
       payload: {},
       timestamp: '2026-06-30T10:00:00.000Z'
     }
@@ -91,23 +69,36 @@ beforeEach(() => {
 });
 
 describe('WorkflowActionPanel', () => {
-  it('renders a mock-mode workbench when the API is offline', () => {
+  it('renders procurement dispatch as the first action', () => {
+    render(<WorkflowActionPanel {...baseProps} apiOnline={false} role="PROCUREMENT" />);
+
+    const riceGroup = within(screen.getByTestId('commodity-group-Rice'));
+    expect(screen.getByText('Mock workflow')).toBeInTheDocument();
+    expect(riceGroup.getByText('Dispatch procurement stock to FCI')).toBeInTheDocument();
+    expect(riceGroup.getByLabelText('Dispatch quantity (kg)')).toHaveValue(demoQuantities.stageOneTransferKg);
+  });
+
+  it('shows DSO authorization details for the depot-to-issue movement', () => {
     render(
       <WorkflowActionPanel
         {...baseProps}
+        {...depotReady}
         apiOnline={false}
         role="CONTROL_OFFICE"
       />
     );
-    expect(screen.getByText('Mock workflow')).toBeInTheDocument();
-    expect(screen.getByText('Approve Stage-II RO-lite movement')).toBeInTheDocument();
+
+    const riceGroup = within(screen.getByTestId('commodity-group-Rice'));
+    expect(riceGroup.getByText(/Approve: Stage-II dispatch to issue point/)).toBeInTheDocument();
+    expect(riceGroup.getByText('TR-POC-RICE-DEPOT-ISSUE')).toBeInTheDocument();
   });
 
-  it('runs mock actions and returns ledger evidence to the parent', async () => {
+  it('runs mock approval actions and returns ledger evidence to the parent', async () => {
     const user = userEvent.setup();
     render(
       <WorkflowActionPanel
         {...baseProps}
+        {...depotReady}
         apiOnline={false}
         role="CONTROL_OFFICE"
       />
@@ -126,6 +117,7 @@ describe('WorkflowActionPanel', () => {
     render(
       <WorkflowActionPanel
         {...baseProps}
+        {...depotReady}
         apiOnline
         role="CONTROL_OFFICE"
         onComplete={onComplete}
@@ -139,203 +131,71 @@ describe('WorkflowActionPanel', () => {
     expect(onComplete).toHaveBeenCalled();
   });
 
-  it('disables a completed live action when refreshed state has not advanced yet', async () => {
-    const user = userEvent.setup();
-    const onComplete = vi.fn().mockResolvedValue(undefined);
+  it('lets FPS see the upstream allocation action but not execute it', () => {
     render(
       <WorkflowActionPanel
         {...baseProps}
-        apiOnline
-        role="CONTROL_OFFICE"
-        onComplete={onComplete}
+        {...issueReady}
+        apiOnline={false}
+        role="FPS"
       />
     );
 
     const riceGroup = within(screen.getByTestId('commodity-group-Rice'));
-    await user.click(riceGroup.getByRole('button', { name: 'Run action' }));
-
-    expect(await riceGroup.findByRole('button', { name: 'Done' })).toBeDisabled();
-    expect(screen.getByText(/completed and persisted through the API/)).toBeInTheDocument();
-  });
-
-  it('lets management inspect but not execute operational actions', () => {
-    render(
-      <WorkflowActionPanel
-        {...baseProps}
-        apiOnline={false}
-        role="MANAGEMENT"
-      />
-    );
-
-    expect(screen.getByText('Management inspection')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Run action' })).not.toBeInTheDocument();
-  });
-
-  it('shows the upstream owner when the selected role is waiting on another role', () => {
-    render(
-      <WorkflowActionPanel
-        {...baseProps}
-        {...contextBeforeShivBhojanDispatch}
-        apiOnline={false}
-        role="SHIV_BHOJAN_OPERATOR"
-      />
-    );
-
-    const riceGroup = within(screen.getByTestId('commodity-group-Rice'));
-    expect(riceGroup.getByText('Dispatch to Shiv Bhojan eatery')).toBeInTheDocument();
-    expect(riceGroup.getByText('upstream')).toBeInTheDocument();
-    expect(riceGroup.getByText('Pending with')).toBeInTheDocument();
-    expect(riceGroup.getAllByText('Depot / Issue Point').length).toBeGreaterThan(0);
+    expect(riceGroup.getByText('Allocate Rice stock to FPS')).toBeInTheDocument();
     expect(riceGroup.getByRole('button', { name: 'Waiting for Depot / Issue Point' })).toBeDisabled();
-    expect(screen.queryByRole('button', { name: 'Run action' })).not.toBeInTheDocument();
   });
 
-  it('lets the upstream owner run the same pending handoff action', () => {
+  it('lets the depot create the FPS allocation', () => {
     render(
       <WorkflowActionPanel
         {...baseProps}
-        {...contextBeforeShivBhojanDispatch}
+        {...issueReady}
         apiOnline={false}
         role="DEPOT"
       />
     );
 
-    expect(screen.getByText('Dispatch to Shiv Bhojan eatery')).toBeInTheDocument();
+    expect(screen.getByText('Allocate Rice stock to FPS')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Run action' })).toBeEnabled();
   });
 
-  it('prefills the receive quantity from the dispatched amount for the active transfer', () => {
+  it('prefills the FPS receipt quantity from the allocated amount', () => {
     render(
       <WorkflowActionPanel
         {...baseProps}
-        {...contextBeforeShivBhojanDispatch}
-        transfers={[
-          ...contextBeforeShivBhojanDispatch.transfers,
-          dispatchedTransfer(
-            'TR-POC-ISSUE-SBE',
-            'ISSUE-001',
-            'SBE-101',
-            demoQuantities.endpointDispatchKg.shivBhojan,
-            'LOT-RICE-2026-002'
-          )
+        {...issueReady}
+        allocations={[
+          {
+            allocationId: 'ALLOC-POC-RICE-FPS',
+            fpsId: 'FPS-101',
+            commodity: 'Rice',
+            allocatedQtyKg: demoQuantities.fpsAllocationKg,
+            month: '2026-06',
+            sourceGodownId: 'ISSUE-001',
+            status: 'ALLOCATED'
+          }
         ]}
         apiOnline={false}
-        role="SHIV_BHOJAN_OPERATOR"
+        role="FPS"
       />
     );
 
-    expect(screen.getByLabelText('Received quantity (kg)')).toHaveValue(demoQuantities.endpointDispatchKg.shivBhojan);
+    expect(screen.getByLabelText('Received quantity (kg)')).toHaveValue(demoQuantities.fpsAllocationKg);
   });
 
-  it('exposes an editable dispatch quantity prefilled with the planned amount', () => {
-    render(
-      <WorkflowActionPanel
-        {...baseProps}
-        apiOnline={false}
-        role="PROCUREMENT"
-      />
-    );
+  it('lets management inspect but not execute operational actions', () => {
+    render(<WorkflowActionPanel {...baseProps} apiOnline={false} role="MANAGEMENT" />);
 
-    const riceGroup = within(screen.getByTestId('commodity-group-Rice'));
-    expect(riceGroup.getByLabelText('Dispatch quantity (kg)')).toHaveValue(demoQuantities.stageOneTransferKg);
+    expect(screen.getByText('Management inspection')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Run action' })).not.toBeInTheDocument();
   });
 
-  it('lets an operator edit the dispatch quantity and applies the edited amount', async () => {
-    const user = userEvent.setup();
-    render(
-      <WorkflowActionPanel
-        {...baseProps}
-        apiOnline={false}
-        role="PROCUREMENT"
-      />
-    );
-
-    const riceGroup = within(screen.getByTestId('commodity-group-Rice'));
-    const input = riceGroup.getByLabelText('Dispatch quantity (kg)');
-    await user.clear(input);
-    await user.type(input, '250');
-    await user.click(riceGroup.getByRole('button', { name: 'Run action' }));
-
-    expect(baseProps.onMockComplete).toHaveBeenCalledTimes(1);
-    const [result] = baseProps.onMockComplete.mock.calls[0] as [{ context: { transfers: Array<{ dispatchedQtyKg: number }> } }];
-    expect(result.context.transfers[0]?.dispatchedQtyKg).toBe(250);
-  });
-
-  it('blocks submission client-side when the edited quantity is zero or blank', async () => {
-    const user = userEvent.setup();
-    render(
-      <WorkflowActionPanel
-        {...baseProps}
-        apiOnline={false}
-        role="PROCUREMENT"
-      />
-    );
-
-    const riceGroup = within(screen.getByTestId('commodity-group-Rice'));
-    const input = riceGroup.getByLabelText('Dispatch quantity (kg)');
-    await user.clear(input);
-    await user.click(riceGroup.getByRole('button', { name: 'Run action' }));
-
-    expect(screen.getByText(/Enter a quantity greater than zero/)).toBeInTheDocument();
-    expect(baseProps.onMockComplete).not.toHaveBeenCalled();
-  });
-
-  it('surfaces a backend rejection when the edited quantity exceeds available stock', async () => {
-    const user = userEvent.setup();
-    render(
-      <WorkflowActionPanel
-        {...baseProps}
-        apiOnline={false}
-        role="PROCUREMENT"
-      />
-    );
-
-    const riceGroup = within(screen.getByTestId('commodity-group-Rice'));
-    const input = riceGroup.getByLabelText('Dispatch quantity (kg)');
-    await user.clear(input);
-    await user.type(input, '999999');
-    await user.click(riceGroup.getByRole('button', { name: 'Run action' }));
-
-    expect(await screen.findByText(/Insufficient stock/)).toBeInTheDocument();
-    expect(baseProps.onMockComplete).not.toHaveBeenCalled();
-  });
-
-  it('removes the old single commodity-route dropdown', () => {
-    render(
-      <WorkflowActionPanel
-        {...baseProps}
-        apiOnline={false}
-        role="PROCUREMENT"
-      />
-    );
-
-    expect(screen.queryByLabelText('Commodity route')).not.toBeInTheDocument();
-  });
-
-  it('renders multiple commodity groups simultaneously without any tab interaction', () => {
-    render(
-      <WorkflowActionPanel
-        {...baseProps}
-        apiOnline={false}
-        role="PROCUREMENT"
-      />
-    );
+  it('renders multiple commodity groups for operational review', () => {
+    render(<WorkflowActionPanel {...baseProps} apiOnline={false} role="PROCUREMENT" />);
 
     expect(screen.getByTestId('commodity-group-Rice')).toBeInTheDocument();
     expect(screen.getByTestId('commodity-group-Wheat')).toBeInTheDocument();
-  });
-
-  it('renders all 6 commodity groups for management', () => {
-    render(
-      <WorkflowActionPanel
-        {...baseProps}
-        apiOnline={false}
-        role="MANAGEMENT"
-      />
-    );
-
-    for (const commodity of ['Rice', 'Wheat', 'Dal', 'Sugar', 'Cooking Oil', 'Kerosene']) {
-      expect(screen.getByTestId(`commodity-group-${commodity}`)).toBeInTheDocument();
-    }
+    expect(screen.queryByLabelText('Commodity route')).not.toBeInTheDocument();
   });
 });

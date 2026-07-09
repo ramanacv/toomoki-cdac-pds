@@ -143,7 +143,6 @@ describe('assertAuthorized (unit)', () => {
   it('allows the department MSP to orchestrate demo supply-chain writes in fabric mode', () => {
     const department = identity('FoodAndCivilSuppliesMSP');
     expect(() => assertAuthorized('CreateCommodityLot', department)).not.toThrow();
-    expect(() => assertAuthorized('TransformLot', department)).not.toThrow();
     expect(() => assertAuthorized('DispatchLot', department)).not.toThrow();
     expect(() => assertAuthorized('ReceiveLot', department)).not.toThrow();
     expect(() => assertAuthorized('RecordFPSReceipt', department)).not.toThrow();

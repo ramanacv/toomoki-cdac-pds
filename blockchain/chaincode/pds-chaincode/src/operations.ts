@@ -2,7 +2,6 @@ export const CHAINCODE_OPERATIONS = [
   // ── Supply chain ──────────────────────────────────────────────────────
   'RegisterStakeholder',
   'CreateCommodityLot',
-  'TransformLot',
   'DispatchLot',
   'ReceiveLot',
   'AllocateToFPS',

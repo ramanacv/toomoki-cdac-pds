@@ -11,7 +11,7 @@ import type {
   LedgerEvent,
   TransferOrder
 } from '@pds/shared-types';
-import { loadWorkspaceData, probeApi } from '@/api.js';
+import { fetchApiHealth, loadWorkspaceData, type LedgerMode, type StockPosition } from '@/api.js';
 import type { DemoScenario } from '@/demo-model.js';
 import {
   demoAllocations,
@@ -37,7 +37,9 @@ export type WorkspaceState = {
   distributions: DistributionTransaction[];
   alerts: AuditAlert[];
   ledgerEvents: LedgerEvent[];
+  stockPositions: StockPosition[];
   apiOnline: boolean;
+  ledgerMode: LedgerMode | null;
   loading: boolean;
   refresh: () => Promise<void>;
   applyMockResult: (result: {
@@ -65,13 +67,16 @@ export function useWorkspace(scenario: DemoScenario): WorkspaceState {
   const [transfers, setTransfers] = useState<TransferOrder[]>(demoTransfers);
   const [alerts, setAlerts] = useState<AuditAlert[]>(getScenarioAlerts(scenario));
   const [ledgerEvents, setLedgerEvents] = useState<LedgerEvent[]>([]);
+  const [stockPositions, setStockPositions] = useState<StockPosition[]>([]);
   const [apiOnline, setApiOnline] = useState(false);
+  const [ledgerMode, setLedgerMode] = useState<LedgerMode | null>(null);
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
     setLoading(true);
-    const apiStatus = await probeApi();
-    setApiOnline(apiStatus);
+    const health = await fetchApiHealth();
+    setApiOnline(health.ok);
+    setLedgerMode(health.ok ? (health.ledgerMode ?? null) : null);
 
     const workspace = await loadWorkspaceData(scenario);
     setSummary(workspace.summary);
@@ -84,6 +89,7 @@ export function useWorkspace(scenario: DemoScenario): WorkspaceState {
     setDistributions(workspace.distributions);
     setAlerts(workspace.alerts);
     setLedgerEvents(workspace.ledgerEvents ?? []);
+    setStockPositions(workspace.stockPositions ?? []);
     setLoading(false);
   }, [scenario]);
 
@@ -113,7 +119,9 @@ export function useWorkspace(scenario: DemoScenario): WorkspaceState {
     distributions,
     alerts,
     ledgerEvents,
+    stockPositions,
     apiOnline,
+    ledgerMode,
     loading,
     refresh,
     applyMockResult

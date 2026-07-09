@@ -4,7 +4,7 @@
 
 Core entities:
 
-- Stakeholder: participating organization or actor such as procurement centre, miller, godown, FPS, department, or auditor.
+- Stakeholder: participating organization or actor such as procurement centre, FCI, state godown, issue point, FPS, DSO, transporter, or auditor.
 - User: authenticated application user mapped to stakeholder and roles.
 - CommodityLot: tracked commodity batch with quantity, grade, owner, location, and status.
 - StockPosition: current stock balance by stakeholder, commodity, lot, and month where applicable.

@@ -24,7 +24,7 @@ describe('PdsRuntime', () => {
       const runtime = await bootRuntime(true, port);
       runtime.registerStakeholder({
         stakeholderId: 'RUNTIME-001',
-        stakeholderType: StakeholderType.DEPARTMENT,
+        stakeholderType: StakeholderType.DISTRICT_SUPPLY_OFFICE,
         name: 'Runtime Department',
         district: 'Demo District',
         licenseNo: 'RUNTIME-LIC-001',

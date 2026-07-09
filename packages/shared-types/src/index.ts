@@ -17,7 +17,6 @@ export type CommodityRouteLeg = {
   stage: 'I' | 'II';
   lot: 'source' | 'transformed';
   requiresAuthorization?: boolean;
-  endpoint?: 'fps' | 'welfareInstitute' | 'shivBhojan';
 };
 
 export type CommodityRouteTemplate = {
@@ -30,6 +29,12 @@ export type CommodityRouteTemplate = {
     parentLotId: string;
     childLotId: string;
     outputCommodity: CommodityName;
+  };
+  fpsDelivery?: {
+    allocationId: string;
+    sourceGodownId: string;
+    fpsId: string;
+    allocatedQtyKg: number;
   };
   legs: CommodityRouteLeg[];
 };
@@ -79,7 +84,9 @@ export const COMMODITIES: CommodityDefinition[] = [
   }
 ];
 
-const directFpsRoute = (
+const FPS_ALLOCATION_KG = 300;
+
+const canonicalFpsRoute = (
   commodity: CommodityName,
   slug: string,
   sourceLotId: string
@@ -88,10 +95,23 @@ const directFpsRoute = (
   sourceLotId,
   activeLotId: sourceLotId,
   requiresTransformation: false,
+  fpsDelivery: {
+    allocationId: `ALLOC-POC-${slug}-FPS`,
+    sourceGodownId: 'ISSUE-001',
+    fpsId: 'FPS-101',
+    allocatedQtyKg: FPS_ALLOCATION_KG
+  },
   legs: [
     {
-      id: `TR-POC-${slug}-PROC-DEPOT`,
+      id: `TR-POC-${slug}-PROC-FCI`,
       fromOrg: 'PROC-001',
+      toOrg: 'FCI-001',
+      stage: 'I',
+      lot: 'source'
+    },
+    {
+      id: `TR-POC-${slug}-FCI-DEPOT`,
+      fromOrg: 'FCI-001',
       toOrg: 'GODOWN-S-001',
       stage: 'I',
       lot: 'source'
@@ -103,147 +123,17 @@ const directFpsRoute = (
       stage: 'II',
       lot: 'source',
       requiresAuthorization: true
-    },
-    {
-      id: `TR-POC-${slug}-ISSUE-FPS`,
-      fromOrg: 'ISSUE-001',
-      toOrg: 'FPS-101',
-      stage: 'II',
-      lot: 'source',
-      requiresAuthorization: true,
-      endpoint: 'fps'
     }
   ]
 });
 
 export const COMMODITY_ROUTE_TEMPLATES: CommodityRouteTemplate[] = [
-  {
-    commodity: 'Rice',
-    sourceLotId: 'LOT-RICE-2026-001',
-    activeLotId: 'LOT-RICE-2026-002',
-    requiresTransformation: true,
-    transformation: {
-      transformedBy: 'MLL-001',
-      parentLotId: 'LOT-RICE-2026-001',
-      childLotId: 'LOT-RICE-2026-002',
-      outputCommodity: 'Rice'
-    },
-    legs: [
-      {
-        id: 'TR-POC-PROC-FCI',
-        fromOrg: 'PROC-001',
-        toOrg: 'FCI-001',
-        stage: 'I',
-        lot: 'source'
-      },
-      {
-        id: 'TR-POC-FCI-BUF',
-        fromOrg: 'FCI-001',
-        toOrg: 'FCI-BUF-001',
-        stage: 'I',
-        lot: 'source'
-      },
-      {
-        id: 'TR-POC-BUF-DEPOT',
-        fromOrg: 'FCI-BUF-001',
-        toOrg: 'GODOWN-S-001',
-        stage: 'I',
-        lot: 'source'
-      },
-      {
-        id: 'TR-POC-DEPOT-MILLER',
-        fromOrg: 'GODOWN-S-001',
-        toOrg: 'MLL-001',
-        stage: 'I',
-        lot: 'source'
-      },
-      {
-        id: 'TR-POC-MILLER-ISSUE',
-        fromOrg: 'MLL-001',
-        toOrg: 'ISSUE-001',
-        stage: 'II',
-        lot: 'transformed',
-        requiresAuthorization: true
-      },
-      {
-        id: 'TR-POC-ISSUE-FPS',
-        fromOrg: 'ISSUE-001',
-        toOrg: 'FPS-101',
-        stage: 'II',
-        lot: 'transformed',
-        requiresAuthorization: true,
-        endpoint: 'fps'
-      },
-      {
-        id: 'TR-POC-ISSUE-WI',
-        fromOrg: 'ISSUE-001',
-        toOrg: 'WI-101',
-        stage: 'II',
-        lot: 'transformed',
-        requiresAuthorization: true,
-        endpoint: 'welfareInstitute'
-      },
-      {
-        id: 'TR-POC-ISSUE-SBE',
-        fromOrg: 'ISSUE-001',
-        toOrg: 'SBE-101',
-        stage: 'II',
-        lot: 'transformed',
-        requiresAuthorization: true,
-        endpoint: 'shivBhojan'
-      }
-    ]
-  },
-  {
-    commodity: 'Wheat',
-    sourceLotId: 'LOT-WHEAT-2026-001',
-    activeLotId: 'LOT-WHEAT-2026-001',
-    requiresTransformation: false,
-    legs: [
-      {
-        id: 'TR-POC-WHEAT-PROC-FCI',
-        fromOrg: 'PROC-001',
-        toOrg: 'FCI-001',
-        stage: 'I',
-        lot: 'source'
-      },
-      {
-        id: 'TR-POC-WHEAT-FCI-BUF',
-        fromOrg: 'FCI-001',
-        toOrg: 'FCI-BUF-001',
-        stage: 'I',
-        lot: 'source'
-      },
-      {
-        id: 'TR-POC-WHEAT-BUF-DEPOT',
-        fromOrg: 'FCI-BUF-001',
-        toOrg: 'GODOWN-S-001',
-        stage: 'I',
-        lot: 'source'
-      },
-      {
-        id: 'TR-POC-WHEAT-DEPOT-ISSUE',
-        fromOrg: 'GODOWN-S-001',
-        toOrg: 'ISSUE-001',
-        stage: 'II',
-        lot: 'source',
-        requiresAuthorization: true
-      },
-      {
-        id: 'TR-POC-WHEAT-ISSUE-FPS',
-        fromOrg: 'ISSUE-001',
-        toOrg: 'FPS-101',
-        stage: 'II',
-        lot: 'source',
-        requiresAuthorization: true,
-        endpoint: 'fps'
-      }
-    ]
-  },
-  directFpsRoute('Dal', 'DAL', 'LOT-DAL-2026-001'),
-  directFpsRoute('Sugar', 'SUGAR', 'LOT-SUGAR-2026-001'),
-  directFpsRoute('Cooking Oil', 'COOKING-OIL', 'LOT-COOKING-OIL-2026-001'),
-  directFpsRoute('Kerosene', 'KEROSENE', 'LOT-KEROSENE-2026-001')
+  canonicalFpsRoute('Rice', 'RICE', 'LOT-RICE-2026-001'),
+  canonicalFpsRoute('Wheat', 'WHEAT', 'LOT-WHEAT-2026-001'),
+  canonicalFpsRoute('Dal', 'DAL', 'LOT-DAL-2026-001'),
+  canonicalFpsRoute('Sugar', 'SUGAR', 'LOT-SUGAR-2026-001'),
+  canonicalFpsRoute('Cooking Oil', 'COOKING-OIL', 'LOT-COOKING-OIL-2026-001'),
+  canonicalFpsRoute('Kerosene', 'KEROSENE', 'LOT-KEROSENE-2026-001')
 ];
 
 export const getCommodityRouteTemplate = (commodity: string): CommodityRouteTemplate | undefined =>
@@ -262,22 +152,13 @@ export const isCommodityRouteEdgeAllowed = (
 };
 
 export enum StakeholderType {
-  DFPD = 'DFPD',
   FCI = 'FCI',
-  FCI_BUFFER_GODOWN = 'FCI_BUFFER_GODOWN',
   PROCUREMENT_CENTER = 'PROCUREMENT_CENTER',
-  MILLER = 'MILLER',
   TRANSPORTER = 'TRANSPORTER',
   STATE_GODOWN = 'STATE_GODOWN',
-  BLOCK_GODOWN = 'BLOCK_GODOWN',
   ISSUE_POINT = 'ISSUE_POINT',
   FAIR_PRICE_SHOP = 'FAIR_PRICE_SHOP',
-  WELFARE_INSTITUTE = 'WELFARE_INSTITUTE',
-  SHIV_BHOJAN_EATERY = 'SHIV_BHOJAN_EATERY',
-  DIVISIONAL_OFFICE = 'DIVISIONAL_OFFICE',
   DISTRICT_SUPPLY_OFFICE = 'DISTRICT_SUPPLY_OFFICE',
-  TALUKA_SUPPLY_OFFICE = 'TALUKA_SUPPLY_OFFICE',
-  DEPARTMENT = 'DEPARTMENT',
   AUDITOR = 'AUDITOR'
 }
 
@@ -519,7 +400,12 @@ export type DashboardSummary = {
   trackedStockKg: number;
   activeLots: number;
   completedDistributions: number;
+  /** Sum of in-transit transfers and ALLOCATED FPS allocations awaiting receipt */
   pendingReceipts: number;
+  /** Transfers dispatched but not yet received at destination */
+  pendingTransferReceipts: number;
+  /** FPS allocations created but not yet receipt-confirmed */
+  pendingFpsAllocations: number;
   openAlerts: number;
   highRiskFps: string[];
 };

@@ -4,9 +4,9 @@ import {
   type AuthTransaction,
   type CommodityLot,
   type CommodityName,
-  type DistributionTransaction,
   type FPSAllocation,
   type AuditAlert,
+  type DistributionTransaction,
   type LedgerEvent,
   type MonthlyEntitlement,
   type TransferOrder
@@ -15,11 +15,13 @@ import { executeWorkflowAction } from '@/api.js';
 import type { DemoRole } from '@/demo-model.js';
 import {
   applyMockWorkflowAction,
+  getActionStockInfo,
   getAllCommoditiesRoleQueue,
   getAllCommoditiesWorkflowActions,
   getAllCommoditiesWorkflowProgress,
   type CommodityActionGroup,
   type MockWorkflowResult,
+  type StockPosition,
   type WorkflowActionRequest,
   type WorkflowActionSpec
 } from '@/workflow-actions.js';
@@ -33,6 +35,23 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DefinitionList } from '@/components/Entity';
 import { formatDateTime, roleTitle } from '@/lib/constants';
 
+const extractLedgerTxId = (result: unknown): string | undefined => {
+  if (typeof result === 'object' && result && 'ledgerTxId' in result) {
+    const ledgerTxId = (result as { ledgerTxId?: unknown }).ledgerTxId;
+    return ledgerTxId ? String(ledgerTxId) : undefined;
+  }
+  return undefined;
+};
+
+const successMessage = (action: WorkflowActionSpec, ledgerTxId?: string, apiOnline = false): string => {
+  if (ledgerTxId) {
+    return `${action.label} completed. Ledger tx ${ledgerTxId}.`;
+  }
+  return apiOnline
+    ? `${action.label} completed and persisted through the API.`
+    : `${action.label} completed.`;
+};
+
 type EditableQuantity = {
   label: string;
   defaultValue: number;
@@ -40,28 +59,23 @@ type EditableQuantity = {
 };
 
 // Only the actions where an operator would realistically adjust the figure
-// (dispatch, receive, milling yield, delivery) expose an editable quantity.
+// (dispatch, receive, FPS receipt, delivery) expose an editable quantity.
 // The duplicate-claim probe keeps its fixed amount since its narrative is
 // specifically "the same claim again," not "a different quantity."
 function getEditableQuantity(request: WorkflowActionRequest): EditableQuantity | null {
   switch (request.kind) {
     case 'receive':
+    case 'fps-receipt':
       return {
         label: 'Received quantity (kg)',
         defaultValue: request.receivedQtyKg,
-        apply: (qtyKg) => ({ ...request, receivedQtyKg: qtyKg })
+        apply: (qtyKg) => ({ ...request, receivedQtyKg: qtyKg } as WorkflowActionRequest)
       };
     case 'dispatch':
       return {
         label: 'Dispatch quantity (kg)',
         defaultValue: request.payload.dispatchedQtyKg,
         apply: (qtyKg) => ({ ...request, payload: { ...request.payload, dispatchedQtyKg: qtyKg } })
-      };
-    case 'transform-lot':
-      return {
-        label: 'Milled quantity (kg)',
-        defaultValue: request.payload.quantityKg,
-        apply: (qtyKg) => ({ ...request, payload: { ...request.payload, quantityKg: qtyKg } })
       };
     case 'distribute':
     case 'supervisor-exception-distribute':
@@ -86,6 +100,7 @@ type WorkflowActionPanelProps = {
   entitlements: MonthlyEntitlement[];
   alerts: AuditAlert[];
   ledgerEvents: LedgerEvent[];
+  stockPositions: StockPosition[];
   onComplete: () => Promise<void>;
   onMockComplete: (result: MockWorkflowResult) => void;
 };
@@ -104,6 +119,7 @@ export function WorkflowActionPanel({
   entitlements,
   alerts,
   ledgerEvents,
+  stockPositions,
   onComplete,
   onMockComplete
 }: WorkflowActionPanelProps) {
@@ -175,18 +191,9 @@ export function WorkflowActionPanel({
 
         if (request.kind === 'duplicate-distribute') {
           setError('Duplicate claim was not blocked. Check entitlement rules.');
-        } else if (request.kind === 'distribute' || request.kind === 'receive') {
-          const ledgerTxId =
-            typeof result === 'object' && result && 'ledgerTxId' in result
-              ? String((result as DistributionTransaction).ledgerTxId ?? '')
-              : '';
-          setMessage(
-            ledgerTxId
-              ? `${action.label} completed. Ledger tx ${ledgerTxId}.`
-              : `${action.label} completed and persisted through the API.`
-          );
         } else {
-          setMessage(`${action.label} completed and persisted through the API.`);
+          const ledgerTxId = extractLedgerTxId(result);
+          setMessage(successMessage(action, ledgerTxId, true));
         }
         setCompletedActionId(action.id);
       } else {
@@ -270,6 +277,7 @@ export function WorkflowActionPanel({
                     const editable = getEditableQuantity(request);
                     const canEdit = role !== 'MANAGEMENT' && actionAllowed && editable && completedActionId !== action.id;
                     const quantityValue = quantityInputs[action.id] ?? (editable ? String(editable.defaultValue) : '');
+                    const stockInfo = getActionStockInfo(request, context, { apiOnline, stockPositions });
 
                     return (
                       <div key={action.id} className="rounded-2xl border border-border bg-card/70 p-4">
@@ -296,6 +304,24 @@ export function WorkflowActionPanel({
                               { label: 'From', value: receiveTransfer.fromOrg },
                               { label: 'Dispatch time', value: formatDateTime(receiveTransfer.dispatchTimestamp) },
                               { label: 'Receive time', value: formatDateTime(receiveTransfer.receiveTimestamp) }
+                            ]}
+                          />
+                        )}
+                        {request.kind === 'authorize-movement' && (
+                          <DefinitionList
+                            className="mt-3"
+                            entries={[
+                              { label: 'Unlocks leg', value: request.transferId },
+                              { label: 'RO reference', value: request.roRef ?? '—' }
+                            ]}
+                          />
+                        )}
+                        {stockInfo && (
+                          <DefinitionList
+                            className="mt-3"
+                            entries={[
+                              { label: 'Available', value: `${stockInfo.availableKg} kg` },
+                              { label: 'Required', value: `${stockInfo.requiredKg} kg` }
                             ]}
                           />
                         )}

@@ -7,7 +7,11 @@ const liveSummary: DashboardSummary = {
   trackedStockKg: 12425,
   activeLots: 2,
   completedDistributions: 1,
-  pendingReceipts: 3
+  pendingReceipts: 3,
+  pendingTransferReceipts: 2,
+  pendingFpsAllocations: 1,
+  openAlerts: 0,
+  highRiskFps: []
 };
 
 const transfer = (overrides: Partial<TransferOrder>): TransferOrder => ({
@@ -61,9 +65,17 @@ const asMap = (cards: Array<[string, string]>) => Object.fromEntries(cards);
 
 describe('roleSummaryCards', () => {
   it('keeps the network-wide cards for management', () => {
-    const cards = asMap(roleSummaryCards('MANAGEMENT', emptyData, liveSummary));
+    const cards = asMap(
+      roleSummaryCards('MANAGEMENT', emptyData, {
+        ...liveSummary,
+        pendingTransferReceipts: 2,
+        pendingFpsAllocations: 1
+      })
+    );
     expect(cards['Tracked stock']).toBe('12,425 kg');
     expect(cards['Active lots']).toBe('2');
+    expect(cards['In-transit transfers']).toBe('2');
+    expect(cards['Pending FPS allocations']).toBe('1');
   });
 
   it('scopes fps cards to its own allocations and distributions', () => {
@@ -149,22 +161,19 @@ describe('roleSummaryCards', () => {
     expect(cards['High risk']).toBe('1');
   });
 
-  it('returns four cards for every role', () => {
+  it('returns four cards for operational roles and five for management', () => {
     const roles = [
-      'MANAGEMENT',
       'CONTROL_OFFICE',
       'FCI_DEPOT',
       'DEPOT',
       'FPS',
-      'WELFARE_INSTITUTE',
-      'SHIV_BHOJAN_OPERATOR',
       'AUDITOR',
-      'DEPARTMENT',
       'PROCUREMENT',
       'GODOWN'
     ] as const;
     for (const role of roles) {
       expect(roleSummaryCards(role, emptyData, liveSummary)).toHaveLength(4);
     }
+    expect(roleSummaryCards('MANAGEMENT', emptyData, liveSummary)).toHaveLength(5);
   });
 });

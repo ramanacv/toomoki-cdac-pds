@@ -6,10 +6,7 @@ export const VALID_ROLES: DemoRole[] = [
   'FCI_DEPOT',
   'DEPOT',
   'FPS',
-  'WELFARE_INSTITUTE',
-  'SHIV_BHOJAN_OPERATOR',
   'AUDITOR',
-  'DEPARTMENT',
   'PROCUREMENT',
   'GODOWN'
 ];

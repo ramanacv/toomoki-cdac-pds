@@ -1,10 +1,12 @@
 import { useState, type ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import type { DemoRole, DemoScenario } from '@/demo-model.js';
+import type { LedgerMode } from '@/api.js';
 import { screenDefinitions } from '@/demo-model.js';
 import { routeToScreen } from '@/lib/screen-routes.js';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { TopBar } from '@/components/layout/TopBar';
+import { DevAuthTokenDialog } from '@/components/DevAuthTokenDialog';
 import { DemoControlsDrawer } from '@/components/layout/DemoControlsDrawer';
 
 type AppShellProps = {
@@ -12,6 +14,7 @@ type AppShellProps = {
   scenario: DemoScenario;
   operatorName: string;
   apiOnline: boolean;
+  ledgerMode: LedgerMode | null;
   onRoleChange: (role: DemoRole) => void;
   onScenarioChange: (scenario: DemoScenario) => void;
   onLogout: () => void;
@@ -23,6 +26,7 @@ export function AppShell({
   scenario,
   operatorName,
   apiOnline,
+  ledgerMode,
   onRoleChange,
   onScenarioChange,
   onLogout,
@@ -70,12 +74,14 @@ export function AppShell({
         <TopBar
           screenLabel={screenLabel}
           apiOnline={apiOnline}
+          ledgerMode={ledgerMode}
           operatorName={operatorName}
           role={role}
           onRoleChange={onRoleChange}
           onLogout={onLogout}
           onToggleSidebar={() => setSidebarOpen((open) => !open)}
         />
+        <DevAuthTokenDialog ledgerMode={ledgerMode} apiOnline={apiOnline} />
         <main id="main" className="mx-auto w-full max-w-[1100px] flex-1 px-4 py-6 md:px-8">
           {children}
         </main>

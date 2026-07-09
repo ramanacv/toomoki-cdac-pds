@@ -23,10 +23,7 @@ export type DemoRole =
   | 'FCI_DEPOT'
   | 'DEPOT'
   | 'FPS'
-  | 'WELFARE_INSTITUTE'
-  | 'SHIV_BHOJAN_OPERATOR'
   | 'AUDITOR'
-  | 'DEPARTMENT'
   | 'PROCUREMENT'
   | 'GODOWN';
 export type DemoScreen =
@@ -97,23 +94,8 @@ export const roleProfiles: Record<DemoRole, RoleProfile> = {
   },
   DEPOT: {
     title: 'Depot / Issue Point',
-    summary: 'Dispatch approved stock to issue points and retail endpoints.',
-    modules: ['Stage-I/II dispatch', 'Transporter evidence', 'Retail receipts']
-  },
-  WELFARE_INSTITUTE: {
-    title: 'Welfare Institute',
-    summary: 'Confirm hostel or institution stock receipts and shortages.',
-    modules: ['Pending receipts', 'Shortage remarks', 'Endpoint stock']
-  },
-  SHIV_BHOJAN_OPERATOR: {
-    title: 'Shiv Bhojan Operator',
-    summary: 'Confirm meal-scheme stock receipts at the eatery endpoint.',
-    modules: ['Pending receipts', 'Endpoint stock', 'Receipt proof']
-  },
-  DEPARTMENT: {
-    title: 'Food Department',
-    summary: 'Allocation, policy controls, and stock visibility.',
-    modules: ['Stock overview', 'Allocation review', 'Audit exceptions']
+    summary: 'Dispatch approved stock to issue points and reserve FPS allocations.',
+    modules: ['Stage-I/II dispatch', 'Transporter evidence', 'FPS allocations']
   },
   PROCUREMENT: {
     title: 'Procurement Center',
@@ -154,9 +136,6 @@ export const roleScreens: Record<DemoRole, DemoScreen[]> = {
   CONTROL_OFFICE: ['dashboard', 'workbench', 'transfers', 'audit-alerts', 'verify'],
   FCI_DEPOT: ['dashboard', 'workbench', 'lots', 'transfers', 'verify'],
   DEPOT: ['dashboard', 'workbench', 'lots', 'transfers', 'allocations', 'verify'],
-  WELFARE_INSTITUTE: ['dashboard', 'workbench', 'transfers', 'audit-alerts', 'verify'],
-  SHIV_BHOJAN_OPERATOR: ['dashboard', 'workbench', 'transfers', 'verify'],
-  DEPARTMENT: ['dashboard', 'stakeholders', 'allocations', 'audit-alerts', 'verify'],
   PROCUREMENT: ['dashboard', 'workbench', 'stakeholders', 'lots', 'transfers', 'verify'],
   GODOWN: ['dashboard', 'workbench', 'lots', 'transfers', 'allocations', 'audit-alerts', 'verify'],
   FPS: ['dashboard', 'workbench', 'allocations', 'distribution', 'verify'],
@@ -168,7 +147,7 @@ export const getRoleScreens = (role: DemoRole): DemoScreen[] => roleScreens[role
 export const getDefaultScreen = (role: DemoRole): DemoScreen => {
   const screens = getRoleScreens(role);
   const fallbackScreen = screens[0] ?? 'dashboard';
-  return role === 'MANAGEMENT' || role === 'DEPARTMENT' || role === 'AUDITOR'
+  return role === 'MANAGEMENT' || role === 'AUDITOR'
     ? screens.includes('dashboard')
       ? 'dashboard'
       : fallbackScreen
@@ -180,14 +159,8 @@ export const getDefaultScreen = (role: DemoRole): DemoScreen => {
 const baseWorkflow: WorkflowStep[] = [
   {
     id: 'central-tier',
-    title: 'DFPD / FCI origin',
-    detail: 'Central allocation and FCI buffer custody are represented before state lifting.',
-    state: 'complete'
-  },
-  {
-    id: 'milling',
-    title: 'Milling transformation',
-    detail: 'Parent paddy lot is transformed into a child rice lot at the miller.',
+    title: 'Procurement / FCI origin',
+    detail: 'Procurement stock enters the FCI custody chain before state lifting.',
     state: 'complete'
   },
   {
@@ -197,9 +170,9 @@ const baseWorkflow: WorkflowStep[] = [
     state: 'complete'
   },
   {
-    id: 'retail-endpoints',
-    title: 'Retail endpoint receipts',
-    detail: 'FPS, Welfare Institute, and Shiv Bhojan endpoints each record receipt.',
+    id: 'fps-receipt',
+    title: 'FPS receipt',
+    detail: 'The fair price shop confirms the allocated stock before beneficiary issue.',
     state: 'complete'
   },
   {
@@ -225,11 +198,11 @@ const baseWorkflow: WorkflowStep[] = [
 export function buildWorkflowSteps(scenario: DemoScenario): WorkflowStep[] {
   if (scenario === 'short-receipt') {
     return baseWorkflow.map((step) =>
-      step.id === 'retail-endpoints'
+      step.id === 'fps-receipt'
         ? {
             ...step,
             state: 'blocked',
-            detail: 'Endpoint receipt was short, which triggers an audit alert.'
+            detail: 'FPS receipt was short, which triggers an audit alert.'
           }
         : step
     );
@@ -272,7 +245,7 @@ export function getTraceCards(scenario: DemoScenario): TraceCard[] {
       {
         title: 'Lot trace',
         value: 'LOT-RICE-2026-001',
-        detail: 'Lot history shows a shortage on receipt at the block godown.',
+        detail: 'Lot history shows a shortage on receipt at the issue point.',
         accent: 'amber'
       },
       {

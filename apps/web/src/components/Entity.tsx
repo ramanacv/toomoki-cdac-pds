@@ -54,7 +54,7 @@ export function EntityCard({
   return (
     <article
       className={cn(
-        'rounded-3xl border border-border bg-card/75 p-4',
+        'min-w-0 rounded-3xl border border-border bg-card/75 p-4',
         tone === 'low' && 'border-success/20',
         tone === 'medium' && 'border-warning/20',
         tone === 'high' && 'border-destructive/25',

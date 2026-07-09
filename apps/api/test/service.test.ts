@@ -33,8 +33,8 @@ describe('PdsRuntime', () => {
       service = first;
       first.registerStakeholder({
         stakeholderId: 'TEST-001',
-        stakeholderType: StakeholderType.DEPARTMENT,
-        name: 'Test Department',
+        stakeholderType: StakeholderType.DISTRICT_SUPPLY_OFFICE,
+        name: 'Test District Supply Office',
         district: 'Demo District',
         licenseNo: 'TEST-LIC-001',
         status: StakeholderStatus.ACTIVE
@@ -69,8 +69,8 @@ describe('PdsRuntime', () => {
       expect(() => service.getTransfer('TR-000')).toThrow();
       service.dispatchLot({ transferId: 'TR-LOOKUP-001', lotId: 'LOT-RICE-2026-001', fromOrg: 'PROC-001', toOrg: 'FCI-001', dispatchedQtyKg: 100, vehicleNo: 'KA01AB0004' });
       service.receiveLot({ transferId: 'TR-LOOKUP-001', receivedQtyKg: 100 });
-      service.addStockForTest('GODOWN-B-001', 'Rice', 100);
-      service.allocateToFps({ allocationId: 'ALLOC-LOOKUP-001', fpsId: 'FPS-101', commodity: 'Rice', allocatedQtyKg: 50, month: '2026-06', sourceGodownId: 'GODOWN-B-001' });
+      service.addStockForTest('ISSUE-001', 'Rice', 100);
+      service.allocateToFps({ allocationId: 'ALLOC-LOOKUP-001', fpsId: 'FPS-101', commodity: 'Rice', allocatedQtyKg: 50, month: '2026-06', sourceGodownId: 'ISSUE-001' });
       const auth = service.simulateAuthentication({ authTxnId: 'AUTH-LOOKUP-001', beneficiaryRefHash: 'beneficiary-hash', rationCardHash: 'demo-ration-card-hash', authMode: AuthMode.MOCK_OTP, authResult: AuthResult.SUCCESS });
 
       expect(service.getTransfer('TR-LOOKUP-001').transferId).toBe('TR-LOOKUP-001');
@@ -86,8 +86,8 @@ describe('PdsRuntime', () => {
     const statePath = createStatePath();
     const service = await boot(true, statePath);
     try {
-      service.addStockForTest('GODOWN-B-001', 'Rice', demoQuantities.fpsAllocationKg);
-      service.allocateToFps({ allocationId: 'ALLOC-API-001', fpsId: 'FPS-101', commodity: 'Rice', allocatedQtyKg: demoQuantities.fpsAllocationKg, month: '2026-06', sourceGodownId: 'GODOWN-B-001' });
+      service.addStockForTest('ISSUE-001', 'Rice', demoQuantities.fpsAllocationKg);
+      service.allocateToFps({ allocationId: 'ALLOC-API-001', fpsId: 'FPS-101', commodity: 'Rice', allocatedQtyKg: demoQuantities.fpsAllocationKg, month: '2026-06', sourceGodownId: 'ISSUE-001' });
       service.recordFpsReceipt({ allocationId: 'ALLOC-API-001', receivedQtyKg: demoQuantities.fpsReceiptKg });
       const auth = service.simulateAuthentication({ authTxnId: 'AUTH-API-001', beneficiaryRefHash: 'beneficiary-hash', rationCardHash: 'demo-ration-card-hash', authMode: AuthMode.MOCK_OTP, authResult: AuthResult.SUCCESS });
       const distribution = service.recordDistribution({
@@ -115,18 +115,9 @@ describe('PdsRuntime', () => {
     const statePath = createStatePath();
     const service = await boot(true, statePath);
     try {
-      const approval = service.authorizeMovement({
-        transferId: 'TR-POC-MILLER-ISSUE',
-        authorizedBy: 'DSO-001',
-        roRef: 'RO-DSO-POC-001'
-      });
-      expect(approval.ledgerTxId).toBeDefined();
-
       const legs = [
-        ['TR-POC-PROC-FCI', 'LOT-RICE-2026-001', 'PROC-001', 'FCI-001', demoQuantities.stageOneTransferKg, 'KA01AB1999'],
-        ['TR-POC-FCI-BUF', 'LOT-RICE-2026-001', 'FCI-001', 'FCI-BUF-001', demoQuantities.stageOneTransferKg, 'FCI01AB2001'],
-        ['TR-POC-BUF-DEPOT', 'LOT-RICE-2026-001', 'FCI-BUF-001', 'GODOWN-S-001', demoQuantities.stageOneTransferKg, 'KA01AB2002'],
-        ['TR-POC-DEPOT-MILLER', 'LOT-RICE-2026-001', 'GODOWN-S-001', 'MLL-001', demoQuantities.stageOneTransferKg, 'KA01AB2003']
+        ['TR-POC-RICE-PROC-FCI', 'LOT-RICE-2026-001', 'PROC-001', 'FCI-001', demoQuantities.stageOneTransferKg, 'KA01AB1999'],
+        ['TR-POC-RICE-FCI-DEPOT', 'LOT-RICE-2026-001', 'FCI-001', 'GODOWN-S-001', demoQuantities.stageOneTransferKg, 'FCI01AB2001']
       ] as const;
 
       for (const [transferId, lotId, fromOrg, toOrg, dispatchedQtyKg, vehicleNo] of legs) {
@@ -134,51 +125,38 @@ describe('PdsRuntime', () => {
         service.receiveLot({ transferId, receivedQtyKg: dispatchedQtyKg });
       }
 
-      const childLot = service.transformLot({
-        parentLotId: 'LOT-RICE-2026-001',
-        childLotId: 'LOT-RICE-2026-002',
-        transformedBy: 'MLL-001',
-        commodity: 'Rice',
-        quantityKg: demoQuantities.millerToIssueKg,
-        qualityGrade: 'A',
-        source: 'Miller 01'
+      const issueApproval = service.authorizeMovement({
+        transferId: 'TR-POC-RICE-DEPOT-ISSUE',
+        authorizedBy: 'DSO-001',
+        roRef: 'RO-DSO-POC-001'
       });
-      expect(childLot.currentOwner).toBe('MLL-001');
+      expect(issueApproval.ledgerTxId).toBeDefined();
 
       service.dispatchLot({
-        transferId: 'TR-POC-MILLER-ISSUE',
-        lotId: 'LOT-RICE-2026-002',
-        fromOrg: 'MLL-001',
+        transferId: 'TR-POC-RICE-DEPOT-ISSUE',
+        lotId: 'LOT-RICE-2026-001',
+        fromOrg: 'GODOWN-S-001',
         toOrg: 'ISSUE-001',
-        dispatchedQtyKg: demoQuantities.millerToIssueKg,
-        vehicleNo: 'KA01AB2004',
+        dispatchedQtyKg: demoQuantities.stageOneTransferKg,
+        vehicleNo: 'KA01AB2002',
         stage: 'II',
         roRef: 'RO-DSO-POC-001',
-        transporterId: 'TRANS-001',
-        transformedFromLotId: 'LOT-RICE-2026-001'
+        transporterId: 'TRANS-001'
       });
-      service.receiveLot({ transferId: 'TR-POC-MILLER-ISSUE', receivedQtyKg: demoQuantities.millerToIssueKg });
+      service.receiveLot({ transferId: 'TR-POC-RICE-DEPOT-ISSUE', receivedQtyKg: demoQuantities.stageOneTransferKg });
 
-      const endpointLegs = [
-        ['TR-POC-ISSUE-FPS', 'FPS-101', demoQuantities.endpointDispatchKg.fps, 'KA01AB2005', 'RO-DSO-POC-FPS'],
-        ['TR-POC-ISSUE-WI', 'WI-101', demoQuantities.endpointDispatchKg.welfareInstitute, 'KA01AB2006', 'RO-DSO-POC-WI'],
-        ['TR-POC-ISSUE-SBE', 'SBE-101', demoQuantities.endpointDispatchKg.shivBhojan, 'KA01AB2007', 'RO-DSO-POC-SBE']
-      ] as const;
-      for (const [transferId, toOrg, dispatchedQtyKg, vehicleNo, roRef] of endpointLegs) {
-        service.dispatchLot({
-          transferId,
-          lotId: 'LOT-RICE-2026-002',
-          fromOrg: 'ISSUE-001',
-          toOrg,
-          dispatchedQtyKg,
-          vehicleNo,
-          stage: 'II',
-          roRef,
-          authorizedBy: 'DSO-001',
-          transporterId: 'TRANS-001'
-        });
-        service.receiveLot({ transferId, receivedQtyKg: dispatchedQtyKg });
-      }
+      service.allocateToFps({
+        allocationId: 'ALLOC-POC-RICE-FPS',
+        fpsId: 'FPS-101',
+        commodity: 'Rice',
+        allocatedQtyKg: demoQuantities.fpsAllocationKg,
+        month: '2026-06',
+        sourceGodownId: 'ISSUE-001'
+      });
+      service.recordFpsReceipt({
+        allocationId: 'ALLOC-POC-RICE-FPS',
+        receivedQtyKg: demoQuantities.fpsReceiptKg
+      });
 
       const distribution = service.recordDistribution({
         distributionId: 'DIST-POC-001',

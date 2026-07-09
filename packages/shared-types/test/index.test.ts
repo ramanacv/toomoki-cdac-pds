@@ -31,13 +31,27 @@ describe('shared types', () => {
     ]);
   });
 
-  it('defines direct routes for oil and kerosene without miller transformation', () => {
+  it('defines canonical routes for oil and kerosene without commodity-specific processing', () => {
     const kerosene = getCommodityRouteTemplate('Kerosene');
     const oil = getCommodityRouteTemplate('Cooking Oil');
 
     expect(kerosene?.requiresTransformation).toBe(false);
     expect(oil?.requiresTransformation).toBe(false);
+    expect(kerosene?.legs.map((leg) => leg.toOrg)).toEqual(['FCI-001', 'GODOWN-S-001', 'ISSUE-001']);
     expect(kerosene?.legs.some((leg) => leg.fromOrg === 'GODOWN-S-001' && leg.toOrg === 'ISSUE-001')).toBe(true);
-    expect(kerosene?.legs.some((leg) => leg.toOrg === 'MLL-001')).toBe(false);
+    expect(kerosene?.legs.some((leg) => leg.toOrg === 'FPS-101')).toBe(false);
+    expect(kerosene?.fpsDelivery?.allocationId).toBe('ALLOC-POC-KEROSENE-FPS');
+  });
+
+  it('keeps rice on the canonical issue point to FPS allocation path', () => {
+    const rice = getCommodityRouteTemplate('Rice');
+
+    expect(rice?.legs.map((leg) => leg.toOrg)).toEqual([
+      'FCI-001',
+      'GODOWN-S-001',
+      'ISSUE-001'
+    ]);
+    expect(rice?.requiresTransformation).toBe(false);
+    expect(rice?.fpsDelivery?.fpsId).toBe('FPS-101');
   });
 });

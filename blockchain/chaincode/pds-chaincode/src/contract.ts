@@ -309,32 +309,6 @@ export class PdsDataContract extends Contract {
     return JSON.stringify(out);
   }
 
-  async TransformLot(ctx: Context, payloadJson: string): Promise<string> {
-    assertAuthorized('TransformLot', identityFromContext(ctx));
-    const txId = ctx.stub.getTxID();
-    const isoTimestamp = getTxTimestamp(ctx);
-    const payload = { ...JSON.parse(payloadJson), transformedAt: isoTimestamp };
-    const [stakeholders, lots, stock, events] = await Promise.all([
-      loadCollection<Stakeholder>(ctx, 'stakeholders'),
-      loadCollection<CommodityLot>(ctx, 'lots'),
-      loadCollection<[StockKey, number]>(ctx, 'stock'),
-      loadCollection<LedgerEvent>(ctx, 'events')
-    ]);
-    const engine = buildEngine({ stakeholders, lots, stock, events });
-    const result = engine.transformLot(payload);
-    const state = engine.exportState();
-    const lotKey = ctx.stub.createCompositeKey('lot', [result.lotId]);
-    await Promise.all([
-      saveCollection(ctx, 'lots', state.lots),
-      saveCollection(ctx, 'stock', state.stock),
-      saveCollection(ctx, 'events', state.events),
-      ctx.stub.putState(lotKey, Buffer.from(JSON.stringify({ ...result, fabricTxId: txId, fabricTimestamp: isoTimestamp })))
-    ]);
-    const out = { ...result, ledgerTxId: txId };
-    emitAndLog(ctx, 'data', 'TransformLot', txId, out);
-    return JSON.stringify(out);
-  }
-
   async ReceiveLot(ctx: Context, payloadJson: string): Promise<string> {
     assertAuthorized('ReceiveLot', identityFromContext(ctx));
     const txId = ctx.stub.getTxID();

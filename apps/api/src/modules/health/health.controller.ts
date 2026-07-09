@@ -1,6 +1,7 @@
 import { Controller, Get, Header, Inject, HttpException, HttpStatus } from '@nestjs/common';
 import { renderLandingPage, renderSwaggerPage } from './api-pages.js';
 import { PdsLedgerFacade } from '../core/pds-ledger.facade.js';
+import { resolveLedgerMode } from '../config/ledger-mode.config.js';
 
 @Controller()
 export class HealthController {
@@ -51,6 +52,6 @@ export class HealthController {
   /** Legacy endpoint — kept for backward compat with existing probes. */
   @Get('/health')
   health() {
-    return { ok: true };
+    return { ok: true, ledgerMode: resolveLedgerMode() };
   }
 }

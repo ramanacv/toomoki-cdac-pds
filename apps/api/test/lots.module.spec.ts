@@ -31,15 +31,14 @@ describe('LotsModule', () => {
     expect(controller.lotHistory('LOT-TEST-001').length).toBeGreaterThan(0);
   });
 
-  it('transforms a parent lot into a child lot and links provenance history', async () => {
+  it('keeps rice in the canonical PDS flow without a processing transform', async () => {
     fixture = await createDemoLedgerFixture();
     controller = await createControllerWithFacade(LotsController, fixture.facade);
 
     const setupLegs = [
-      ['TR-LOT-TRANSFORM-PROC-FCI', 'PROC-001', 'FCI-001'],
-      ['TR-LOT-TRANSFORM-FCI-BUF', 'FCI-001', 'FCI-BUF-001'],
-      ['TR-LOT-TRANSFORM-BUF-DEPOT', 'FCI-BUF-001', 'GODOWN-S-001'],
-      ['TR-LOT-TRANSFORM-DEPOT-MILLER', 'GODOWN-S-001', 'MLL-001']
+      ['TR-LOT-CANONICAL-PROC-FCI', 'PROC-001', 'FCI-001'],
+      ['TR-LOT-CANONICAL-FCI-DEPOT', 'FCI-001', 'GODOWN-S-001'],
+      ['TR-LOT-CANONICAL-DEPOT-ISSUE', 'GODOWN-S-001', 'ISSUE-001']
     ] as const;
     for (const [transferId, fromOrg, toOrg] of setupLegs) {
       fixture.facade.dispatchLot({
@@ -53,19 +52,8 @@ describe('LotsModule', () => {
       fixture.facade.receiveLot({ transferId, receivedQtyKg: demoQuantities.stageOneTransferKg });
     }
 
-    const child = controller.transformLot({
-      parentLotId: 'LOT-RICE-2026-001',
-      childLotId: 'LOT-RICE-2026-002',
-      transformedBy: 'MLL-001',
-      commodity: 'Rice',
-      quantityKg: demoQuantities.millerToIssueKg,
-      qualityGrade: 'A',
-      source: 'Miller 01'
-    });
-
-    expect(child.transformedFromLotId).toBe('LOT-RICE-2026-001');
-    expect(controller.lot('LOT-RICE-2026-002').currentOwner).toBe('MLL-001');
-    expect(controller.lotHistory('LOT-RICE-2026-002').some((event) => event.eventType === 'TransformLot')).toBe(true);
-    expect(controller.lotHistory('LOT-RICE-2026-001').some((event) => event.entityId === 'LOT-RICE-2026-002')).toBe(true);
+    const lot = controller.lot('LOT-RICE-2026-001');
+    expect(lot.currentOwner).toBe('ISSUE-001');
+    expect(controller.lotHistory('LOT-RICE-2026-001').some((event) => event.eventType === 'TransformLot')).toBe(false);
   });
 });

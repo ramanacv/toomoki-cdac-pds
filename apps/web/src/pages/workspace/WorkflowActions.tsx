@@ -15,6 +15,7 @@ export function WorkflowActions() {
       distributions={workspace.distributions}
       alerts={workspace.alerts}
       ledgerEvents={workspace.ledgerEvents}
+      stockPositions={workspace.stockPositions}
       onComplete={workspace.refresh}
       onMockComplete={workspace.applyMockResult}
     />

@@ -42,22 +42,22 @@ export const createControllerWithFacade = async <T>(
   return moduleRef.get(Controller);
 };
 
-export const moveLotToGodownB = (
+export const moveLotToIssuePoint = (
   facade: PdsLedgerFacade,
   quantityKg = 1000
 ): void => {
-  facade.addStockForTest('GODOWN-B-001', 'Rice', quantityKg);
+  facade.addStockForTest('ISSUE-001', 'Rice', quantityKg);
 };
 
 export const prepareFpsStock = (facade: PdsLedgerFacade, allocationId: string, quantityKg = 100): void => {
-  moveLotToGodownB(facade);
+  moveLotToIssuePoint(facade);
   facade.allocateToFps({
     allocationId,
     fpsId: 'FPS-101',
     commodity: 'Rice',
     allocatedQtyKg: quantityKg,
     month: '2026-06',
-    sourceGodownId: 'GODOWN-B-001'
+    sourceGodownId: 'ISSUE-001'
   });
   facade.recordFpsReceipt({ allocationId, receivedQtyKg: quantityKg });
 };

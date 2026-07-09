@@ -13,7 +13,7 @@
       "mspId": "FoodAndCivilSuppliesMSP",
       "peerHost": "peer0.food.example.com",
       "peerPort": 7051,
-      "role": "DEPARTMENT"
+      "role": "DISTRICT_SUPPLY_OFFICE"
     },
     {
       "name": "ProcurementMiller",

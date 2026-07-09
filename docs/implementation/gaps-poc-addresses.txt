@@ -10,9 +10,9 @@ Specifically, your proposed changes map well to these gaps:
   ─────────────────────────────────────────  ────────────────────────────────────────────────────────────────────────────
    Manual auth exception misuse               supervisor exception recorded with approvedBy and reason
   ─────────────────────────────────────────  ────────────────────────────────────────────────────────────────────────────
-   Miller/commodity transformation opacity    TransformLot parent-child lot lineage
+   Commodity movement opacity    Dispatch and receipt lineage from procurement to FPS
   ─────────────────────────────────────────  ────────────────────────────────────────────────────────────────────────────
-   Endpoint accountability                    FPS, Welfare Institution, and Shiv Bhojan receipt events
+   Endpoint accountability                    FPS receipt and beneficiary issue events
 
   Recommended claim:
 

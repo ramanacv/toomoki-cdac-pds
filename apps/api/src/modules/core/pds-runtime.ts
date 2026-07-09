@@ -85,12 +85,6 @@ export class PdsRuntime extends PdsLedgerEngine {
     return result;
   }
 
-  override transformLot(...args: Parameters<PdsLedgerEngine['transformLot']>) {
-    const result = super.transformLot(...args);
-    void this.persist();
-    return result;
-  }
-
   override dispatchLot(...args: Parameters<PdsLedgerEngine['dispatchLot']>) {
     const result = super.dispatchLot(...args);
     void this.persist();

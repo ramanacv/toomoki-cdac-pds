@@ -3,17 +3,87 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 
+const duplicateClaimWorkspace = {
+  summary: {
+    trackedStockKg: 5000,
+    activeLots: 3,
+    completedDistributions: 12,
+    pendingReceipts: 2,
+    pendingTransferReceipts: 0,
+    pendingFpsAllocations: 0
+  },
+  stakeholders: [],
+  lots: [{ lotId: 'LOT-RICE-2026-001', commodity: 'Rice', currentLocation: 'FPS 101' }],
+  transfers: [
+    ['TR-POC-RICE-PROC-FCI', 'PROC-001', 'FCI-001', 1000],
+    ['TR-POC-RICE-FCI-DEPOT', 'FCI-001', 'GODOWN-S-001', 1000],
+    ['TR-POC-RICE-DEPOT-ISSUE', 'GODOWN-S-001', 'ISSUE-001', 1000]
+  ].map(([transferId, fromOrg, toOrg, qty]) => ({
+    transferId: String(transferId),
+    lotId: 'LOT-RICE-2026-001',
+    fromOrg: String(fromOrg),
+    toOrg: String(toOrg),
+    dispatchedQtyKg: Number(qty),
+    receivedQtyKg: Number(qty),
+    vehicleNo: 'KA01AB2000',
+    status: 'RECEIVED',
+    dispatchTimestamp: '2026-06-09T10:00:00.000Z',
+    receiveTimestamp: '2026-06-09T11:00:00.000Z'
+  })),
+  allocations: [
+    {
+      allocationId: 'ALLOC-POC-RICE-FPS',
+      fpsId: 'FPS-101',
+      commodity: 'Rice',
+      allocatedQtyKg: 300,
+      receivedQtyKg: 300,
+      month: '2026-06',
+      sourceGodownId: 'ISSUE-001',
+      status: 'RECEIVED'
+    }
+  ],
+  authTransactions: [],
+  entitlements: [],
+  distributions: [
+    {
+      distributionId: 'DIST-POC-001',
+      deliveredKg: 25,
+      rationCardHash: 'demo-ration-card-hash',
+      commodity: 'Rice',
+      fpsId: 'FPS-101',
+      authResult: 'SUCCESS',
+      authTxnRefHash: 'auth-ref-poc',
+      ledgerTxId: 'TX-POC'
+    }
+  ],
+  alerts: [],
+  ledgerEvents: [
+    {
+      ledgerTxId: 'MOCK-RO',
+      entityType: 'workflow',
+      entityId: 'TR-POC-RICE-DEPOT-ISSUE',
+      eventType: 'RO_LITE_APPROVED',
+      payload: {},
+      timestamp: '2026-06-09T10:00:00.000Z'
+    }
+  ],
+  stockPositions: []
+};
+
 vi.mock('@/api.js', () => ({
   probeApi: vi.fn().mockResolvedValue(false),
+  fetchApiHealth: vi.fn().mockResolvedValue({ ok: false }),
   loadWorkspaceData: vi.fn().mockResolvedValue({
     summary: {
       trackedStockKg: 5000,
       activeLots: 3,
       completedDistributions: 12,
-      pendingReceipts: 2
+      pendingReceipts: 2,
+      pendingTransferReceipts: 0,
+      pendingFpsAllocations: 0
     },
     stakeholders: [],
-    lots: [{ lotId: 'LOT-RICE-2026-001', commodity: 'Rice', currentLocation: 'Block Godown 01' }],
+    lots: [{ lotId: 'LOT-RICE-2026-001', commodity: 'Rice', currentLocation: 'FPS 101' }],
     transfers: [],
     allocations: [],
     authTransactions: [],
@@ -30,18 +100,23 @@ vi.mock('@/api.js', () => ({
         ledgerTxId: 'TX-1'
       }
     ],
-    alerts: []
+    alerts: [],
+    ledgerEvents: [],
+    stockPositions: []
   }),
   buildApiUrl: vi.fn((path: string) => `/api${path}`),
   executeWorkflowAction: vi.fn()
 }));
 
 import { AppRoutes } from '@/App.js';
-import { loadWorkspaceData, probeApi } from '@/api.js';
+import { fetchApiHealth, loadWorkspaceData, probeApi } from '@/api.js';
 
 beforeEach(() => {
   vi.clearAllMocks();
   (probeApi as unknown as { mockResolvedValue: (v: boolean) => void }).mockResolvedValue(false);
+  (fetchApiHealth as unknown as { mockResolvedValue: (v: { ok: boolean; ledgerMode?: string }) => void }).mockResolvedValue({
+    ok: false
+  });
 });
 
 async function renderApp(initialEntry: string) {
@@ -137,24 +212,9 @@ describe('app shell', () => {
   });
 
   it('surfaces the duplicate-claim probe to auditors on the audit page', async () => {
-    const base = await (loadWorkspaceData as unknown as { getMockImplementation: () => () => Promise<Record<string, unknown>> })
-      .getMockImplementation()!();
-    (loadWorkspaceData as unknown as { mockResolvedValueOnce: (v: unknown) => void }).mockResolvedValueOnce({
-      ...base,
-      distributions: [
-        ...(base.distributions as unknown[]),
-        {
-          distributionId: 'DIST-POC-001',
-          deliveredKg: 25,
-          rationCardHash: 'demo-ration-card-hash',
-          commodity: 'Rice',
-          fpsId: 'FPS-101',
-          authResult: 'SUCCESS',
-          authTxnRefHash: 'auth-ref-poc',
-          ledgerTxId: 'TX-POC'
-        }
-      ]
-    });
+    (loadWorkspaceData as unknown as { mockResolvedValueOnce: (v: unknown) => void }).mockResolvedValueOnce(
+      duplicateClaimWorkspace
+    );
 
     await renderApp('/audit?role=AUDITOR');
 
@@ -175,8 +235,12 @@ describe('app shell', () => {
 
   it('disables scenario buttons in the drawer when the API is online', async () => {
     (probeApi as unknown as { mockResolvedValue: (v: boolean) => void }).mockResolvedValue(true);
+    (fetchApiHealth as unknown as { mockResolvedValue: (v: { ok: boolean; ledgerMode?: string }) => void }).mockResolvedValue({
+      ok: true,
+      ledgerMode: 'demo'
+    });
     const user = await renderApp('/?role=MANAGEMENT');
-    expect(await screen.findByText('Live API')).toBeInTheDocument();
+    expect(await screen.findByText('Live API (Demo)')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Demo controls' }));
     expect(await screen.findByText('Live API available')).toBeInTheDocument();

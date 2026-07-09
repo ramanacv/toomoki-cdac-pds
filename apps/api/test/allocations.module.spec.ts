@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { AllocationsController } from '../src/modules/allocations/allocations.controller.js';
-import { createControllerWithFacade, createDemoLedgerFixture, moveLotToGodownB, type DemoLedgerFixture } from './helpers/demo-ledger.js';
+import { createControllerWithFacade, createDemoLedgerFixture, moveLotToIssuePoint, type DemoLedgerFixture } from './helpers/demo-ledger.js';
 
 describe('AllocationsModule', () => {
   let fixture: DemoLedgerFixture;
@@ -10,7 +10,7 @@ describe('AllocationsModule', () => {
 
   it('allocates stock to an FPS and records receipt', async () => {
     fixture = await createDemoLedgerFixture();
-    moveLotToGodownB(fixture.facade);
+    moveLotToIssuePoint(fixture.facade);
     controller = await createControllerWithFacade(AllocationsController, fixture.facade);
 
     const allocation = controller.allocate({
@@ -19,7 +19,7 @@ describe('AllocationsModule', () => {
       commodity: 'Rice',
       allocatedQtyKg: 75,
       month: '2026-06',
-      sourceGodownId: 'GODOWN-B-001'
+      sourceGodownId: 'ISSUE-001'
     });
 
     expect(allocation.allocationId).toBe('ALLOC-MOD-001');

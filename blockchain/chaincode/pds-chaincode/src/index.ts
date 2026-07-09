@@ -67,7 +67,6 @@ const sortByTime = <T>(entries: T[]): T[] =>
 const ALLOWED_LEDGER_EVENT_TYPES = new Set([
   'RegisterStakeholder',
   'CreateCommodityLot',
-  'TransformLot',
   'AuthorizeMovement',
   'DispatchLot',
   'ReceiveLot',
@@ -397,66 +396,6 @@ export class PdsLedgerEngine {
     this.addStock(lot.currentOwner, lot.commodity, lot.quantityKg);
     this.recordEvent('lot', lot.lotId, 'CreateCommodityLot', lot);
     return lot;
-  }
-
-  transformLot(input: {
-    parentLotId: string;
-    childLotId: string;
-    transformedBy: string;
-    commodity: string;
-    season?: string;
-    quantityKg: number;
-    qualityGrade: string;
-    source?: string;
-    transformedAt?: string;
-  }): CommodityLot {
-    if (this.lots.has(input.childLotId)) {
-      throw new Error(`Lot ${input.childLotId} already exists`);
-    }
-    if (input.quantityKg <= 0) {
-      throw new Error('quantityKg must be positive');
-    }
-    const parent = this.mustGetLot(input.parentLotId);
-    this.assertActiveStakeholder(input.transformedBy);
-    const route = getCommodityRouteTemplate(parent.commodity);
-    if (route && !route.requiresTransformation) {
-      throw new Error(`${parent.commodity} does not require transformation in the configured commodity route`);
-    }
-    if (route?.transformation) {
-      if (
-        route.transformation.parentLotId !== parent.lotId ||
-        route.transformation.childLotId !== input.childLotId ||
-        route.transformation.transformedBy !== input.transformedBy ||
-        route.transformation.outputCommodity !== input.commodity
-      ) {
-        throw new Error(`TransformLot does not match the configured ${parent.commodity} commodity route`);
-      }
-    }
-    if (parent.currentOwner !== input.transformedBy) {
-      throw new Error(`Lot ${parent.lotId} is owned by ${parent.currentOwner}, not ${input.transformedBy}`);
-    }
-    this.consumeStock(input.transformedBy, parent.commodity, input.quantityKg);
-    const child: CommodityLot = {
-      lotId: input.childLotId,
-      commodity: input.commodity,
-      season: input.season ?? parent.season,
-      quantityKg: input.quantityKg,
-      qualityGrade: input.qualityGrade,
-      source: input.source ?? parent.lotId,
-      currentOwner: input.transformedBy,
-      currentLocation: input.transformedBy,
-      status: LotStatus.CREATED,
-      transformedFromLotId: parent.lotId
-    };
-    this.lots.set(child.lotId, child);
-    this.addStock(child.currentOwner, child.commodity, child.quantityKg);
-    this.recordEvent('lot', child.lotId, 'TransformLot', {
-      ...child,
-      parentLotId: parent.lotId,
-      transformedBy: input.transformedBy,
-      transformedAt: input.transformedAt ?? makeTimestamp()
-    });
-    return child;
   }
 
   dispatchLot(input: {
@@ -1322,11 +1261,19 @@ export class PdsLedgerEngine {
   }
 
   getDashboardSummary(): DashboardSummary {
+    const pendingTransferReceipts = [...this.transfers.values()].filter(
+      (transfer) => transfer.status === TransferStatus.DISPATCHED
+    ).length;
+    const pendingFpsAllocations = [...this.allocations.values()].filter(
+      (allocation) => allocation.status === 'ALLOCATED'
+    ).length;
     return {
       trackedStockKg: [...this.stock.values()].reduce((total, qty) => total + qty, 0),
       activeLots: [...this.lots.values()].filter((lot) => lot.status === LotStatus.CREATED || lot.status === LotStatus.DISPATCHED).length,
       completedDistributions: this.distributions.size,
-      pendingReceipts: [...this.allocations.values()].filter((allocation) => allocation.status === 'ALLOCATED').length + [...this.transfers.values()].filter((transfer) => transfer.status === TransferStatus.DISPATCHED).length,
+      pendingTransferReceipts,
+      pendingFpsAllocations,
+      pendingReceipts: pendingTransferReceipts + pendingFpsAllocations,
       openAlerts: [...this.alerts.values()].filter((alert) => alert.status !== 'RESOLVED').length,
       highRiskFps: [...new Set([...this.alerts.values()].filter((alert) => alert.riskLevel === 'HIGH').map((alert) => alert.entityId))]
     };
@@ -1447,12 +1394,6 @@ export class PdsLedgerEngine {
         this.stakeholders.set(String(payload.stakeholderId), payload as unknown as Stakeholder);
         break;
       case 'CreateCommodityLot': {
-        const lot = payload as unknown as CommodityLot;
-        this.lots.set(lot.lotId, lot);
-        this.stock.set(keyFor(lot.currentOwner, lot.commodity), lot.quantityKg);
-        break;
-      }
-      case 'TransformLot': {
         const lot = payload as unknown as CommodityLot;
         this.lots.set(lot.lotId, lot);
         this.stock.set(keyFor(lot.currentOwner, lot.commodity), lot.quantityKg);

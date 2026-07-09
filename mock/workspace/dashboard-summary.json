@@ -3,6 +3,8 @@
   "activeLots": 6,
   "completedDistributions": 1,
   "pendingReceipts": 0,
+  "pendingTransferReceipts": 0,
+  "pendingFpsAllocations": 0,
   "openAlerts": 1,
   "highRiskFps": ["FPS-101"]
 }

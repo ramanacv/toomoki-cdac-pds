@@ -30,12 +30,10 @@ export type RoleSummaryInput = {
 // Demo org identities operated by each role, mirroring the planned legs in workflow-actions.
 const roleOrgs: Partial<Record<DemoRole, string[]>> = {
   PROCUREMENT: ['PROC-001'],
-  FCI_DEPOT: ['FCI-001', 'FCI-BUF-001'],
-  DEPOT: ['GODOWN-S-001', 'MLL-001', 'ISSUE-001'],
+  FCI_DEPOT: ['FCI-001'],
+  DEPOT: ['GODOWN-S-001', 'ISSUE-001'],
   GODOWN: ['GODOWN-S-001'],
-  FPS: ['FPS-101'],
-  WELFARE_INSTITUTE: ['WI-101'],
-  SHIV_BHOJAN_OPERATOR: ['SBE-101']
+  FPS: ['FPS-101']
 };
 
 const kg = (value: number): string => `${value.toLocaleString()} kg`;
@@ -67,14 +65,6 @@ export function roleSummaryCards(
   switch (role) {
     case 'MANAGEMENT':
       return summaryCardData(liveSummary);
-
-    case 'DEPARTMENT':
-      return [
-        ['Tracked stock', kg(liveSummary.trackedStockKg)],
-        ['Allocated to FPS', kg(sum(data.allocations.map((a) => a.allocatedQtyKg)))],
-        ['Active stakeholders', data.stakeholders.filter((s) => s.status === StakeholderStatus.ACTIVE).length.toString()],
-        ['Open alerts', openAlerts.length.toString()]
-      ];
 
     case 'AUDITOR':
       return [
@@ -130,13 +120,5 @@ export function roleSummaryCards(
       ];
     }
 
-    case 'WELFARE_INSTITUTE':
-    case 'SHIV_BHOJAN_OPERATOR':
-      return [
-        ['Queued actions', queued.toString()],
-        ['Inbound pending', inboundPending(data.transfers, orgs).toString()],
-        ['Received', kg(receivedKg(data.transfers, orgs))],
-        ['Shortages', kg(shortageKg(data.transfers, orgs))]
-      ];
   }
 }

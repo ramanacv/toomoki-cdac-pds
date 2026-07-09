@@ -8,9 +8,9 @@ ViksitPDS complements SMART-PDS, state PDS systems, ePoS, and command-centre das
 
 ```text
 Procurement Centre
-  -> Miller
+  -> FCI
   -> State Godown
-  -> Block Godown
+  -> Issue Point
   -> FPS Allocation
   -> FPS Receipt
   -> Beneficiary Authentication (mock)

@@ -6,9 +6,9 @@ Build a working 2-week MVP of ViksitPDS that demonstrates a complete commodity j
 
 ```text
 Procurement Centre
-  -> Miller
+  -> FCI
   -> State Godown
-  -> Block Godown
+  -> Issue Point
   -> FPS Allocation
   -> FPS Receipt
   -> Beneficiary Authentication
@@ -26,7 +26,7 @@ The implementation must follow the existing product and technical docs and prese
 |------|--------|-------|
 | **Gate 1: Platform Ready** | **Complete** | Docker Compose (demo + fabric profiles), PostgreSQL seed, NestJS 11 API with feature modules, 52/52 API tests |
 | **Gate 2: Supply Chain Ready** | **Complete** | Stakeholders, lots, transfers, lot history — demo mode and fabric gateway mode |
-| Gate 3: FPS And Beneficiary Ready | In progress | Core flows implemented; see acceptance criteria below |
+| Gate 3: FPS And Beneficiary Ready | Complete | Allocate + FPS receipt path; per-leg RO-lite; fabric-aware demo scripts |
 | Gate 4: Audit Ready | In progress | Audit rules and trace APIs implemented |
 
 Ledger modes:
@@ -137,7 +137,7 @@ Deliverables:
 
 - Fabric MVP network with five org identities represented in config:
   - Food Department.
-  - Procurement/Miller.
+  - Procurement/FCI.
   - Godown/Warehouse.
   - FPS.
   - Auditor.
@@ -257,9 +257,9 @@ Seed dataset (defined in `mock/`):
 
 - One district.
 - One procurement centre.
-- One miller.
+- One FCI node.
 - One state godown.
-- One block godown.
+- One issue point.
 - One FPS.
 - One auditor.
 - One active ration card scenario ready for June 2026.
@@ -475,10 +475,20 @@ This order keeps backend and ledger foundations ahead of UI and avoids rework.
 
 ## Gate 3: FPS And Beneficiary Ready
 
-- FPS allocation and receipt work.
-- Beneficiary authentication simulation works.
-- Entitlement validation works.
-- Distribution writes receipt to ledger.
+- [x] FPS allocation and receipt work (issue point → FPS via `allocateToFps` / `recordFpsReceipt`, not direct ISSUE→FPS transfer).
+- [x] Per-leg Stage-II RO-lite authorization before each authorized dispatch leg.
+- [x] Beneficiary authentication simulation works.
+- [x] Entitlement validation works.
+- [x] Distribution writes receipt to ledger.
+- [x] Demo scripts support `--ledger=fabric` against a live stack with bearer auth.
+
+```mermaid
+flowchart LR
+  Issue[Issue point stock] --> Allocate[Allocate to FPS]
+  Allocate --> FpsReceipt[FPS receipt]
+  FpsReceipt --> Auth[Beneficiary auth]
+  Auth --> Distribute[Distribution + ledger tx]
+```
 
 ## Gate 4: Audit Ready
 

@@ -6,7 +6,7 @@
     "allocatedQtyKg": 1000,
     "receivedQtyKg": 1000,
     "month": "2026-06",
-    "sourceGodownId": "GODOWN-B-001",
+    "sourceGodownId": "ISSUE-001",
     "status": "RECEIVED"
   },
   {
@@ -15,7 +15,7 @@
     "commodity": "Rice",
     "allocatedQtyKg": 500,
     "month": "2026-07",
-    "sourceGodownId": "GODOWN-B-001",
+    "sourceGodownId": "ISSUE-001",
     "status": "ALLOCATED"
   }
 ]

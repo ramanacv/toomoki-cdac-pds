@@ -4,7 +4,7 @@
 
 The MVP stack is standardized on:
 
-- Hyperledger Fabric 3.1.x for live demo (`PDS_LEDGER_MODE=fabric`); in-process chaincode for default demo mode.
+- Hyperledger Fabric **2.5.13** for live demo (`PDS_LEDGER_MODE=fabric`); in-process chaincode for default demo mode.
 - Node.js 22 and NestJS 11 for backend APIs.
 - PostgreSQL for operational state.
 - React 19 and Vite 7 for frontend dashboard.
@@ -16,7 +16,7 @@ This stack matches the expert proposal and supports a practical 2-week MVP while
 
 Selected:
 
-- Hyperledger Fabric 3.1.x (2-org live demo stack).
+- Hyperledger Fabric 2.5.13 (2-org live demo stack; peer/orderer images in `docker-compose.fabric.yml`).
 - In-process chaincode runtime for default demo mode (`PDS_LEDGER_MODE=demo`).
 - Fabric CA for identities.
 - `@hyperledger/fabric-gateway` for Node.js (fabric mode).
@@ -113,7 +113,7 @@ Rationale:
 MVP:
 
 - Docker Compose with demo (default) and `--profile fabric` stacks.
-- Fabric 3.1.x network containers (fabric profile).
+- Fabric 2.5.13 network containers (fabric profile).
 - Backend API container (NestJS 11).
 - PostgreSQL container.
 - CouchDB containers (fabric profile).

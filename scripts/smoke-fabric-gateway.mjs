@@ -25,7 +25,7 @@ const main = async () => {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       stakeholderId: SMOKE_ID,
-      stakeholderType: 'DEPARTMENT',
+      stakeholderType: 'DISTRICT_SUPPLY_OFFICE',
       name: 'Gateway Smoke Test',
       district: 'Demo',
       licenseNo: SMOKE_ID,

@@ -29,9 +29,9 @@ The MVP demonstrates one complete commodity journey:
 
 ```text
 Procurement Centre
-  -> Miller
+  -> FCI
   -> State Godown
-  -> Block Godown
+  -> Issue Point
   -> Fair Price Shop
   -> Beneficiary Authentication
   -> Entitlement Validation

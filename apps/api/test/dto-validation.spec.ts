@@ -26,7 +26,7 @@ describe('module DTO validation', () => {
     expectValid(
       plainToInstance(StakeholderCreateDto, {
         stakeholderId: 'STK-001',
-        stakeholderType: StakeholderType.DEPARTMENT,
+        stakeholderType: StakeholderType.DISTRICT_SUPPLY_OFFICE,
         name: 'Demo',
         district: 'Demo',
         licenseNo: 'LIC-001',
@@ -80,7 +80,7 @@ describe('module DTO validation', () => {
         transferId: 'TR-001',
         lotId: 'LOT-001',
         fromOrg: 'PROC-001',
-        toOrg: 'MLL-001',
+        toOrg: 'FCI-001',
         dispatchedQtyKg: 50,
         vehicleNo: 'KA01AB0001'
       })
@@ -101,7 +101,7 @@ describe('module DTO validation', () => {
         commodity: 'Rice',
         allocatedQtyKg: 25,
         month: '2026-06',
-        sourceGodownId: 'GODOWN-B-001'
+        sourceGodownId: 'ISSUE-001'
       })
     );
   });
@@ -156,7 +156,7 @@ describe('module DTO validation', () => {
     expectValid(
       plainToInstance(ResolveAuditAlertDto, {
         resolvedBy: 'AUDIT-001',
-        resolutionNote: 'Verified against miller invoice.'
+        resolutionNote: 'Verified against issue-point receipt.'
       })
     );
     expectValid(plainToInstance(ResolveAuditAlertDto, { resolvedBy: 'AUDIT-001' }));

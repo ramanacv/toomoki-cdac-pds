@@ -75,4 +75,18 @@ describe('LotsPanel', () => {
 
     expect(onSelectLot).toHaveBeenCalledWith('LOT-PENDING');
   });
+
+  it('filters lots by commodity', async () => {
+    const user = userEvent.setup();
+    const mixedLots: CommodityLot[] = [
+      lot({ lotId: 'LOT-RICE', commodity: 'Rice' }),
+      lot({ lotId: 'LOT-WHEAT', commodity: 'Wheat' })
+    ];
+    render(<LotsPanel lots={mixedLots} />);
+
+    await user.click(screen.getByRole('tab', { name: /^Wheat/ }));
+
+    expect(screen.getByText('LOT-WHEAT')).toBeInTheDocument();
+    expect(screen.queryByText('LOT-RICE')).not.toBeInTheDocument();
+  });
 });

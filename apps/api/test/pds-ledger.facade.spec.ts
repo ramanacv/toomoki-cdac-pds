@@ -22,7 +22,7 @@ describe('PdsLedgerFacade', () => {
 
     fixture.facade.registerStakeholder({
       stakeholderId: 'FACADE-001',
-      stakeholderType: StakeholderType.DEPARTMENT,
+      stakeholderType: StakeholderType.DISTRICT_SUPPLY_OFFICE,
       name: 'Facade Department',
       district: 'Demo',
       licenseNo: 'LIC-FACADE-001',

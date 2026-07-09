@@ -15,9 +15,9 @@ describe('TransfersModule', () => {
 
     const transfer = controller.dispatch({
       transferId: 'TR-MOD-001',
-      lotId: 'LOT-KEROSENE-2026-001',
+      lotId: 'LOT-RICE-2026-001',
       fromOrg: 'PROC-001',
-      toOrg: 'GODOWN-S-001',
+      toOrg: 'FCI-001',
       dispatchedQtyKg: 250,
       vehicleNo: 'KA01TR0001'
     });

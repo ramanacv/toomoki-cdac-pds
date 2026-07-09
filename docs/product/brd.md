@@ -33,10 +33,10 @@ The core requirement is to enhance transparency, accountability, and efficiency 
 
 - Food and Civil Supplies Department.
 - Procurement centre.
-- Miller.
 - Transporter.
+- FCI.
 - State godown.
-- Block godown.
+- Issue point.
 - Fair Price Shop dealer.
 - Beneficiary.
 - Inspector or auditor.
@@ -57,7 +57,7 @@ ViksitPDS will maintain:
 The MVP demonstrates one complete commodity journey:
 
 ```text
-Procurement Centre -> Miller -> State Godown -> Block Godown -> FPS -> Beneficiary -> Audit
+Procurement Centre -> FCI -> State Godown -> Issue Point -> FPS -> Beneficiary -> Audit
 ```
 
 MVP example:

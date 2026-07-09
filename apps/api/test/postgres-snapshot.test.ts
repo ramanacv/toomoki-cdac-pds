@@ -19,7 +19,7 @@ describe('postgres snapshot mapper', () => {
       stakeholders: [
         {
           stakeholderId: 'S-1',
-          stakeholderType: StakeholderType.DEPARTMENT,
+          stakeholderType: StakeholderType.DISTRICT_SUPPLY_OFFICE,
           name: 'Food Department',
           district: 'Demo District',
           licenseNo: 'FD-1',

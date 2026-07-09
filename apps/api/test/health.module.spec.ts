@@ -15,7 +15,9 @@ describe('HealthModule', () => {
   });
 
   it('returns health status', () => {
-    expect(controller.health()).toEqual({ ok: true });
+    const result = controller.health();
+    expect(result.ok).toBe(true);
+    expect(result.ledgerMode).toBeDefined();
   });
 
   it('renders landing page html', () => {

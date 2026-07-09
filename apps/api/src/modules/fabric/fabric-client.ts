@@ -6,7 +6,6 @@ import type { LedgerEvent } from '@pds/shared-types';
 export type FabricOperationName =
   | 'RegisterStakeholder'
   | 'CreateCommodityLot'
-  | 'TransformLot'
   | 'DispatchLot'
   | 'ReceiveLot'
   | 'AllocateToFPS'
@@ -64,7 +63,6 @@ export const toFabricTransactionEnvelope = (event: LedgerEvent): FabricTransacti
   const operationByEventType: Record<LedgerEvent['eventType'], FabricOperationName> = {
     RegisterStakeholder: 'RegisterStakeholder',
     CreateCommodityLot: 'CreateCommodityLot',
-    TransformLot: 'TransformLot',
     AuthorizeMovement: 'RecordLedgerProof',
     DispatchLot: 'DispatchLot',
     ReceiveLot: 'ReceiveLot',

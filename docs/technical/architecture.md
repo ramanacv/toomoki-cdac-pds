@@ -165,7 +165,7 @@ MVP network (implemented):
 Documented consortium (5 orgs in `network-manifest.json`):
 
 - Org1: Food and Civil Supplies Department.
-- Org2: Procurement/Miller.
+- Org2: Procurement/FCI.
 - Org3: Godown/Warehouse.
 - Org4: Fair Price Shop.
 - Org5: Auditor/Inspection Authority.

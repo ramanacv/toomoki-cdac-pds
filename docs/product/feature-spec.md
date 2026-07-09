@@ -70,7 +70,7 @@ Acceptance criteria:
 
 Purpose: Record stock movement from sender to receiver.
 
-Primary actors: Procurement User, Miller, Godown Operator, Department Admin.
+Primary actors: Procurement User, FCI Operator, Godown Operator, DSO.
 
 Inputs: `transferId`, `lotId`, `fromOrg`, `toOrg`, `dispatchedQtyKg`, `vehicleNo`, `dispatchTimestamp`.
 
@@ -131,16 +131,16 @@ Acceptance criteria:
 
 ## FPS Allocation
 
-Purpose: Allocate stock from block godown to FPS.
+Purpose: Allocate stock from issue point to FPS.
 
-Primary actors: Department Admin, Block Godown Operator.
+Primary actors: Department Admin, Issue Point Operator.
 
 Inputs: `allocationId`, `fpsId`, `commodity`, `allocatedQtyKg`, `month`, `sourceGodownId`.
 
 Preconditions:
 
 - FPS is active.
-- Source godown has sufficient stock.
+- Issue point has sufficient stock.
 
 Main flow:
 
@@ -158,7 +158,7 @@ Error cases:
 
 Acceptance criteria:
 
-- Allocation cannot exceed block godown stock.
+- Allocation cannot exceed issue point stock.
 - FPS stock is not distributable until FPS receipt is confirmed.
 
 ## FPS Receipt

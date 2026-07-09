@@ -5,7 +5,7 @@
  * the organization layout in blockchain/fabric-network/organization-layout.json:
  *
  *   - ProcurementMillerMSP  → procurement center (CreateCommodityLot, DispatchLot from procurement)
- *   - GodownWarehouseMSP    → state/block godowns (ReceiveLot, AllocateToFPS, DispatchLot from godown)
+ *   - GodownWarehouseMSP    → state godowns / issue points (ReceiveLot, AllocateToFPS, DispatchLot from godown)
  *   - FairPriceShopMSP      → FPS (RecordDistribution, RegisterBeneficiaryHash)
  *   - FoodAndCivilSuppliesMSP → department / entitlement authority and demo orchestration identity
  *   - AuditAuthorityMSP     → auditors (RaiseAuditFlag, ResolveAuditFlag)
@@ -30,7 +30,6 @@ export type ClientIdentity = {
 const OPERATION_MSP_ALLOWLIST: Record<string, Set<string>> = {
   // Supply chain
   CreateCommodityLot: new Set(['ProcurementMillerMSP', 'FoodAndCivilSuppliesMSP']),
-  TransformLot: new Set(['ProcurementMillerMSP', 'FoodAndCivilSuppliesMSP']),
   DispatchLot: new Set(['ProcurementMillerMSP', 'GodownWarehouseMSP', 'FoodAndCivilSuppliesMSP']),
   ReceiveLot: new Set(['GodownWarehouseMSP', 'ProcurementMillerMSP', 'FoodAndCivilSuppliesMSP']),
   AllocateToFPS: new Set(['GodownWarehouseMSP', 'FoodAndCivilSuppliesMSP']),

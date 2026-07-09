@@ -20,7 +20,7 @@ export function AdminStakeholdersPage() {
               <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
                 {overview.stakeholders.byType.map((entry) => (
                   <EntityCard key={entry.stakeholderType} className="space-y-1">
-                    <strong className="block">{entry.stakeholderType}</strong>
+                    <strong className="block break-words">{entry.stakeholderType}</strong>
                     <span className="text-sm text-muted-foreground">{entry.count} registered</span>
                   </EntityCard>
                 ))}
@@ -31,7 +31,7 @@ export function AdminStakeholdersPage() {
               <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
                 {overview.stakeholders.byStatus.map((entry) => (
                   <EntityCard key={entry.status} className="space-y-1">
-                    <strong className="block">{entry.status}</strong>
+                    <strong className="block break-words">{entry.status}</strong>
                     <span className="text-sm text-muted-foreground">{entry.count} stakeholders</span>
                   </EntityCard>
                 ))}

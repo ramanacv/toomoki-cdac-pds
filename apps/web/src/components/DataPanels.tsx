@@ -3,13 +3,14 @@ import type {
   AuditAlert,
   AuthTransaction,
   CommodityLot,
+  CommodityName,
   DistributionTransaction,
   FPSAllocation,
   MonthlyEntitlement,
   Stakeholder,
   TransferOrder
 } from '@pds/shared-types';
-import { LotStatus } from '@pds/shared-types';
+import { COMMODITIES, LotStatus } from '@pds/shared-types';
 import { Panel } from '@/components/Panel';
 import { CardTopline, DefinitionList, EntityCard } from '@/components/Entity';
 import {
@@ -22,8 +23,9 @@ import {
 } from '@/components/ui/table';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { formatDateTime } from '@/lib/constants';
+import { formatDateTime, stakeholderParticipation } from '@/lib/constants';
 import { cn } from '@/lib/utils';
+import { ParticipationBadge, participationCardClass } from '@/components/ParticipationIndicator';
 
 const alertTone: Record<AuditAlert['riskLevel'], 'low' | 'medium' | 'high'> = {
   LOW: 'low',
@@ -32,27 +34,88 @@ const alertTone: Record<AuditAlert['riskLevel'], 'low' | 'medium' | 'high'> = {
 };
 
 export function StakeholdersPanel({ stakeholders }: { stakeholders: Stakeholder[] }) {
+  const sortedStakeholders = [...stakeholders].sort((left, right) => {
+    const leftActive = stakeholderParticipation(left.stakeholderType) === 'active' ? 0 : 1;
+    const rightActive = stakeholderParticipation(right.stakeholderType) === 'active' ? 0 : 1;
+    return leftActive - rightActive || left.name.localeCompare(right.name);
+  });
+  const activeCount = stakeholders.filter(
+    (stakeholder) => stakeholderParticipation(stakeholder.stakeholderType) === 'active'
+  ).length;
+
   return (
     <Panel
       eyebrow="Stakeholders"
       title="Demo operating network"
       pill={`${stakeholders.length} parties`}
+      lead={`${activeCount} workbench operators and ${stakeholders.length - activeCount} oversight or supporting parties.`}
     >
+      <div className="mb-4 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+        <span className="inline-flex items-center gap-2">
+          <ParticipationBadge mode="active" />
+          <span>Custody chain actions</span>
+        </span>
+        <span className="inline-flex items-center gap-2">
+          <ParticipationBadge mode="passive" />
+          <span>Policy, audit, or supporting role</span>
+        </span>
+      </div>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
-        {stakeholders.map((stakeholder) => (
-          <EntityCard key={stakeholder.stakeholderId} className="space-y-1">
-            <strong className="block">{stakeholder.name}</strong>
-            <span className="block text-sm text-muted-foreground">{stakeholder.stakeholderType}</span>
-            <p className="text-sm text-muted-foreground">{stakeholder.district}</p>
-            <code className="mt-3 block text-secondary">{stakeholder.stakeholderId}</code>
-          </EntityCard>
-        ))}
+        {sortedStakeholders.map((stakeholder) => {
+          const mode = stakeholderParticipation(stakeholder.stakeholderType);
+          return (
+            <EntityCard
+              key={stakeholder.stakeholderId}
+              className={cn('space-y-2', participationCardClass[mode])}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <strong className="block leading-snug">{stakeholder.name}</strong>
+                <ParticipationBadge mode={mode} />
+              </div>
+              <span className="block break-words text-sm text-muted-foreground">
+                {stakeholder.stakeholderType}
+              </span>
+              <p className="text-sm text-muted-foreground">{stakeholder.district}</p>
+              <code className="mt-1 block text-secondary">{stakeholder.stakeholderId}</code>
+            </EntityCard>
+          );
+        })}
       </div>
     </Panel>
   );
 }
 
 type LotStatusFilter = 'ALL' | 'PENDING' | 'RECEIVED' | 'SHORTAGE';
+type CommodityFilter = CommodityName | 'ALL';
+
+const commodityFilterCounts = <T,>(items: T[], getCommodity: (item: T) => string | undefined) => {
+  const counts = new Map<CommodityFilter, number>([['ALL', items.length]]);
+  for (const def of COMMODITIES) {
+    counts.set(def.name, items.filter((item) => getCommodity(item) === def.name).length);
+  }
+  return counts;
+};
+
+const CommodityFilterTabs = ({
+  value,
+  onChange,
+  counts
+}: {
+  value: CommodityFilter;
+  onChange: (value: CommodityFilter) => void;
+  counts: Map<CommodityFilter, number>;
+}) => (
+  <Tabs value={value} onValueChange={(next) => onChange(next as CommodityFilter)} className="mb-4">
+    <TabsList className="h-auto flex-wrap">
+      <TabsTrigger value="ALL">All ({counts.get('ALL') ?? 0})</TabsTrigger>
+      {COMMODITIES.map((commodity) => (
+        <TabsTrigger key={commodity.slug} value={commodity.name}>
+          {commodity.name} ({counts.get(commodity.name) ?? 0})
+        </TabsTrigger>
+      ))}
+    </TabsList>
+  </Tabs>
+);
 
 const isPendingLot = (lot: CommodityLot) => lot.status === LotStatus.CREATED || lot.status === LotStatus.DISPATCHED;
 const isShortageLot = (lot: CommodityLot) => lot.status === LotStatus.RECEIVED_WITH_SHORTAGE;
@@ -66,6 +129,9 @@ export function LotsPanel({
   onSelectLot?: (lotId: string) => void;
 }) {
   const [statusFilter, setStatusFilter] = useState<LotStatusFilter>('ALL');
+  const [commodityFilter, setCommodityFilter] = useState<CommodityFilter>('ALL');
+
+  const commodityCounts = commodityFilterCounts(lots, (lot) => lot.commodity);
 
   const counts = {
     ALL: lots.length,
@@ -75,6 +141,7 @@ export function LotsPanel({
   };
 
   const visibleLots = lots.filter((lot) => {
+    if (commodityFilter !== 'ALL' && lot.commodity !== commodityFilter) return false;
     if (statusFilter === 'PENDING') return isPendingLot(lot);
     if (statusFilter === 'RECEIVED') return isReceivedLot(lot);
     if (statusFilter === 'SHORTAGE') return isShortageLot(lot);
@@ -83,6 +150,7 @@ export function LotsPanel({
 
   return (
     <Panel eyebrow="Lots" title="Commodity lots overview" pill={`${lots.length} lots`}>
+      <CommodityFilterTabs value={commodityFilter} onChange={setCommodityFilter} counts={commodityCounts} />
       <Tabs value={statusFilter} onValueChange={(value) => setStatusFilter(value as LotStatusFilter)} className="mb-4">
         <TabsList>
           <TabsTrigger value="ALL">All ({counts.ALL})</TabsTrigger>
@@ -140,9 +208,15 @@ export function TransfersPanel({
   lots?: CommodityLot[];
 }) {
   const commodityByLotId = new Map(lots.map((lot) => [lot.lotId, lot.commodity]));
+  const [commodityFilter, setCommodityFilter] = useState<CommodityFilter>('ALL');
+  const transferCommodity = (transfer: TransferOrder) => commodityByLotId.get(transfer.lotId);
+  const commodityCounts = commodityFilterCounts(transfers, transferCommodity);
+  const visibleTransfers =
+    commodityFilter === 'ALL' ? transfers : transfers.filter((transfer) => transferCommodity(transfer) === commodityFilter);
 
   return (
     <Panel eyebrow="Transfers" title="Operational movement log" pill={`${transfers.length} records`}>
+      <CommodityFilterTabs value={commodityFilter} onChange={setCommodityFilter} counts={commodityCounts} />
       <Table>
         <TableHeader>
           <TableRow>
@@ -157,7 +231,7 @@ export function TransfersPanel({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {transfers.map((transfer) => (
+          {visibleTransfers.map((transfer) => (
             <TableRow key={transfer.transferId}>
               <TableCell className="font-semibold">{transfer.transferId}</TableCell>
               <TableCell>{commodityByLotId.get(transfer.lotId) ?? '—'}</TableCell>
@@ -184,6 +258,13 @@ export function TransfersPanel({
               </TableCell>
             </TableRow>
           ))}
+          {visibleTransfers.length === 0 && (
+            <TableRow>
+              <TableCell colSpan={8} className="text-center text-muted-foreground">
+                No transfers match this filter.
+              </TableCell>
+            </TableRow>
+          )}
         </TableBody>
       </Table>
     </Panel>
