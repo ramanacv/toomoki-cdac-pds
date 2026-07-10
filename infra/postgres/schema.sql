@@ -92,6 +92,7 @@ CREATE TABLE IF NOT EXISTS fps_allocations (
   commodity TEXT NOT NULL,
   allocated_qty_kg INTEGER NOT NULL CHECK (allocated_qty_kg > 0),
   received_qty_kg INTEGER,
+  shortage_qty_kg INTEGER,
   month TEXT NOT NULL,
   source_godown_id TEXT NOT NULL REFERENCES stakeholders(stakeholder_id) ON DELETE RESTRICT,
   status TEXT NOT NULL,

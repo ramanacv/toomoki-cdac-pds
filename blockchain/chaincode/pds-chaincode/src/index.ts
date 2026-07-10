@@ -716,10 +716,33 @@ export class PdsLedgerEngine {
       );
     }
 
-    const updated: FPSAllocation = { ...allocation, receivedQtyKg: input.receivedQtyKg, status: 'RECEIVED' };
+    const shortageQtyKg = Math.max(0, allocation.allocatedQtyKg - input.receivedQtyKg);
+    const updated: FPSAllocation = {
+      ...allocation,
+      receivedQtyKg: input.receivedQtyKg,
+      ...(shortageQtyKg > 0 ? { shortageQtyKg } : {}),
+      status: shortageQtyKg > 0 ? 'RECEIVED_WITH_SHORTAGE' : 'RECEIVED'
+    };
     this.allocations.set(updated.allocationId, updated);
     this.addStock(updated.fpsId, updated.commodity, input.receivedQtyKg);
     this.recordEvent('allocation', updated.allocationId, 'RecordFPSReceipt', updated);
+
+    if (shortageQtyKg > 0) {
+      this.raiseAuditFlag({
+        alertType: AlertType.SHORT_RECEIPT,
+        entityId: updated.allocationId,
+        message: `FPS received ${input.receivedQtyKg}kg against allocated ${allocation.allocatedQtyKg}kg`,
+        evidence: {
+          allocationId: updated.allocationId,
+          fpsId: updated.fpsId,
+          sourceGodownId: updated.sourceGodownId,
+          commodity: updated.commodity,
+          allocatedQtyKg: allocation.allocatedQtyKg,
+          receivedQtyKg: input.receivedQtyKg,
+          shortageQtyKg
+        }
+      });
+    }
     return updated;
   }
 

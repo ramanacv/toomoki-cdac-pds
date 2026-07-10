@@ -272,6 +272,9 @@ const findTransfer = (transfers: TransferOrder[], transferId: string): TransferO
 const isReceived = (transfer: TransferOrder | undefined): boolean =>
   transfer?.status === TransferStatus.RECEIVED || transfer?.status === TransferStatus.RECEIVED_WITH_SHORTAGE;
 
+const isAllocationReceived = (allocation: FPSAllocation | undefined): boolean =>
+  allocation?.status === 'RECEIVED' || allocation?.status === 'RECEIVED_WITH_SHORTAGE';
+
 const isAuthorizationEvent = (eventType: string): boolean =>
   eventType === 'RO_LITE_APPROVED' || eventType === 'AuthorizeMovement';
 
@@ -320,7 +323,7 @@ export const getSessionStockKg = (
   );
   const allocationInflow = sumKg(
     (context.allocations ?? [])
-      .filter((allocation) => allocation.fpsId === org && allocation.status === 'RECEIVED')
+      .filter((allocation) => allocation.fpsId === org && isAllocationReceived(allocation))
       .filter((allocation) => !relevantCommodity || allocation.commodity === relevantCommodity)
       .map((allocation) => allocation.receivedQtyKg ?? allocation.allocatedQtyKg)
   );
@@ -555,7 +558,7 @@ export function getWorkflowActions(context: WorkflowContext, commodity: string =
       });
       return actions;
     }
-    if (allocation.status !== 'RECEIVED') {
+    if (!isAllocationReceived(allocation)) {
       actions.push({
         id: `${fpsDelivery.allocationId}-receipt`,
         label: `Confirm FPS receipt for ${route.commodity}`,
@@ -574,7 +577,7 @@ export function getWorkflowActions(context: WorkflowContext, commodity: string =
 
   const fpsAllocationReceived = fpsDelivery
     ? context.allocations.some(
-        (item) => item.allocationId === fpsDelivery.allocationId && item.status === 'RECEIVED'
+        (item) => item.allocationId === fpsDelivery.allocationId && isAllocationReceived(item)
       )
     : true;
 
@@ -909,21 +912,51 @@ export function applyMockWorkflowAction(context: WorkflowContext, request: Workf
     if (!allocation) {
       throw new Error(`Allocation ${request.allocationId} not found`);
     }
-    if (allocation.status === 'RECEIVED') {
+    if (isAllocationReceived(allocation)) {
       throw new Error(`Allocation ${request.allocationId} already received`);
     }
     if (request.receivedQtyKg <= 0) {
       throw new Error('receivedQtyKg must be positive');
     }
+    if (request.receivedQtyKg > allocation.allocatedQtyKg) {
+      throw new Error(`receivedQtyKg cannot exceed allocatedQtyKg for allocation ${allocation.allocationId}`);
+    }
+    const shortageQtyKg = Math.max(0, allocation.allocatedQtyKg - request.receivedQtyKg);
     current.allocations = current.allocations.map((item) =>
       item.allocationId === request.allocationId
-        ? { ...item, status: 'RECEIVED' as const, receivedQtyKg: request.receivedQtyKg }
+        ? {
+            ...item,
+            status: shortageQtyKg > 0 ? ('RECEIVED_WITH_SHORTAGE' as const) : ('RECEIVED' as const),
+            receivedQtyKg: request.receivedQtyKg,
+            ...(shortageQtyKg > 0 ? { shortageQtyKg } : {})
+          }
         : item
     );
     event = evidence('RECORD_FPS_RECEIPT', 'allocation', request.allocationId, {
       allocationId: request.allocationId,
-      receivedQtyKg: request.receivedQtyKg
+      receivedQtyKg: request.receivedQtyKg,
+      ...(shortageQtyKg > 0 ? { shortageQtyKg } : {})
     });
+    if (shortageQtyKg > 0) {
+      current.alerts.push({
+        alertId: `ALERT-${request.allocationId}-SHORT`,
+        alertType: AlertType.SHORT_RECEIPT,
+        entityId: request.allocationId,
+        riskLevel: 'HIGH',
+        message: `${shortageQtyKg} kg short FPS receipt at ${allocation.fpsId}.`,
+        status: 'OPEN',
+        evidence: {
+          allocationId: request.allocationId,
+          fpsId: allocation.fpsId,
+          sourceGodownId: allocation.sourceGodownId,
+          commodity: allocation.commodity,
+          allocatedQtyKg: allocation.allocatedQtyKg,
+          receivedQtyKg: request.receivedQtyKg,
+          shortageQtyKg
+        },
+        createdAt: now()
+      });
+    }
     message = `FPS receipt recorded for ${request.allocationId}.`;
   } else if (request.kind === 'auth') {
     event = evidence(request.kind.toUpperCase(), 'workflow', request.kind, request as unknown as Record<string, unknown>);
@@ -954,7 +987,7 @@ export const getWorkflowProgress = (context: WorkflowContext, commodity: Commodi
       ? [
           context.allocations.some((item) => item.allocationId === route.fpsDelivery!.allocationId),
           context.allocations.some(
-            (item) => item.allocationId === route.fpsDelivery!.allocationId && item.status === 'RECEIVED'
+            (item) => item.allocationId === route.fpsDelivery!.allocationId && isAllocationReceived(item)
           )
         ]
       : []),

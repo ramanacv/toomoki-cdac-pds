@@ -955,8 +955,17 @@ describe('Quota rollover', () => {
       engine.getAlerts().some((alert) => alert.alertType === AlertType.UNAUTHORIZED_TRANSACTION && alert.entityId === 'ALLOC-RCPT-1')
     ).toBe(true);
     const received = engine.recordFpsReceipt({ allocationId: 'ALLOC-RCPT-1', receivedQtyKg: 180 });
-    expect(received.status).toBe('RECEIVED');
+    expect(received.status).toBe('RECEIVED_WITH_SHORTAGE');
     expect(received.receivedQtyKg).toBe(180);
+    expect(received.shortageQtyKg).toBe(20);
+    expect(
+      engine.getAlerts().some(
+        (alert) =>
+          alert.alertType === AlertType.SHORT_RECEIPT &&
+          alert.entityId === 'ALLOC-RCPT-1' &&
+          alert.evidence.shortageQtyKg === 20
+      )
+    ).toBe(true);
   });
 
   it('rejects non-positive distribution quantities', () => {

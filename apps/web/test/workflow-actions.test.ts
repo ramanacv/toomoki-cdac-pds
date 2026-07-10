@@ -227,6 +227,41 @@ describe('workflow actions', () => {
     expect(action?.request.kind).toBe('duplicate-distribute');
   });
 
+  it('raises an audit alert for short FPS receipt in mock workflow', () => {
+    const result = applyMockWorkflowAction(
+      {
+        ...emptyContext,
+        transfers: completedTransfers,
+        allocations: [
+          {
+            allocationId: 'ALLOC-POC-RICE-FPS',
+            fpsId: 'FPS-101',
+            commodity: 'Rice',
+            allocatedQtyKg: 300,
+            month: '2026-06',
+            sourceGodownId: 'ISSUE-001',
+            status: 'ALLOCATED'
+          }
+        ],
+        ledgerEvents: [roEvent]
+      },
+      { kind: 'fps-receipt', allocationId: 'ALLOC-POC-RICE-FPS', receivedQtyKg: 100 }
+    );
+
+    expect(result.context.allocations.find((item) => item.allocationId === 'ALLOC-POC-RICE-FPS')).toMatchObject({
+      receivedQtyKg: 100,
+      shortageQtyKg: 200,
+      status: 'RECEIVED_WITH_SHORTAGE'
+    });
+    expect(result.context.alerts).toContainEqual(
+      expect.objectContaining({
+        alertType: 'SHORT_RECEIPT',
+        entityId: 'ALLOC-POC-RICE-FPS',
+        evidence: expect.objectContaining({ shortageQtyKg: 200 })
+      })
+    );
+  });
+
   it('keeps the planned workflow free of removed stakeholder IDs', () => {
     const serialized = JSON.stringify(getWorkflowActions(emptyContext));
 

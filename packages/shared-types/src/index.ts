@@ -410,9 +410,10 @@ export type FPSAllocation = {
   commodity: string;
   allocatedQtyKg: number;
   receivedQtyKg?: number;
+  shortageQtyKg?: number;
   month: string;
   sourceGodownId: string;
-  status: 'ALLOCATED' | 'RECEIVED';
+  status: 'ALLOCATED' | 'RECEIVED' | 'RECEIVED_WITH_SHORTAGE';
 };
 
 export type MonthlyEntitlement = {

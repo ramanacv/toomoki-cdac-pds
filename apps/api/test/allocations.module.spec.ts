@@ -29,4 +29,36 @@ describe('AllocationsModule', () => {
     expect(receipt.receivedQtyKg).toBe(75);
     expect(controller.allocation('ALLOC-MOD-001').status).toBe('RECEIVED');
   });
+
+  it('raises a short-receipt alert when FPS receives less than allocated', async () => {
+    fixture = await createDemoLedgerFixture();
+    moveLotToIssuePoint(fixture.facade);
+    controller = await createControllerWithFacade(AllocationsController, fixture.facade);
+
+    await controller.allocate({
+      allocationId: 'ALLOC-MOD-SHORT',
+      fpsId: 'FPS-101',
+      commodity: 'Rice',
+      allocatedQtyKg: 75,
+      month: '2026-06',
+      sourceGodownId: 'ISSUE-001'
+    });
+
+    const receipt = await controller.fpsReceipt('ALLOC-MOD-SHORT', { receivedQtyKg: 25 });
+
+    expect(receipt).toMatchObject({
+      allocationId: 'ALLOC-MOD-SHORT',
+      receivedQtyKg: 25,
+      shortageQtyKg: 50,
+      status: 'RECEIVED_WITH_SHORTAGE'
+    });
+    expect(
+      fixture.facade.getAlerts().some(
+        (alert) =>
+          alert.alertType === 'SHORT_RECEIPT' &&
+          alert.entityId === 'ALLOC-MOD-SHORT' &&
+          alert.evidence.shortageQtyKg === 50
+      )
+    ).toBe(true);
+  });
 });

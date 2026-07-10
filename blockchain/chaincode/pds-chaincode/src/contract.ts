@@ -375,18 +375,20 @@ export class PdsDataContract extends Contract {
     const txId = ctx.stub.getTxID();
     const isoTimestamp = getTxTimestamp(ctx);
     const payload = { ...JSON.parse(payloadJson), receiveTimestamp: isoTimestamp };
-    const [allocations, stock, events] = await Promise.all([
+    const [allocations, stock, alerts, events] = await Promise.all([
       loadCollection<FPSAllocation>(ctx, 'allocations'),
       loadCollection<[StockKey, number]>(ctx, 'stock'),
+      loadCollection<AuditAlert>(ctx, 'alerts'),
       loadCollection<LedgerEvent>(ctx, 'events')
     ]);
-    const engine = buildEngine({ allocations, stock, events });
+    const engine = buildEngine({ allocations, stock, alerts, events });
     const result = engine.recordFpsReceipt(payload);
     const state = engine.exportState();
     const allocationKey = ctx.stub.createCompositeKey('allocation', [result.allocationId]);
     await Promise.all([
       saveCollection(ctx, 'allocations', state.allocations),
       saveCollection(ctx, 'stock', state.stock),
+      saveCollection(ctx, 'alerts', state.alerts),
       saveCollection(ctx, 'events', state.events),
       ctx.stub.putState(allocationKey, Buffer.from(JSON.stringify({ ...result, fabricTxId: txId })))
     ]);
