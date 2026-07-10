@@ -59,7 +59,7 @@ export const participationLabel: Record<ParticipationMode, string> = {
 
 export const stageHints: Record<'I' | 'II', string> = {
   I: 'Stage-I: government movement before the issue point (procurement to FCI to depot).',
-  II: 'Stage-II: RO-authorized movement from the issue point toward FPS allocation.'
+  II: 'Stage-II: RO-authorized movement from state depot to issue point before FPS allocation.'
 };
 
 export const scenarioOptions: Array<{ id: DemoScenario; label: string; short: string }> = [

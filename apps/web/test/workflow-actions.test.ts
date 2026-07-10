@@ -73,6 +73,58 @@ describe('workflow actions', () => {
     expect(getRoleQueue(emptyContext, 'CONTROL_OFFICE')).toHaveLength(0);
   });
 
+  it('requires FCI receipt before FCI can dispatch downstream', () => {
+    const context: WorkflowContext = {
+      ...emptyContext,
+      transfers: [
+        {
+          transferId: 'TR-POC-RICE-PROC-FCI',
+          lotId: 'LOT-RICE-2026-001',
+          fromOrg: 'PROC-001',
+          toOrg: 'FCI-001',
+          dispatchedQtyKg: demoQuantities.stageOneTransferKg,
+          vehicleNo: 'KA01AB2000',
+          status: TransferStatus.DISPATCHED,
+          dispatchTimestamp: '2026-06-09T10:00:00.000Z'
+        }
+      ]
+    };
+
+    const action = getNextWorkflowAction(context);
+
+    expect(action?.id).toBe('TR-POC-RICE-PROC-FCI-receive');
+    expect(action?.request.kind).toBe('receive');
+    expect(getRoleQueue(context, 'FCI_DEPOT')[0]?.id).toBe('TR-POC-RICE-PROC-FCI-receive');
+    expect(getRoleQueue(context, 'DEPOT')).toHaveLength(0);
+  });
+
+  it('requires state depot receipt before Stage-II approval or issue-point dispatch', () => {
+    const context: WorkflowContext = {
+      ...emptyContext,
+      transfers: [
+        completedTransfers[0]!,
+        {
+          transferId: 'TR-POC-RICE-FCI-DEPOT',
+          lotId: 'LOT-RICE-2026-001',
+          fromOrg: 'FCI-001',
+          toOrg: 'GODOWN-S-001',
+          dispatchedQtyKg: demoQuantities.stageOneTransferKg,
+          vehicleNo: 'KA01AB2000',
+          status: TransferStatus.DISPATCHED,
+          dispatchTimestamp: '2026-06-09T10:00:00.000Z'
+        }
+      ]
+    };
+
+    const action = getNextWorkflowAction(context);
+
+    expect(action?.id).toBe('TR-POC-RICE-FCI-DEPOT-receive');
+    expect(action?.request.kind).toBe('receive');
+    expect(getRoleQueue(context, 'DEPOT')[0]?.id).toBe('TR-POC-RICE-FCI-DEPOT-receive');
+    expect(getRoleQueue(context, 'CONTROL_OFFICE')).toHaveLength(0);
+    expect(getRoleQueue(context, 'FCI_DEPOT')).toHaveLength(0);
+  });
+
   it('queues DSO approval when stock reaches the state godown', () => {
     const readyContext: WorkflowContext = {
       ...emptyContext,
@@ -103,6 +155,38 @@ describe('workflow actions', () => {
     expect(action?.id).toBe('TR-POC-RICE-DEPOT-ISSUE');
     expect(action?.request.kind).toBe('dispatch');
     expect(getRoleQueue(result.context, 'DEPOT')).toHaveLength(1);
+  });
+
+  it('requires issue-point receipt before FPS allocation', () => {
+    const context: WorkflowContext = {
+      ...emptyContext,
+      transfers: [
+        completedTransfers[0]!,
+        completedTransfers[1]!,
+        {
+          transferId: 'TR-POC-RICE-DEPOT-ISSUE',
+          lotId: 'LOT-RICE-2026-001',
+          fromOrg: 'GODOWN-S-001',
+          toOrg: 'ISSUE-001',
+          dispatchedQtyKg: demoQuantities.stageOneTransferKg,
+          vehicleNo: 'KA01AB2000',
+          status: TransferStatus.DISPATCHED,
+          dispatchTimestamp: '2026-06-09T10:00:00.000Z',
+          stage: 'II',
+          authorizedBy: 'DSO-001',
+          approvalStatus: 'APPROVED',
+          roRef: 'RO-DSO-POC-001'
+        }
+      ],
+      ledgerEvents: [roEvent]
+    };
+
+    const action = getNextWorkflowAction(context);
+
+    expect(action?.id).toBe('TR-POC-RICE-DEPOT-ISSUE-receive');
+    expect(action?.request.kind).toBe('receive');
+    expect(getRoleQueue(context, 'DEPOT')[0]?.id).toBe('TR-POC-RICE-DEPOT-ISSUE-receive');
+    expect(getRoleQueue(context, 'FPS')).toHaveLength(0);
   });
 
   it('offers FPS allocation after issue point receipt', () => {

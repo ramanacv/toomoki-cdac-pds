@@ -60,6 +60,49 @@ type EditableQuantity = {
   apply: (qtyKg: number) => WorkflowActionRequest;
 };
 
+type ActionContextEntry = { label: string; value: string };
+
+function getActionContextEntries(
+  request: WorkflowActionRequest,
+  transfers: TransferOrder[],
+  allocations: FPSAllocation[]
+): ActionContextEntry[] {
+  switch (request.kind) {
+    case 'dispatch':
+      return [
+        { label: 'Acting as', value: request.payload.fromOrg },
+        { label: 'Destination', value: request.payload.toOrg }
+      ];
+    case 'receive': {
+      const transfer = transfers.find((item) => item.transferId === request.transferId);
+      return transfer
+        ? [
+            { label: 'Acting as', value: transfer.toOrg },
+            { label: 'Receiving from', value: transfer.fromOrg }
+          ]
+        : [];
+    }
+    case 'allocate':
+      return [
+        { label: 'Acting as', value: request.payload.sourceGodownId },
+        { label: 'Destination', value: request.payload.fpsId }
+      ];
+    case 'fps-receipt': {
+      const allocation = allocations.find((item) => item.allocationId === request.allocationId);
+      return allocation
+        ? [
+            { label: 'Acting as', value: allocation.fpsId },
+            { label: 'Receiving from', value: allocation.sourceGodownId }
+          ]
+        : [];
+    }
+    case 'authorize-movement':
+      return [{ label: 'Acting as', value: request.authorizedBy }];
+    default:
+      return [];
+  }
+}
+
 // Only the actions where an operator would realistically adjust the figure
 // (dispatch, receive, FPS receipt, delivery) expose an editable quantity.
 // The duplicate-claim probe keeps its fixed amount since its narrative is
@@ -323,6 +366,7 @@ export function WorkflowActionPanel({
                     const quantityValue = quantityInputs[action.id] ?? (editable ? String(editable.defaultValue) : '');
                     const stockInfo = getActionStockInfo(request, context, { apiOnline, stockPositions });
                     const quantityLimit = editable ? getQuantityLimit(action, editable) : undefined;
+                    const actionContextEntries = getActionContextEntries(request, transfers, allocations);
 
                     return (
                       <div key={action.id} className="rounded-2xl border border-border bg-card/70 p-4">
@@ -333,6 +377,9 @@ export function WorkflowActionPanel({
                           </Badge>
                         </div>
                         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{action.detail}</p>
+                        {actionContextEntries.length > 0 && (
+                          <DefinitionList className="mt-3" entries={actionContextEntries} />
+                        )}
                         {role !== 'MANAGEMENT' && !actionAllowed && (
                           <DefinitionList
                             className="mt-3"
@@ -346,7 +393,6 @@ export function WorkflowActionPanel({
                           <DefinitionList
                             className="mt-3"
                             entries={[
-                              { label: 'From', value: receiveTransfer.fromOrg },
                               { label: 'Dispatch time', value: formatDateTime(receiveTransfer.dispatchTimestamp) },
                               { label: 'Receive time', value: formatDateTime(receiveTransfer.receiveTimestamp) }
                             ]}

@@ -157,6 +157,13 @@ const roleForSender = (fromOrg: string): DemoRole[] => {
   return ['GODOWN'];
 };
 
+const roleForReceiver = (toOrg: string): DemoRole[] => {
+  if (toOrg === 'FCI-001') return ['FCI_DEPOT'];
+  if (toOrg === 'GODOWN-S-001' || toOrg === 'ISSUE-001') return ['DEPOT'];
+  if (toOrg === 'FPS-101') return ['FPS'];
+  return ['GODOWN'];
+};
+
 const vehicleForLeg = (leg: CommodityRouteLeg, index: number): string =>
   leg.id.endsWith('PROC-FCI')
     ? 'KA01AB1999'
@@ -174,11 +181,11 @@ const labelForLeg = (template: CommodityRouteTemplate, leg: CommodityRouteLeg): 
       'TR-POC-PROC-FCI': 'Dispatch procurement stock to FCI',
       'TR-POC-RICE-PROC-FCI': 'Dispatch procurement stock to FCI',
       'TR-POC-RICE-FCI-DEPOT': 'Stage-I dispatch to state depot',
-      'TR-POC-RICE-DEPOT-ISSUE': 'Stage-II dispatch to issue point'
+      'TR-POC-RICE-DEPOT-ISSUE': 'Stage-II state depot dispatch to issue point'
     };
     return labels[leg.id] ?? `Dispatch ${template.commodity}`;
   }
-  if (leg.toOrg === 'ISSUE-001') return `Dispatch ${template.commodity} to issue point`;
+  if (leg.toOrg === 'ISSUE-001') return `State depot dispatch ${template.commodity} to issue point`;
   if (leg.toOrg === 'FPS-101') return `Allocate ${template.commodity} to FPS`;
   if (leg.toOrg === 'GODOWN-S-001') return `Dispatch ${template.commodity} to state depot`;
   if (leg.toOrg === 'FCI-001') return `Dispatch ${template.commodity} to FCI`;
@@ -191,12 +198,12 @@ const detailForLeg = (template: CommodityRouteTemplate, leg: CommodityRouteLeg):
       'TR-POC-PROC-FCI': 'Procurement centre hands the seeded lot to FCI before central buffer movement.',
       'TR-POC-RICE-PROC-FCI': 'Procurement centre hands the seeded lot to FCI before state lifting.',
       'TR-POC-RICE-FCI-DEPOT': 'Move lifted stock from FCI to the state depot.',
-      'TR-POC-RICE-DEPOT-ISSUE': 'RO-lite approval is required before this movement can dispatch.'
+      'TR-POC-RICE-DEPOT-ISSUE': 'State depot dispatches DSO/TSO-approved stock to the issue point. Issue-point receipt is the next checkpoint after this dispatch is recorded.'
     };
     return details[leg.id] ?? `Move ${template.commodity} stock through the configured route.`;
   }
   return leg.requiresAuthorization
-    ? `RO-lite approval is required before this ${template.commodity} Stage-II movement.`
+    ? `State depot dispatches DSO/TSO-approved ${template.commodity} stock to the issue point. Issue-point receipt is the next checkpoint after this dispatch is recorded.`
     : `Move ${template.commodity} stock through the configured route.`;
 };
 
@@ -515,7 +522,7 @@ export function getWorkflowActions(context: WorkflowContext, commodity: string =
         id: `${leg.id}-receive`,
         label: `Confirm receipt at ${leg.toOrg}`,
         detail: `Record stock received against ${transfer.dispatchedQtyKg} kg dispatched.`,
-        roles: leg.toOrg === 'FPS-101' ? ['FPS'] : ['DEPOT', 'FCI_DEPOT', 'GODOWN'],
+        roles: roleForReceiver(leg.toOrg),
         status: 'dispatched',
         request: { kind: 'receive', transferId: leg.id, receivedQtyKg: transfer.dispatchedQtyKg }
       });

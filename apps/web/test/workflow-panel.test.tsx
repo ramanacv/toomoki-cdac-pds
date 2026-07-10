@@ -93,7 +93,7 @@ describe('WorkflowActionPanel', () => {
     );
 
     const riceGroup = within(screen.getByTestId('commodity-group-Rice'));
-    expect(riceGroup.getByText(/Approve: Stage-II dispatch to issue point/)).toBeInTheDocument();
+    expect(riceGroup.getByText(/Approve: Stage-II state depot dispatch to issue point/)).toBeInTheDocument();
     expect(riceGroup.getByText('TR-POC-RICE-DEPOT-ISSUE')).toBeInTheDocument();
   });
 
@@ -162,6 +162,66 @@ describe('WorkflowActionPanel', () => {
 
     expect(screen.getByText('Allocate Rice stock to FPS')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Run action' })).toBeEnabled();
+  });
+
+  it('distinguishes depot sender context from issue-point receipt context', () => {
+    const roEvent = {
+      ledgerTxId: 'TX-RO',
+      entityType: 'workflow' as const,
+      entityId: 'TR-POC-RICE-DEPOT-ISSUE',
+      eventType: 'RO_LITE_APPROVED',
+      payload: {},
+      timestamp: '2026-06-30T10:00:00.000Z'
+    };
+    const { rerender } = render(
+      <WorkflowActionPanel
+        {...baseProps}
+        {...depotReady}
+        ledgerEvents={[roEvent]}
+        apiOnline={false}
+        role="DEPOT"
+      />
+    );
+
+    let riceGroup = within(screen.getByTestId('commodity-group-Rice'));
+    expect(riceGroup.getByText('Stage-II state depot dispatch to issue point')).toBeInTheDocument();
+    expect(riceGroup.getByText('Acting as')).toBeInTheDocument();
+    expect(riceGroup.getByText('GODOWN-S-001')).toBeInTheDocument();
+    expect(riceGroup.getByText('Destination')).toBeInTheDocument();
+    expect(riceGroup.getByText('ISSUE-001')).toBeInTheDocument();
+
+    rerender(
+      <WorkflowActionPanel
+        {...baseProps}
+        transfers={[
+          ...depotReady.transfers,
+          {
+            transferId: 'TR-POC-RICE-DEPOT-ISSUE',
+            lotId: 'LOT-RICE-2026-001',
+            fromOrg: 'GODOWN-S-001',
+            toOrg: 'ISSUE-001',
+            dispatchedQtyKg: demoQuantities.stageOneTransferKg,
+            vehicleNo: 'KA01AB1000',
+            status: TransferStatus.DISPATCHED,
+            dispatchTimestamp: '2026-06-30T10:00:00.000Z',
+            stage: 'II',
+            authorizedBy: 'DSO-001',
+            approvalStatus: 'APPROVED',
+            roRef: 'RO-DSO-POC-001'
+          }
+        ]}
+        ledgerEvents={[roEvent]}
+        apiOnline={false}
+        role="DEPOT"
+      />
+    );
+
+    riceGroup = within(screen.getByTestId('commodity-group-Rice'));
+    expect(riceGroup.getByText('Confirm receipt at ISSUE-001')).toBeInTheDocument();
+    expect(riceGroup.getByText('Acting as')).toBeInTheDocument();
+    expect(riceGroup.getByText('ISSUE-001')).toBeInTheDocument();
+    expect(riceGroup.getByText('Receiving from')).toBeInTheDocument();
+    expect(riceGroup.getByText('GODOWN-S-001')).toBeInTheDocument();
   });
 
   it('prefills the FPS receipt quantity from the allocated amount', () => {
