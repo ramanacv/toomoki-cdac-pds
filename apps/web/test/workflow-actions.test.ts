@@ -172,4 +172,53 @@ describe('workflow actions', () => {
       transferId: 'TR-POC-WHEAT-DEPOT-ISSUE'
     });
   });
+
+  it('derives workbench transfer ids from the active lot series after reset', () => {
+    const seriesId = 'R20260710-165432-ab12';
+    const seriesContext: WorkflowContext = {
+      ...emptyContext,
+      lots: demoLots.map((lot) =>
+        lot.commodity === 'Kerosene'
+          ? {
+              ...lot,
+              lotId: `LOT-KEROSENE-${seriesId}-001`
+            }
+          : lot
+      )
+    };
+
+    const action = getWorkflowActions(seriesContext, 'Kerosene')[0];
+    expect(action?.id).toBe(`TR-${seriesId}-KEROSENE-PROC-FCI`);
+    expect(action?.request).toMatchObject({
+      kind: 'dispatch',
+      payload: {
+        transferId: `TR-${seriesId}-KEROSENE-PROC-FCI`,
+        lotId: `LOT-KEROSENE-${seriesId}-001`
+      }
+    });
+  });
+
+  it('keeps low-stock dispatches runnable when the requested quantity can be reduced', () => {
+    const context: WorkflowContext = {
+      ...emptyContext,
+      lots: demoLots.map((lot) =>
+        lot.commodity === 'Kerosene'
+          ? {
+              ...lot,
+              quantityKg: 500
+            }
+          : lot
+      )
+    };
+
+    const action = getWorkflowActions(context, 'Kerosene')[0];
+
+    expect(action?.status).toBe('pending');
+    expect(action?.request).toMatchObject({
+      kind: 'dispatch',
+      payload: {
+        dispatchedQtyKg: demoQuantities.stageOneTransferKg
+      }
+    });
+  });
 });

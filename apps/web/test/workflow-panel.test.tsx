@@ -76,6 +76,9 @@ describe('WorkflowActionPanel', () => {
     const riceGroup = within(screen.getByTestId('commodity-group-Rice'));
     expect(screen.getByText('Mock workflow')).toBeInTheDocument();
     expect(riceGroup.getByText('Dispatch procurement stock to FCI')).toBeInTheDocument();
+    expect(riceGroup.getByText('Available stock')).toBeInTheDocument();
+    expect(riceGroup.getByText('Dispatch qty')).toBeInTheDocument();
+    expect(riceGroup.queryByText('Required')).not.toBeInTheDocument();
     expect(riceGroup.getByLabelText('Dispatch quantity (kg)')).toHaveValue(demoQuantities.stageOneTransferKg);
   });
 
@@ -183,6 +186,10 @@ describe('WorkflowActionPanel', () => {
     );
 
     expect(screen.getByLabelText('Received quantity (kg)')).toHaveValue(demoQuantities.fpsAllocationKg);
+    expect(screen.getByLabelText('Received quantity (kg)')).toHaveAttribute(
+      'max',
+      demoQuantities.fpsAllocationKg.toString()
+    );
   });
 
   it('lets management inspect but not execute operational actions', () => {

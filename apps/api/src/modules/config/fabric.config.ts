@@ -20,6 +20,7 @@ export type FabricRuntimeConfig = {
   peerTlsCertPath: string;
   peerHostAlias: string;
   mspId: string;
+  endorsingOrgs: string[];
   certPath: string;
   keyPath: string;
 };
@@ -91,6 +92,10 @@ export const loadFabricRuntimeConfig = (): FabricRuntimeConfig => {
   const channel = process.env.PDS_FABRIC_CHANNEL ?? contract.channel;
   const chaincode = process.env.PDS_FABRIC_CHAINCODE ?? contract.chaincode;
   const mspId = process.env.PDS_FABRIC_MSP_ID ?? clientOrgToMspId(clientOrg);
+  const endorsingOrgs =
+    process.env.PDS_FABRIC_ENDORSING_ORGS?.split(',')
+      .map((item) => item.trim())
+      .filter(Boolean) ?? [mspId];
   const cryptoBase = resolveFabricNetworkPath('crypto');
 
   return {
@@ -110,6 +115,7 @@ export const loadFabricRuntimeConfig = (): FabricRuntimeConfig => {
     peerTlsCertPath: process.env.PDS_FABRIC_PEER_TLS_CERT_PATH ?? resolve(cryptoBase, 'peerOrganizations/food.example.com/peers/peer0.food.example.com/tls/ca.crt'),
     peerHostAlias: process.env.PDS_FABRIC_PEER_HOST_ALIAS ?? 'peer0.food.example.com',
     mspId,
+    endorsingOrgs,
     certPath: process.env.PDS_FABRIC_CERT_PATH ?? resolve(cryptoBase, 'peerOrganizations/food.example.com/users/User1@food.example.com/msp/signcerts/User1@food.example.com-cert.pem'),
     keyPath: process.env.PDS_FABRIC_KEY_PATH ?? resolve(cryptoBase, 'peerOrganizations/food.example.com/users/User1@food.example.com/msp/keystore')
   };

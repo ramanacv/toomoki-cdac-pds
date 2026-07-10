@@ -19,7 +19,11 @@ import {
   AuthResult,
   TransferStatus,
   getCommodityRouteTemplate,
-  isCommodityRouteEdgeAllowed
+  isCommodityRouteEdgeAllowed,
+  seriesIdFromLotId,
+  buildCommodityRouteForSeries,
+  buildDistributionId,
+  INITIAL_DEMO_SERIES_ID
 } from '@pds/shared-types';
 import { demoQuantities } from '@pds/fixtures';
 import type { DemoRole } from './demo-model.js';
@@ -192,15 +196,43 @@ const detailForLeg = (template: CommodityRouteTemplate, leg: CommodityRouteLeg):
     return details[leg.id] ?? `Move ${template.commodity} stock through the configured route.`;
   }
   return leg.requiresAuthorization
-    ? `${template.commodity} follows a direct non-milling route; RO-lite approval is required before this Stage-II movement.`
-    : `${template.commodity} follows a direct non-milling route for this custody handoff.`;
+    ? `RO-lite approval is required before this ${template.commodity} Stage-II movement.`
+    : `Move ${template.commodity} stock through the configured route.`;
 };
 
-export const getWorkflowRoute = (commodity: string = DEFAULT_WORKFLOW_COMMODITY): CommodityRouteTemplate =>
-  getCommodityRouteTemplate(commodity) ?? getCommodityRouteTemplate(DEFAULT_WORKFLOW_COMMODITY)!;
+export const resolveSourceLotForCommodity = (
+  lots: CommodityLot[],
+  commodity: string
+): CommodityLot | undefined => {
+  const matches = lots.filter((lot) => lot.commodity === commodity);
+  if (matches.length === 0) {
+    return undefined;
+  }
+  const ranked = [...matches].sort((left, right) => right.lotId.localeCompare(left.lotId));
+  return ranked.find((lot) => /-\d{3}$/.test(lot.lotId)) ?? ranked[0];
+};
 
-export const getPlannedLegs = (commodity: string = DEFAULT_WORKFLOW_COMMODITY): PlannedLeg[] => {
-  const template = getWorkflowRoute(commodity);
+export const getWorkflowRoute = (
+  commodity: string = DEFAULT_WORKFLOW_COMMODITY,
+  lots: CommodityLot[] = []
+): CommodityRouteTemplate => {
+  const fallback = getCommodityRouteTemplate(commodity) ?? getCommodityRouteTemplate(DEFAULT_WORKFLOW_COMMODITY)!;
+  if (lots.length === 0) {
+    return fallback;
+  }
+  const sourceLot = resolveSourceLotForCommodity(lots, commodity);
+  if (!sourceLot) {
+    return fallback;
+  }
+  const seriesId = seriesIdFromLotId(sourceLot.lotId);
+  return buildCommodityRouteForSeries(commodity, seriesId, sourceLot.lotId) ?? fallback;
+};
+
+export const getPlannedLegs = (
+  commodity: string = DEFAULT_WORKFLOW_COMMODITY,
+  lots: CommodityLot[] = []
+): PlannedLeg[] => {
+  const template = getWorkflowRoute(commodity, lots);
   return template.legs.map((leg, index) => ({
     id: leg.id,
     lotId: leg.lot === 'transformed' ? template.activeLotId : template.sourceLotId,
@@ -247,7 +279,7 @@ const txId = (prefix: string, id: string) => `MOCK-${prefix}-${id}`;
 const sumKg = (values: number[]): number => values.reduce((total, value) => total + value, 0);
 
 const isSessionTransfer = (transfer: TransferOrder): boolean =>
-  transfer.transferId.startsWith('TR-POC');
+  transfer.transferId.startsWith('TR-') && !transfer.transferId.startsWith('TR-SEED');
 
 const getTransferCommodity = (
   context: Pick<WorkflowContext, 'lots'>,
@@ -304,6 +336,13 @@ export type StockPosition = {
   quantityKg: number;
 };
 
+export type ActionStockInfo = {
+  availableLabel: string;
+  availableKg: number;
+  requiredLabel: string;
+  requiredKg: number;
+};
+
 const lookupLiveStockKg = (
   stockPositions: StockPosition[] | undefined,
   org: string,
@@ -324,7 +363,7 @@ export function getActionStockInfo(
     apiOnline: boolean;
     stockPositions?: StockPosition[];
   }
-): { availableKg: number; requiredKg: number } | null {
+): ActionStockInfo | null {
   switch (request.kind) {
     case 'dispatch': {
       const commodity = context.lots.find((lot) => lot.lotId === request.payload.lotId)?.commodity;
@@ -332,11 +371,23 @@ export function getActionStockInfo(
         options.apiOnline && options.stockPositions
           ? (lookupLiveStockKg(options.stockPositions, request.payload.fromOrg, commodity) ?? 0)
           : getSessionStockKg(context, request.payload.fromOrg, request.payload.lotId, commodity);
-      return { availableKg, requiredKg: request.payload.dispatchedQtyKg };
+      return {
+        availableLabel: 'Available stock',
+        availableKg,
+        requiredLabel: 'Dispatch qty',
+        requiredKg: request.payload.dispatchedQtyKg
+      };
     }
     case 'receive': {
       const transfer = context.transfers.find((item) => item.transferId === request.transferId);
-      return transfer ? { availableKg: transfer.dispatchedQtyKg, requiredKg: request.receivedQtyKg } : null;
+      return transfer
+        ? {
+            availableLabel: 'Dispatched qty',
+            availableKg: transfer.dispatchedQtyKg,
+            requiredLabel: 'Receipt qty',
+            requiredKg: request.receivedQtyKg
+          }
+        : null;
     }
     default:
       return null;
@@ -391,8 +442,11 @@ export function getAllCommoditiesRoleQueue(context: WorkflowContext, role: DemoR
 }
 
 export function getWorkflowActions(context: WorkflowContext, commodity: string = DEFAULT_WORKFLOW_COMMODITY): WorkflowActionSpec[] {
-  const route = getWorkflowRoute(commodity);
-  const plannedLegs = getPlannedLegs(route.commodity);
+  const route = getWorkflowRoute(commodity, context.lots);
+  const plannedLegs = getPlannedLegs(route.commodity, context.lots);
+  const seriesId = seriesIdFromLotId(route.sourceLotId);
+  const seriesToken = seriesId === INITIAL_DEMO_SERIES_ID ? 'POC' : seriesId;
+  const slug = commodityDefinition(route.commodity).slug;
   const actions: WorkflowActionSpec[] = [];
 
   for (let legIndex = 0; legIndex < plannedLegs.length; legIndex += 1) {
@@ -422,15 +476,17 @@ export function getWorkflowActions(context: WorkflowContext, commodity: string =
 
     if (!transfer) {
       const availableStock = getSessionStockKg(context, leg.fromOrg, leg.lotId, leg.commodity);
-      const insufficientStock = !missingApproval && availableStock < leg.qtyKg;
-      const blocked = missingApproval || insufficientStock;
+      const depletedStock = !missingApproval && availableStock <= 0;
+      const blocked = missingApproval || depletedStock;
       actions.push({
         id: leg.id,
         label: leg.label,
         detail: missingApproval
           ? `${leg.detail} Approval is still missing.`
-          : insufficientStock
-            ? `${leg.detail} Insufficient stock at ${leg.fromOrg} (${availableStock} kg available, ${leg.qtyKg} kg required).`
+          : depletedStock
+            ? `${leg.detail} No stock is currently available at ${leg.fromOrg}.`
+            : availableStock < leg.qtyKg
+              ? `${leg.detail} ${availableStock} kg is available now, so reduce the dispatch quantity before running this action.`
             : leg.detail,
         roles: leg.roles,
         status: blocked ? 'blocked' : 'pending',
@@ -515,10 +571,9 @@ export function getWorkflowActions(context: WorkflowContext, commodity: string =
       )
     : true;
 
-  const distributionId = route.commodity === 'Rice' ? 'DIST-POC-001' : `DIST-POC-${commodityDefinition(route.commodity).slug}-001`;
-  const duplicateDistributionId = route.commodity === 'Rice' ? 'DIST-POC-002' : `DIST-POC-${commodityDefinition(route.commodity).slug}-002`;
-  const exceptionDistributionId =
-    route.commodity === 'Rice' ? 'DIST-POC-EXCEPTION' : `DIST-POC-${commodityDefinition(route.commodity).slug}-EXCEPTION`;
+  const distributionId = buildDistributionId(seriesId, slug, '001');
+  const duplicateDistributionId = buildDistributionId(seriesId, slug, '002');
+  const exceptionDistributionId = buildDistributionId(seriesId, slug, 'EXCEPTION');
 
   if (fpsAllocationReceived && !context.distributions.some((item) => item.distributionId === distributionId)) {
     const timestamp = getDistributionTimestamp(context, DEMO_RATION_CARD_HASH, route.commodity);
@@ -549,7 +604,9 @@ export function getWorkflowActions(context: WorkflowContext, commodity: string =
 
   if (context.distributions.some((item) => item.distributionId === distributionId)) {
     const duplicateAlertId =
-      route.commodity === 'Rice' ? 'ALERT-POC-DUPLICATE' : `ALERT-POC-${commodityDefinition(route.commodity).slug}-DUPLICATE`;
+      seriesId === INITIAL_DEMO_SERIES_ID && route.commodity === 'Rice'
+        ? 'ALERT-POC-DUPLICATE'
+        : `ALERT-${seriesToken}-${slug}-DUPLICATE`;
     if (!context.alerts?.some((alert) => alert.alertId === duplicateAlertId)) {
       const timestamp = getDistributionTimestamp(context, DEMO_RATION_CARD_HASH, route.commodity);
       actions.push({
@@ -717,10 +774,16 @@ export function applyMockWorkflowAction(context: WorkflowContext, request: Workf
     message = `${transfer.transferId} receipt recorded.`;
   } else if (request.kind === 'duplicate-distribute') {
     const timestamp = request.payload.timestamp ?? getDistributionTimestamp(current, request.payload.rationCardHash, request.payload.commodity) ?? now();
+    const seriesId = seriesIdFromLotId(
+      current.lots.find((lot) => lot.commodity === request.payload.commodity)?.lotId ??
+        `LOT-${commodityDefinition(request.payload.commodity).slug}-2026-001`
+    );
+    const seriesToken = seriesId === INITIAL_DEMO_SERIES_ID ? 'POC' : seriesId;
+    const slug = commodityDefinition(request.payload.commodity).slug;
     const duplicateAlertId =
-      request.payload.commodity === 'Rice'
+      seriesId === INITIAL_DEMO_SERIES_ID && request.payload.commodity === 'Rice'
         ? 'ALERT-POC-DUPLICATE'
-        : `ALERT-POC-${commodityDefinition(request.payload.commodity).slug}-DUPLICATE`;
+        : `ALERT-${seriesToken}-${slug}-DUPLICATE`;
     event = evidence('DUPLICATE_CLAIM_BLOCKED', 'audit', request.payload.distributionId, request.payload);
     current.alerts.push({
       alertId: duplicateAlertId,
@@ -866,13 +929,17 @@ export function applyMockWorkflowAction(context: WorkflowContext, request: Workf
 }
 
 export const getWorkflowProgress = (context: WorkflowContext, commodity: CommodityName = DEFAULT_WORKFLOW_COMMODITY): { completed: number; total: number } => {
-  const route = getWorkflowRoute(commodity);
-  const plannedLegs = getPlannedLegs(route.commodity);
-  const distributionId = route.commodity === 'Rice' ? 'DIST-POC-001' : `DIST-POC-${commodityDefinition(route.commodity).slug}-001`;
+  const route = getWorkflowRoute(commodity, context.lots);
+  const plannedLegs = getPlannedLegs(route.commodity, context.lots);
+  const seriesId = seriesIdFromLotId(route.sourceLotId);
+  const seriesToken = seriesId === INITIAL_DEMO_SERIES_ID ? 'POC' : seriesId;
+  const slug = commodityDefinition(route.commodity).slug;
+  const distributionId = buildDistributionId(seriesId, slug, '001');
   const duplicateAlertId =
-    route.commodity === 'Rice' ? 'ALERT-POC-DUPLICATE' : `ALERT-POC-${commodityDefinition(route.commodity).slug}-DUPLICATE`;
-  const exceptionDistributionId =
-    route.commodity === 'Rice' ? 'DIST-POC-EXCEPTION' : `DIST-POC-${commodityDefinition(route.commodity).slug}-EXCEPTION`;
+    seriesId === INITIAL_DEMO_SERIES_ID && route.commodity === 'Rice'
+      ? 'ALERT-POC-DUPLICATE'
+      : `ALERT-${seriesToken}-${slug}-DUPLICATE`;
+  const exceptionDistributionId = buildDistributionId(seriesId, slug, 'EXCEPTION');
   const checkpoints = [
     ...plannedLegs.filter((leg) => leg.roRef).map((leg) => isLegAuthorized(context, leg.id)),
     ...plannedLegs.map((leg) => isReceived(findTransfer(context.transfers, leg.id))),

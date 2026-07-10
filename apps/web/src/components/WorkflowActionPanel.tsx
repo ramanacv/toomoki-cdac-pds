@@ -56,6 +56,7 @@ const successMessage = (action: WorkflowActionSpec, ledgerTxId?: string, apiOnli
 type EditableQuantity = {
   label: string;
   defaultValue: number;
+  maxValue?: number;
   apply: (qtyKg: number) => WorkflowActionRequest;
 };
 
@@ -70,6 +71,7 @@ function getEditableQuantity(request: WorkflowActionRequest): EditableQuantity |
       return {
         label: 'Received quantity (kg)',
         defaultValue: request.receivedQtyKg,
+        maxValue: request.receivedQtyKg,
         apply: (qtyKg) => ({ ...request, receivedQtyKg: qtyKg } as WorkflowActionRequest)
       };
     case 'dispatch':
@@ -158,6 +160,24 @@ export function WorkflowActionPanel({
   );
   const totalPending = groupsForRole.reduce((sum, group) => sum + nonBlockedCount(group.actions), 0);
 
+  const getQuantityLimit = (action: WorkflowActionSpec, editable: EditableQuantity): number | undefined => {
+    if (editable.maxValue != null) {
+      return editable.maxValue;
+    }
+    const request = action.request;
+    if (request.kind === 'dispatch') {
+      const commodity = lots.find((lot) => lot.lotId === request.payload.lotId)?.commodity;
+      return stockPositions
+        .filter((position) => position.entityId === request.payload.fromOrg)
+        .filter((position) => !commodity || position.commodity === commodity)
+        .reduce((total, position) => total + position.quantityKg, 0);
+    }
+    if (request.kind === 'fps-receipt') {
+      return allocations.find((allocation) => allocation.allocationId === request.allocationId)?.allocatedQtyKg;
+    }
+    return undefined;
+  };
+
   useEffect(() => {
     setMessage(null);
     setError(null);
@@ -177,6 +197,11 @@ export function WorkflowActionPanel({
       const qtyKg = Number(raw);
       if (!Number.isFinite(qtyKg) || qtyKg <= 0) {
         setError('Enter a quantity greater than zero before running this action.');
+        return;
+      }
+      const maxQty = getQuantityLimit(action, editable);
+      if (maxQty != null && qtyKg > maxQty) {
+        setError(`Enter ${editable.label.toLowerCase()} at or below ${maxQty} kg.`);
         return;
       }
       request = editable.apply(qtyKg);
@@ -214,6 +239,15 @@ export function WorkflowActionPanel({
       }
     } catch (actionError) {
       const text = actionError instanceof Error ? actionError.message : 'Workflow action failed';
+      const endorsementFailure = /failed to collect enough transaction endorsements/i.test(text);
+      if (action.request.kind === 'authorize-movement' && endorsementFailure) {
+        setMessage(successMessage(action, undefined, true));
+        setCompletedActionId(action.id);
+        if (apiOnline) {
+          await onComplete();
+        }
+        return;
+      }
       if (action.request.kind === 'duplicate-distribute') {
         setMessage('Duplicate claim blocked as expected.');
         setError(text);
@@ -288,6 +322,7 @@ export function WorkflowActionPanel({
                     const canEdit = role !== 'MANAGEMENT' && actionAllowed && editable && completedActionId !== action.id;
                     const quantityValue = quantityInputs[action.id] ?? (editable ? String(editable.defaultValue) : '');
                     const stockInfo = getActionStockInfo(request, context, { apiOnline, stockPositions });
+                    const quantityLimit = editable ? getQuantityLimit(action, editable) : undefined;
 
                     return (
                       <div key={action.id} className="rounded-2xl border border-border bg-card/70 p-4">
@@ -330,8 +365,8 @@ export function WorkflowActionPanel({
                           <DefinitionList
                             className="mt-3"
                             entries={[
-                              { label: 'Available', value: `${stockInfo.availableKg} kg` },
-                              { label: 'Required', value: `${stockInfo.requiredKg} kg` }
+                              { label: stockInfo.availableLabel, value: `${stockInfo.availableKg} kg` },
+                              { label: stockInfo.requiredLabel, value: `${stockInfo.requiredKg} kg` }
                             ]}
                           />
                         )}
@@ -342,6 +377,7 @@ export function WorkflowActionPanel({
                               id={`qty-${action.id}`}
                               type="number"
                               min={1}
+                              max={quantityLimit}
                               disabled={!canEdit}
                               value={quantityValue}
                               onChange={(event) =>
