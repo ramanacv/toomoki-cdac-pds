@@ -1,9 +1,12 @@
 import type { CommodityLot, DistributionTransaction, TransferOrder } from '@pds/shared-types';
+import { demoQuantities } from '@pds/fixtures';
 import type { TraceCard } from '@/demo-model.js';
 import { Panel } from '@/components/Panel';
 import { buildApiUrl } from '@/api.js';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { HintLabel } from '@/components/HintLabel';
+import { formatDateTime, stageHints } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 
 const accentClass: Record<TraceCard['accent'], string> = {
@@ -117,10 +120,10 @@ export function TraceExplorer({
       <div className="mt-4 grid gap-2 rounded-3xl border border-dashed border-primary/20 bg-primary/5 p-4">
         <p className="leading-relaxed">
           Selected lot: <strong>{traceLot?.commodity ?? 'Rice'}</strong> in{' '}
-          {traceLot?.currentLocation ?? 'Block Godown 01'}.
+          {traceLot?.currentLocation ?? 'Issue Point 01'}.
         </p>
         <p className="leading-relaxed">
-          Selected receipt: <strong>{visibleDistribution?.deliveredKg ?? 25} kg</strong> for ration
+          Selected receipt: <strong>{visibleDistribution?.deliveredKg ?? demoQuantities.citizenDistributionKg} kg</strong> for ration
           card hash {visibleDistribution?.rationCardHash ?? 'demo-ration-card-hash'}.
         </p>
       </div>
@@ -136,8 +139,17 @@ export function TraceExplorer({
               <div>
                 <strong className="block text-sm">{transfer.fromOrg} to {transfer.toOrg}</strong>
                 <span className="text-sm text-muted-foreground">
-                  {transfer.transferId} · {transfer.dispatchedQtyKg} kg · {transfer.stage ? `Stage-${transfer.stage}` : 'custody'}
+                  {transfer.transferId} · {transfer.dispatchedQtyKg} kg ·{' '}
+                  {transfer.stage ? (
+                    <HintLabel label={`Stage-${transfer.stage}`} hint={stageHints[transfer.stage]} />
+                  ) : (
+                    'custody'
+                  )}
                   {transfer.roRef ? ` · ${transfer.roRef}` : ''}
+                </span>
+                <span className="mt-1 block text-xs text-muted-foreground">
+                  Dispatched {formatDateTime(transfer.dispatchTimestamp)} · Received {formatDateTime(transfer.receiveTimestamp)}
+                  {transfer.authorizedAt ? ` · Authorized ${formatDateTime(transfer.authorizedAt)}` : ''}
                 </span>
               </div>
               <span className="text-sm font-semibold text-muted-foreground">{transfer.status}</span>

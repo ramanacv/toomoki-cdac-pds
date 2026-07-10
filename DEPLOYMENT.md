@@ -1,6 +1,6 @@
-# PDS-Chain Deployment Guide
+# ViksitPDS Deployment Guide
 
-This document covers how to deploy and operate PDS-Chain for local development, demo, and future pilot environments.
+This document covers how to deploy and operate ViksitPDS for local development, demo, and future pilot environments.
 
 ## Deployment Models
 
@@ -12,7 +12,7 @@ This document covers how to deploy and operate PDS-Chain for local development, 
 | **Local dev (postgres)** | Integration testing | Demo mode (default) | PostgreSQL |
 | **Production pilot** | Post-MVP | Full Fabric consortium (5-org target) | PostgreSQL + CouchDB peers |
 
-The MVP ships with a **working Docker Compose stack** for both demo and live Fabric modes. The Fabric 3.1.x 2-org network lives under `blockchain/fabric-network/` and is started via `docker compose --profile fabric`.
+The MVP ships with a **working Docker Compose stack** for both demo and live Fabric modes. The Fabric **2.5.13** 2-org network (channel participation, no system channel) lives under `blockchain/fabric-network/` and is started via `docker compose --profile fabric`.
 
 ## Default Docker Compose Deployment
 
@@ -33,7 +33,7 @@ The MVP ships with a **working Docker Compose stack** for both demo and live Fab
 
 ### Architecture (fabric profile)
 
-Adds Fabric 3.1.x services on network `pds-fabric`. The API joins that network and uses `@hyperledger/fabric-gateway` to submit/evaluate on `pds-chaincode` / `pdschannel`.
+Adds Fabric **2.5.13** services on network `pds-fabric`. The API joins that network and uses `@hyperledger/fabric-gateway` to submit/evaluate on `pds-chaincode` / `pdschannel`.
 
 ```text
 web ──▶ api (PDS_LEDGER_MODE=fabric) ──▶ postgres
@@ -100,21 +100,32 @@ PostgreSQL is initialized from:
 - `infra/postgres/schema.sql`
 - `infra/postgres/seed.sql`
 
-### Fabric profile
-
-**Prerequisites:** Fabric CLI binaries on the host (`peer`, `osnadmin`, `configtxgen`). See [blockchain/fabric-network/README.md](blockchain/fabric-network/README.md).
+### Fabric profile — quick start (MVP)
 
 ```bash
-# 1. Generate crypto, channel block, deploy chaincode (host-side)
+# 1. Bootstrap crypto, channel, and chaincode (Docker-based tools)
+./blockchain/fabric-network/scripts/bootstrap-fabric-full.sh
+
+# 2. Configure fabric mode + auth tokens
+cp .env.fabric.example .env
+
+# 3. Start full stack with live ledger
+docker compose --profile fabric up --build -d
+
+# 4. Verify API + gateway (from repo root)
+PDS_DEV_AUTH_TOKEN=dev-mvp-token npm run smoke:fabric
+# Optional: curl smoke with auth
+PDS_DEV_AUTH_TOKEN=dev-mvp-token blockchain/fabric-network/scripts/smoke-fabric.sh
+```
+
+Set the same `PDS_DEV_AUTH_TOKEN` in the web UI (banner on login) or via `VITE_DEV_AUTH_TOKEN` at build time.
+
+**Prerequisites (partial bootstrap):** Fabric CLI binaries on the host (`peer`, `osnadmin`, `configtxgen`). See [blockchain/fabric-network/README.md](blockchain/fabric-network/README.md).
+
+```bash
+# Alternative: partial bootstrap then compose
 blockchain/fabric-network/scripts/bootstrap-network.sh
-
-# 2. Start full stack with live ledger
 PDS_LEDGER_MODE=fabric docker compose --profile fabric up --build -d
-
-# 3. Verify API + gateway (from repo root)
-node scripts/smoke-fabric-gateway.mjs
-# Optional: peer-level smoke
-blockchain/fabric-network/scripts/smoke-fabric.sh
 ```
 
 Gateway env vars (defaults in root `docker-compose.yml`; overrides in `blockchain/fabric-network/fabric-env.example`):
@@ -136,7 +147,7 @@ Gateway env vars (defaults in root `docker-compose.yml`; overrides in `blockchai
 
 ```bash
 curl -f http://localhost:3000/health
-# Expected: {"ok":true}
+# Expected: {"ok":true,"ledgerMode":"demo"} or "fabric"
 
 curl -f http://localhost:3000/dashboard/summary
 ```
@@ -257,7 +268,7 @@ Web image CMD: `npm run start --workspace=@pds/web` (Vite preview on `0.0.0.0:41
 
 ### Current status
 
-- **Fabric version:** 3.1.x (channel participation; no genesis system channel)
+- **Fabric version:** 2.5.13 (peer/orderer images; channel participation APIs; no genesis system channel)
 - **Channel:** `pdschannel`
 - **Chaincode:** `pds-chaincode` (TypeScript)
 - **Organizations (deployed):** Food Department + Godown (2-org demo)
@@ -293,6 +304,22 @@ PDS_LEDGER_MODE=demo npm run start --workspace=@pds/api
 ```
 
 See [blockchain/fabric-network/README.md](blockchain/fabric-network/README.md) for step-by-step script breakdown.
+
+### Demo scripts (demo vs fabric)
+
+| Command | Mode | Notes |
+| ------- | ---- | ----- |
+| `npm run demo:happy` | In-process demo ledger | Default; no API required |
+| `npm run demo:exception` | In-process demo ledger | Short receipt + duplicate claim |
+| `node scripts/demo/happy-path.mjs --ledger=fabric` | Live API + Fabric | Requires `PDS_DEV_AUTH_TOKEN` and running stack |
+| `node scripts/demo/exception-path.mjs --ledger=fabric` | Live API + Fabric | Same auth/env requirements |
+
+Fabric examples:
+
+```bash
+PDS_DEV_AUTH_TOKEN=dev-mvp-token node scripts/demo/happy-path.mjs --ledger=fabric
+PDS_DEV_AUTH_TOKEN=dev-mvp-token node scripts/demo/exception-path.mjs --ledger=fabric
+```
 
 ## Mock Data and SQL Generation
 
@@ -355,6 +382,22 @@ npm run smoke
 ```
 
 `smoke` runs happy-path and exception-path flows in-process and prints JSON results.
+
+### Regression gates (POC → MVP)
+
+After workflow or Fabric changes, run the consolidated checklist:
+
+```bash
+npm run regression
+```
+
+Fabric profile (live stack + bearer token):
+
+```bash
+PDS_DEV_AUTH_TOKEN=dev-mvp-token npm run regression:fabric
+```
+
+See [docs/technical/poc-to-mvp-with-fabric.md](docs/technical/poc-to-mvp-with-fabric.md) for the full matrix and manual web workbench gate.
 
 ## Operational Endpoints
 
@@ -481,4 +524,4 @@ Recommended production hardening path:
 - [README.md](README.md) — project overview and quick start
 - [docs/technical/architecture.md](docs/technical/architecture.md) — system architecture
 - [docs/implementation/mvp-implementation-plan.md](docs/implementation/mvp-implementation-plan.md) — MVP scope and acceptance gates
-- [blockchain/fabric-network/README.md](blockchain/fabric-network/README.md) — Fabric 3.x topology and bootstrap
+- [blockchain/fabric-network/README.md](blockchain/fabric-network/README.md) — Fabric 2.5.x topology and bootstrap

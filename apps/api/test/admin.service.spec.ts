@@ -25,6 +25,7 @@ const fabricConfigFixture = (overrides: Partial<FabricRuntimeConfig> = {}): Fabr
   peerTlsCertPath: '/tmp/tls/ca.crt',
   peerHostAlias: 'peer0.food.example.com',
   mspId: 'FoodAndCivilSuppliesMSP',
+  endorsingOrgs: ['FoodAndCivilSuppliesMSP'],
   certPath: '/tmp/cert.pem',
   keyPath: '/tmp/keystore',
   ...overrides
@@ -61,6 +62,9 @@ describe('AdminService', () => {
     expect(overview.network.demo?.worldStateSummary.lots).toBeGreaterThan(0);
     expect(overview.activity.eventCount).toBeGreaterThan(0);
     expect(overview.health.some((check) => check.name === 'api')).toBe(true);
+    expect(overview.stock.every((position) => position.quantityKg > 0)).toBe(true);
+    expect(overview.entitlementSummary.recordCount).toBeGreaterThanOrEqual(overview.entitlementSummary.activeCount);
+    expect(overview.entitlementSummary.utilizationPct).toBeGreaterThanOrEqual(0);
   });
 
   it('returns network, activity, and stakeholder summaries', () => {
@@ -71,7 +75,53 @@ describe('AdminService', () => {
     expect(network.persistenceBackend).toBeDefined();
     expect(activity.recentEvents.length).toBeGreaterThan(0);
     expect(stakeholders.byType.length).toBeGreaterThan(0);
+    expect(stakeholders.byStatus.length).toBeGreaterThan(0);
     expect(stakeholders.fabricOrgMapping.length).toBeGreaterThan(0);
+  });
+
+  it('resets transactional data while leaving stakeholders intact', async () => {
+    const before = service.getOverview();
+    expect(before.metrics.lots).toBeGreaterThan(0);
+    expect(before.stock.length).toBeGreaterThan(0);
+
+    const result = await service.resetLedger();
+    expect(result.ledgerTxId).toMatch(/^TX-/);
+    expect(result.seriesId).toMatch(/^R/);
+    expect(result.lots).toHaveLength(6);
+    expect(result.lots.every((lot) => lot.lotId.includes(result.seriesId))).toBe(true);
+
+    const after = service.getOverview();
+    // The demo's starting lots are recreated by the reset so the frontend's
+    // scripted rice workflow can be replayed while the commodity catalog remains visible.
+    expect(after.metrics.lots).toBe(6);
+    expect(after.metrics.transfers).toBe(0);
+    expect(after.metrics.distributions).toBe(0);
+    expect(after.stock.map((position) => position.commodity)).toEqual(
+      expect.arrayContaining(['Rice', 'Wheat', 'Dal', 'Sugar', 'Cooking Oil', 'Kerosene'])
+    );
+    expect(after.metrics.stakeholders).toBe(before.metrics.stakeholders);
+  });
+
+  it('scopes a reset to one commodity, leaving the others in place', async () => {
+    const before = service.getOverview();
+    const wheatStockBefore = before.stock.find((position) => position.commodity === 'Wheat');
+    expect(wheatStockBefore?.quantityKg).toBeGreaterThan(0);
+
+    const result = await service.resetLedger('Rice');
+    expect(result.ledgerTxId).toMatch(/^TX-/);
+    expect(result.seriesId).toMatch(/^R/);
+    expect(result.lots).toHaveLength(1);
+    expect(result.lots[0]?.commodity).toBe('Rice');
+    expect(result.message).toContain('Rice');
+
+    const after = service.getOverview();
+    expect(after.metrics.lots).toBe(before.metrics.lots);
+    expect(after.stock.map((position) => position.commodity)).toEqual(
+      expect.arrayContaining(['Rice', 'Wheat', 'Dal', 'Sugar', 'Cooking Oil', 'Kerosene'])
+    );
+    const wheatStockAfter = after.stock.find((position) => position.commodity === 'Wheat');
+    expect(wheatStockAfter?.quantityKg).toBe(wheatStockBefore?.quantityKg);
+    expect(after.metrics.stakeholders).toBe(before.metrics.stakeholders);
   });
 
   it('cleans up temp files', () => {

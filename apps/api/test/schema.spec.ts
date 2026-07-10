@@ -37,7 +37,7 @@ describe('postgres schema indexes and foreign keys (T6.1)', () => {
       'idx_auth_transactions_ration_card',
       'idx_auth_transactions_timestamp',
       'idx_distribution_transactions_fps',
-      'idx_distribution_transactions_commodity_month',
+      'idx_distribution_transactions_commodity_timestamp',
       'idx_ledger_events_entity_id',
       'idx_ledger_events_event_type',
       'idx_ledger_events_timestamp',

@@ -31,7 +31,7 @@ describe('StakeholdersModule', () => {
     const initialCount = controller.stakeholders().length;
     controller.registerStakeholder({
       stakeholderId: 'NEST-001',
-      stakeholderType: StakeholderType.DEPARTMENT,
+      stakeholderType: StakeholderType.DISTRICT_SUPPLY_OFFICE,
       name: 'Nest Test',
       district: 'Demo',
       licenseNo: 'LIC-NEST-001',

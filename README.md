@@ -1,16 +1,16 @@
-# PDS-Chain
+# ViksitPDS
 
 Blockchain-enabled trust, traceability, audit, and authenticated-delivery layer for India's **Public Distribution System (PDS)**.
 
-PDS-Chain complements SMART-PDS, state PDS systems, ePoS, and command-centre dashboards. It does **not** replace them. The MVP demonstrates one complete rice journey from procurement to beneficiary distribution with mock data and simulated integrations.
+ViksitPDS complements SMART-PDS, state PDS systems, ePoS, and command-centre dashboards. It does **not** replace them. The MVP demonstrates one complete rice journey from procurement to beneficiary distribution with mock data and simulated integrations.
 
 ## What the MVP Demonstrates
 
 ```text
 Procurement Centre
-  -> Miller
+  -> FCI
   -> State Godown
-  -> Block Godown
+  -> Issue Point
   -> FPS Allocation
   -> FPS Receipt
   -> Beneficiary Authentication (mock)
@@ -26,7 +26,7 @@ Sensitive beneficiary data stays **off-chain**. Aadhaar numbers, biometrics, OTP
 
 ## Architecture Overview
 
-PDS-Chain supports two ledger modes via `PDS_LEDGER_MODE`:
+ViksitPDS supports two ledger modes via `PDS_LEDGER_MODE`:
 
 | Mode | Value | Ledger | Fabric containers |
 |------|-------|--------|-------------------|
@@ -73,7 +73,7 @@ scripts/
 docs/           Product, technical, and implementation documentation
 ```
 
-> **Note:** The `NBF-LITE/` folder contains separate CDAC/academia reference tooling and is not part of the PDS-Chain application runtime.
+> **Note:** The `NBF-LITE/` folder contains separate CDAC/academia reference tooling and is not part of the ViksitPDS application runtime.
 
 ## Prerequisites
 

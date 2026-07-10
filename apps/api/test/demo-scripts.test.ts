@@ -13,7 +13,8 @@ describe('demo scripts', () => {
   it('runs the exception-path demo flow', async () => {
     const result = await runExceptionDemo();
 
-    expect(result.alert.alertType).toBe('SHORT_RECEIPT');
+    expect(result.shortReceiptAlert.alertType).toBe('SHORT_RECEIPT');
+    expect(result.duplicateClaimAlert?.alertType).toBe('DUPLICATE_CLAIM');
     expect(result.summary.openAlerts).toBeGreaterThan(0);
   });
 
@@ -21,6 +22,6 @@ describe('demo scripts', () => {
     const result = await runDemoSmoke();
 
     expect(result.happy.summary.completedDistributions).toBeGreaterThan(0);
-    expect(result.exception.alert.alertType).toBe('SHORT_RECEIPT');
+    expect(result.exception.shortReceiptAlert.alertType).toBe('SHORT_RECEIPT');
   });
 });

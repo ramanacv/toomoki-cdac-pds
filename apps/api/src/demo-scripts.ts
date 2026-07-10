@@ -13,6 +13,7 @@ import {
   type MonthlyEntitlement,
   type Stakeholder
 } from '@pds/shared-types';
+import { demoQuantities } from '@pds/fixtures';
 import { PdsRuntime } from './modules/core/pds-runtime.js';
 
 export type DemoFlowResult = {
@@ -27,7 +28,8 @@ export type DemoFlowResult = {
 
 export type DemoExceptionResult = {
   summary: DashboardSummary;
-  alert: AuditAlert;
+  shortReceiptAlert: AuditAlert;
+  duplicateClaimAlert?: AuditAlert;
   alerts: AuditAlert[];
 };
 
@@ -49,53 +51,18 @@ export const runHappyPathDemo = async (): Promise<DemoFlowResult> => {
   const service = await createRuntime(true, statePath);
 
   try {
-    service.dispatchLot({
-      transferId: 'TR-DEMO-001',
-      lotId: 'LOT-RICE-2026-001',
-      fromOrg: 'PROC-001',
-      toOrg: 'MLL-001',
-      dispatchedQtyKg: 1000,
-      vehicleNo: 'KA01AB2001'
-    });
-    service.receiveLot({
-      transferId: 'TR-DEMO-001',
-      receivedQtyKg: 1000
-    });
-    service.dispatchLot({
-      transferId: 'TR-DEMO-002',
-      lotId: 'LOT-RICE-2026-001',
-      fromOrg: 'MLL-001',
-      toOrg: 'GODOWN-S-001',
-      dispatchedQtyKg: 1000,
-      vehicleNo: 'KA01AB2002'
-    });
-    service.receiveLot({
-      transferId: 'TR-DEMO-002',
-      receivedQtyKg: 1000
-    });
-    service.dispatchLot({
-      transferId: 'TR-DEMO-003',
-      lotId: 'LOT-RICE-2026-001',
-      fromOrg: 'GODOWN-S-001',
-      toOrg: 'GODOWN-B-001',
-      dispatchedQtyKg: 1000,
-      vehicleNo: 'KA01AB2003'
-    });
-    service.receiveLot({
-      transferId: 'TR-DEMO-003',
-      receivedQtyKg: 1000
-    });
+    service.addStockForTest('ISSUE-001', 'Rice', demoQuantities.fpsAllocationKg);
     service.allocateToFps({
       allocationId: 'ALLOC-DEMO-001',
       fpsId: 'FPS-101',
       commodity: 'Rice',
-      allocatedQtyKg: 100,
+      allocatedQtyKg: demoQuantities.fpsAllocationKg,
       month: '2026-06',
-      sourceGodownId: 'GODOWN-B-001'
+      sourceGodownId: 'ISSUE-001'
     });
     service.recordFpsReceipt({
       allocationId: 'ALLOC-DEMO-001',
-      receivedQtyKg: 100
+      receivedQtyKg: demoQuantities.fpsReceiptKg
     });
     const auth = service.simulateAuthentication({
       authTxnId: 'AUTH-DEMO-001',
@@ -110,11 +77,12 @@ export const runHappyPathDemo = async (): Promise<DemoFlowResult> => {
       rationCardHash: 'demo-ration-card-hash',
       beneficiaryRefHash: 'beneficiary-hash',
       commodity: 'Rice',
-      deliveredKg: 25,
+      deliveredKg: demoQuantities.citizenDistributionKg,
       authMode: auth.authMode,
       authResult: auth.authResult,
       authTxnRefHash: auth.authTxnRefHash,
-      dealerId: 'FPS-DEALER-101'
+      dealerId: 'FPS-DEALER-101',
+      timestamp: '2026-06-09T10:10:00.000Z'
     });
     await service.flushPersist();
 
@@ -141,25 +109,88 @@ export const runExceptionDemo = async (): Promise<DemoExceptionResult> => {
       transferId: 'TR-EXC-001',
       lotId: 'LOT-RICE-2026-001',
       fromOrg: 'PROC-001',
-      toOrg: 'MLL-001',
-      dispatchedQtyKg: 1000,
+      toOrg: 'FCI-001',
+      dispatchedQtyKg: demoQuantities.shortReceiptDispatchKg,
       vehicleNo: 'KA01AB3001'
     });
     const transfer = service.receiveLot({
       transferId: 'TR-EXC-001',
-      receivedQtyKg: 800
+      receivedQtyKg: demoQuantities.shortReceiptReceivedKg
     });
-    const alert = service.getAlerts().find((item) => item.alertType === AlertType.SHORT_RECEIPT) ?? service.raiseAuditFlag({
-      alertType: AlertType.SHORT_RECEIPT,
-      entityId: transfer.transferId,
-      message: 'Fallback shortage alert',
-      evidence: { dispatchedQtyKg: 1000, receivedQtyKg: 800, shortageQtyKg: 200 }
+    const shortReceiptAlert =
+      service.getAlerts().find((item) => item.alertType === AlertType.SHORT_RECEIPT) ??
+      service.raiseAuditFlag({
+        alertType: AlertType.SHORT_RECEIPT,
+        entityId: transfer.transferId,
+        message: 'Fallback shortage alert',
+        evidence: {
+          dispatchedQtyKg: demoQuantities.shortReceiptDispatchKg,
+          receivedQtyKg: demoQuantities.shortReceiptReceivedKg,
+          shortageQtyKg: demoQuantities.shortReceiptDispatchKg - demoQuantities.shortReceiptReceivedKg
+        }
+      });
+
+    service.addStockForTest('ISSUE-001', 'Rice', demoQuantities.fpsAllocationKg);
+    service.allocateToFps({
+      allocationId: 'ALLOC-EXC-001',
+      fpsId: 'FPS-101',
+      commodity: 'Rice',
+      allocatedQtyKg: demoQuantities.fpsAllocationKg,
+      month: '2026-06',
+      sourceGodownId: 'ISSUE-001'
     });
+    service.recordFpsReceipt({
+      allocationId: 'ALLOC-EXC-001',
+      receivedQtyKg: demoQuantities.fpsReceiptKg
+    });
+    const auth = service.simulateAuthentication({
+      authTxnId: 'AUTH-EXC-001',
+      beneficiaryRefHash: 'beneficiary-hash',
+      rationCardHash: 'demo-ration-card-hash',
+      authMode: AuthMode.MOCK_OTP,
+      authResult: AuthResult.SUCCESS
+    });
+    service.recordDistribution({
+      distributionId: 'DIST-EXC-001',
+      fpsId: 'FPS-101',
+      rationCardHash: 'demo-ration-card-hash',
+      beneficiaryRefHash: 'beneficiary-hash',
+      commodity: 'Rice',
+      deliveredKg: demoQuantities.citizenDistributionKg,
+      authMode: auth.authMode,
+      authResult: auth.authResult,
+      authTxnRefHash: auth.authTxnRefHash,
+      dealerId: 'FPS-DEALER-101',
+      timestamp: '2026-06-09T10:20:00.000Z'
+    });
+
+    let duplicateClaimAlert: AuditAlert | undefined;
+    try {
+      service.recordDistribution({
+        distributionId: 'DIST-EXC-002',
+        fpsId: 'FPS-101',
+        rationCardHash: 'demo-ration-card-hash',
+        beneficiaryRefHash: 'beneficiary-hash',
+        commodity: 'Rice',
+        deliveredKg: demoQuantities.citizenDistributionKg,
+        authMode: auth.authMode,
+        authResult: auth.authResult,
+        authTxnRefHash: auth.authTxnRefHash,
+        dealerId: 'FPS-DEALER-101',
+        timestamp: '2026-06-09T10:25:00.000Z'
+      });
+    } catch {
+      duplicateClaimAlert = service
+        .getAlerts()
+        .find((item) => item.alertType === AlertType.DUPLICATE_CLAIM && item.entityId === 'demo-ration-card-hash');
+    }
+
     await service.flushPersist();
 
     return {
       summary: service.getDashboardSummary(),
-      alert,
+      shortReceiptAlert,
+      ...(duplicateClaimAlert ? { duplicateClaimAlert } : {}),
       alerts: service.getAlerts()
     };
   } finally {

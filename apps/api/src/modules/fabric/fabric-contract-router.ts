@@ -11,7 +11,6 @@ export const buildFabricRoutePlan = (manifest: FabricContractManifest): FabricRo
     const route = Object.keys({
       '/stakeholders': null,
       '/lots': null,
-      '/lots/transform': null,
       '/transfers/:transferId/authorize': null,
       '/transfers': null,
       '/transfers/:transferId/receive': null,

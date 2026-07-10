@@ -25,16 +25,16 @@ export class TransfersController {
 
   @Post('/transfers')
   dispatch(@Body() body: DispatchDto) {
-    return this.ledger.dispatchLot(body);
+    return this.ledger.dispatchLotPersisted(body);
   }
 
   @Post('/transfers/:transferId/receive')
   receive(@Param('transferId') transferId: string, @Body() body: TransferReceiveDto) {
-    return this.ledger.receiveLot({ transferId, receivedQtyKg: body.receivedQtyKg });
+    return this.ledger.receiveLotPersisted({ transferId, receivedQtyKg: body.receivedQtyKg });
   }
 
   @Post('/transfers/:transferId/authorize')
   authorize(@Param('transferId') transferId: string, @Body() body: TransferAuthorizeDto) {
-    return this.ledger.authorizeMovement({ transferId, ...body });
+    return this.ledger.authorizeMovementPersisted({ transferId, ...body });
   }
 }

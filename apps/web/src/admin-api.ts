@@ -41,6 +41,21 @@ export type AdminNetworkInfo = {
   };
 };
 
+export type AdminStockPosition = {
+  entityId: string;
+  commodity: string;
+  quantityKg: number;
+};
+
+export type AdminEntitlementSummary = {
+  totalMonthlyEntitlementKg: number;
+  totalLiftedKg: number;
+  totalAvailableKg: number;
+  utilizationPct: number;
+  activeCount: number;
+  recordCount: number;
+};
+
 export type AdminMetrics = {
   stakeholders: number;
   lots: number;
@@ -75,8 +90,17 @@ export type AdminOverview = {
     byRiskLevel: Record<string, number>;
     recent: AuditAlert[];
   };
+  stock: AdminStockPosition[];
+  entitlementSummary: AdminEntitlementSummary;
   health: AdminHealthCheck[];
   links: Record<string, string>;
+};
+
+export type AdminResetResult = {
+  ledgerTxId: string;
+  message: string;
+  seriesId: string;
+  lots: Array<{ lotId: string; commodity: string; quantityKg: number }>;
 };
 
 export const getStoredAdminToken = (): string => {
@@ -104,6 +128,19 @@ async function fetchAdminJson<T>(path: string): Promise<T> {
   return (await response.json()) as T;
 }
 
+async function postAdminJson<T>(path: string, body?: Record<string, unknown>): Promise<T> {
+  const response = await fetch(buildApiUrl(path), {
+    method: 'POST',
+    headers: { ...adminHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify(body ?? {})
+  });
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || `Admin request failed for ${path}`);
+  }
+  return (await response.json()) as T;
+}
+
 export const loadAdminOverview = (): Promise<AdminOverview> => fetchAdminJson('/admin/overview');
 
 export const loadAdminNetwork = (): Promise<AdminNetworkInfo> => fetchAdminJson('/admin/network');
@@ -112,3 +149,6 @@ export const loadAdminActivity = (): Promise<AdminOverview['activity']> => fetch
 
 export const loadAdminStakeholderSummary = (): Promise<AdminOverview['stakeholders']> =>
   fetchAdminJson('/admin/stakeholders/summary');
+
+export const resetAdminLedger = (commodity?: string): Promise<AdminResetResult> =>
+  postAdminJson('/admin/reset', commodity ? { commodity } : undefined);

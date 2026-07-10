@@ -23,6 +23,7 @@ const fabricConfigFixture = (overrides: Partial<FabricRuntimeConfig> = {}): Fabr
   peerTlsCertPath: '/tmp/tls/ca.crt',
   peerHostAlias: 'peer0.food.example.com',
   mspId: 'FoodAndCivilSuppliesMSP',
+  endorsingOrgs: ['FoodAndCivilSuppliesMSP'],
   certPath: '/tmp/cert.pem',
   keyPath: '/tmp/keystore',
   ...overrides
@@ -60,5 +61,40 @@ describe('AdminModule', () => {
 
     const stakeholders = controller.stakeholdersSummary();
     expect(stakeholders.byType.length).toBeGreaterThan(0);
+
+    const beforeReset = controller.overview();
+    expect(beforeReset.metrics.lots).toBeGreaterThan(0);
+
+    const resetResult = await controller.reset({});
+    expect(resetResult.ledgerTxId).toMatch(/^TX-/);
+
+    const afterReset = controller.overview();
+    // The demo's starting lots are recreated by the reset so the scripted rice
+    // workflow can be replayed while the commodity catalog remains visible.
+    expect(afterReset.metrics.lots).toBe(6);
+    expect(afterReset.stock.map((position) => position.commodity)).toEqual(
+      expect.arrayContaining(['Rice', 'Wheat', 'Dal', 'Sugar', 'Cooking Oil', 'Kerosene'])
+    );
+  });
+
+  it('accepts a commodity-scoped reset and rejects an unknown commodity', async () => {
+    fixture = await createDemoLedgerFixture();
+
+    const moduleRef = await Test.createTestingModule({
+      controllers: [AdminController],
+      providers: [
+        AdminService,
+        { provide: PdsLedgerFacade, useValue: fixture.facade },
+        { provide: 'FABRIC_RUNTIME_CONFIG', useValue: fabricConfigFixture() }
+      ]
+    }).compile();
+
+    controller = moduleRef.get(AdminController);
+
+    const result = await controller.reset({ commodity: 'Rice' });
+    expect(result.ledgerTxId).toMatch(/^TX-/);
+    expect(result.message).toContain('Rice');
+
+    expect(() => controller.reset({ commodity: 'Not-A-Commodity' })).toThrow('Unknown commodity: Not-A-Commodity');
   });
 });

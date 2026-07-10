@@ -55,7 +55,8 @@ export const emptyState = (): PdsLedgerState => ({
   stock: [],
   rationCards: [],
   grievances: [],
-  entitlementRules: []
+  entitlementRules: [],
+  seriesId: 'POC'
 });
 
 export const buildEngine = (partial: Partial<PdsLedgerState>): PdsLedgerEngine => {

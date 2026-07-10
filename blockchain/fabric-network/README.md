@@ -1,6 +1,6 @@
 # Fabric Network (2-org demo)
 
-This folder defines the Hyperledger Fabric topology for the PDS-Chain MVP and ships a **Fabric 3.1.x** two-organization demo (Food Department + Godown).
+This folder defines the Hyperledger Fabric topology for the ViksitPDS MVP and ships a **Fabric 3.1.x** two-organization demo (Food Department + Godown).
 
 ## Topology
 
@@ -26,6 +26,25 @@ Individual steps:
 6. `peer-channel-join.sh` — both peers join
 7. `deploy-chaincode.sh` — package/install/approve/commit lifecycle
 8. `smoke-fabric.sh` — API smoke against running gateway
+9. `query-chaincode.sh` — read-only chaincode queries via the food peer
+
+## Verifying ledger writes
+
+See [fabric-deployment.md](../../fabric-deployment.md#verifying-fabric-writes) for the full guide. Quick checks:
+
+- `curl localhost:3000/health` → `ledgerMode: "fabric"`
+- `curl localhost:3000/trace/lots/LOT-RICE-2026-001` → `verificationSource: "chaincode"`
+- `./scripts/query-chaincode.sh GetLotHistory '{"lotId":"LOT-RICE-2026-001"}'`
+
+### CouchDB Fauxton (local debug)
+
+World state lives in CouchDB (`couchdb0` / `couchdb1`). Ports are hidden by default. To browse documents in Fauxton:
+
+```bash
+docker compose --profile fabric --profile fabric-debug up -d
+```
+
+Then open http://localhost:5984/_utils (food peer) or http://localhost:6984/_utils (godown peer). Database: `pdschannel_pds-chaincode`. Credentials: `pds_couch` / `changeme-couch`.
 
 ## API integration
 

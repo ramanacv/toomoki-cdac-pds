@@ -11,12 +11,26 @@ import type {
   TransferOrder
 } from '@pds/shared-types';
 import { AuthMode, AuthResult } from '@pds/shared-types';
-import { getWorkspaceSnapshot, type DemoScenario } from '@pds/fixtures';
+import { demoQuantities, getWorkspaceSnapshot, type DemoScenario } from '@pds/fixtures';
+import { authHeaders } from './auth-token.js';
 import { getDataSourceMode, usesMockData } from './data-source.js';
 import { getScenarioAlerts } from './demo-model.js';
 import type { WorkflowActionRequest } from './workflow-actions.js';
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? '/api';
+
+export type LedgerMode = 'demo' | 'fabric';
+
+export type ApiHealth = {
+  ok: boolean;
+  ledgerMode?: LedgerMode;
+};
+
+export type StockPosition = {
+  entityId: string;
+  commodity: string;
+  quantityKg: number;
+};
 
 export type WorkspaceData = {
   summary: DashboardSummary;
@@ -29,17 +43,32 @@ export type WorkspaceData = {
   distributions: DistributionTransaction[];
   alerts: AuditAlert[];
   ledgerEvents: LedgerEvent[];
+  stockPositions: StockPosition[];
 };
 
 const mockWorkspace = (scenario: DemoScenario): WorkspaceData => ({
   ...getWorkspaceSnapshot(scenario),
-  ledgerEvents: []
+  ledgerEvents: [],
+  stockPositions: []
 });
 
+async function readApiError(response: Response, path: string): Promise<string> {
+  const text = await response.text();
+  try {
+    const body = JSON.parse(text) as { message?: string };
+    if (response.status === 401) {
+      return 'Fabric mode requires a saved API bearer token. Enter dev-mvp-token in the banner at the top and click Save token.';
+    }
+    return body.message ?? text ?? `Request failed for ${path}`;
+  } catch {
+    return text || `Request failed for ${path}`;
+  }
+}
+
 async function fetchJson<T>(path: string): Promise<T> {
-  const response = await fetch(`${apiBaseUrl}${path}`);
+  const response = await fetch(`${apiBaseUrl}${path}`, { headers: authHeaders() });
   if (!response.ok) {
-    throw new Error(`Request failed for ${path}`);
+    throw new Error(await readApiError(response, path));
   }
   return (await response.json()) as T;
 }
@@ -47,13 +76,12 @@ async function fetchJson<T>(path: string): Promise<T> {
 async function postJson<T>(path: string, body: unknown): Promise<T> {
   const response = await fetch(`${apiBaseUrl}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify(body)
   });
 
   if (!response.ok) {
-    const message = await response.text();
-    throw new Error(message || `Request failed for ${path}`);
+    throw new Error(await readApiError(response, path));
   }
 
   return (await response.json()) as T;
@@ -111,17 +139,29 @@ export async function loadLedgerEvents(apiOnline = true): Promise<LedgerEvent[]>
   return loadFromApiOrMock('/ledger-events', [], apiOnline);
 }
 
-export async function probeApi(): Promise<boolean> {
+export async function loadStockPositions(apiOnline = true): Promise<StockPosition[]> {
+  return loadFromApiOrMock('/stock', [], apiOnline);
+}
+
+export async function fetchApiHealth(): Promise<ApiHealth> {
   if (getDataSourceMode() === 'mock') {
-    return false;
+    return { ok: false };
   }
 
   try {
     const response = await fetch(`${apiBaseUrl}/health`);
-    return response.ok;
+    if (!response.ok) {
+      return { ok: false };
+    }
+    return (await response.json()) as ApiHealth;
   } catch {
-    return false;
+    return { ok: false };
   }
+}
+
+export async function probeApi(): Promise<boolean> {
+  const health = await fetchApiHealth();
+  return health.ok;
 }
 
 export async function loadWorkspaceData(scenario: DemoScenario): Promise<WorkspaceData> {
@@ -131,7 +171,7 @@ export async function loadWorkspaceData(scenario: DemoScenario): Promise<Workspa
     return mockWorkspace(scenario);
   }
 
-  const [summary, stakeholders, lots, transfers, allocations, authTransactions, entitlements, distributions, alerts, ledgerEvents] =
+  const [summary, stakeholders, lots, transfers, allocations, authTransactions, entitlements, distributions, alerts, ledgerEvents, stockPositions] =
     await Promise.all([
       loadDashboardSummary(apiOnline),
       loadStakeholders(apiOnline),
@@ -142,7 +182,8 @@ export async function loadWorkspaceData(scenario: DemoScenario): Promise<Workspa
       loadEntitlements(apiOnline),
       loadDistributions(apiOnline),
       loadAlerts(scenario, apiOnline),
-      loadLedgerEvents(apiOnline)
+      loadLedgerEvents(apiOnline),
+      loadStockPositions(apiOnline)
     ]);
 
   return {
@@ -155,7 +196,8 @@ export async function loadWorkspaceData(scenario: DemoScenario): Promise<Workspa
     entitlements,
     distributions,
     alerts,
-    ledgerEvents
+    ledgerEvents,
+    stockPositions
   };
 }
 
@@ -170,8 +212,6 @@ export async function executeWorkflowAction(request: WorkflowActionRequest): Pro
       });
     case 'dispatch':
       return postJson('/transfers', request.payload);
-    case 'transform-lot':
-      return postJson('/lots/transform', request.payload);
     case 'receive':
       return postJson(`/transfers/${request.transferId}/receive`, { receivedQtyKg: request.receivedQtyKg });
     case 'allocate':
@@ -195,12 +235,14 @@ export const runShortReceiptDemo = async (): Promise<TransferOrder> => {
   await postJson('/transfers', {
     transferId: 'TR-UI-SHORT-001',
     lotId: 'LOT-RICE-2026-001',
-    fromOrg: 'PROC-001',
-    toOrg: 'MLL-001',
-    dispatchedQtyKg: 1000,
+    fromOrg: 'GODOWN-S-001',
+    toOrg: 'ISSUE-001',
+    dispatchedQtyKg: demoQuantities.shortReceiptDispatchKg,
     vehicleNo: 'KA01AB9001'
   });
-  return postJson<TransferOrder>('/transfers/TR-UI-SHORT-001/receive', { receivedQtyKg: 800 });
+  return postJson<TransferOrder>('/transfers/TR-UI-SHORT-001/receive', {
+    receivedQtyKg: demoQuantities.shortReceiptReceivedKg
+  });
 };
 
 export const authenticateBeneficiary = async (authTxnId: string) =>
@@ -229,6 +271,26 @@ export const recordDistribution = async (input: {
     authResult: input.authResult,
     authTxnRefHash: input.authTxnRefHash,
     dealerId: 'FPS-DEALER-101'
+  });
+
+export const createStockLot = async (input: {
+  commodity: string;
+  quantityKg: number;
+  qualityGrade: string;
+  currentOwner: string;
+  currentLocation: string;
+  season?: string;
+  source?: string;
+}): Promise<CommodityLot> =>
+  postJson('/lots', {
+    lotId: `LOT-${input.commodity.toUpperCase().replace(/[^A-Z0-9]+/g, '-')}-${Date.now()}`,
+    commodity: input.commodity,
+    season: input.season ?? 'Manual top-up',
+    quantityKg: input.quantityKg,
+    qualityGrade: input.qualityGrade,
+    source: input.source ?? 'Admin top-up',
+    currentOwner: input.currentOwner,
+    currentLocation: input.currentLocation
   });
 
 export function buildApiUrl(path: string): string {

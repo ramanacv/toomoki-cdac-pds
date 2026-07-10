@@ -20,43 +20,59 @@ const baseConfig = (): FabricRuntimeConfig => ({
   peerTlsCertPath: '/tmp/ca.crt',
   peerHostAlias: 'peer0.food.example.com',
   mspId: 'FoodAndCivilSuppliesMSP',
+  endorsingOrgs: ['FoodAndCivilSuppliesMSP'],
   certPath: '/tmp/cert.pem',
   keyPath: '/tmp/key.pem'
 });
 
 describe('FabricGatewayClient', () => {
   it('submits and evaluates transactions via the gateway contract', async () => {
-    const submitTransaction = vi.fn().mockResolvedValue(Buffer.from('{}'));
-    const evaluateTransaction = vi
+    const submit = vi.fn().mockResolvedValue(Buffer.from('{}'));
+    const evaluate = vi
       .fn()
       .mockResolvedValue(Buffer.from(JSON.stringify([{ eventType: 'CreateCommodityLot' }])));
 
     vi.spyOn(connectionModule, 'createFabricGatewayConnection').mockResolvedValue({
       client: { close: vi.fn() } as never,
-      gateway: { close: vi.fn() } as never,
-      contract: { submitTransaction, evaluateTransaction } as never,
+      gateway: {
+        close: vi.fn(),
+        getNetwork: vi.fn().mockReturnValue({
+          getContract: vi.fn().mockReturnValue({ submit, evaluate })
+        })
+      } as never,
+      contract: { submit, evaluate } as never,
       close: vi.fn()
     });
 
     const client = new FabricGatewayClient(baseConfig());
     await client.submitAsync('DispatchLot', { lotId: 'LOT-1' });
-    expect(submitTransaction).toHaveBeenCalledWith('DispatchLot', JSON.stringify({ lotId: 'LOT-1' }));
+    expect(submit).toHaveBeenCalledWith('DispatchLot', {
+      arguments: [JSON.stringify({ lotId: 'LOT-1' })],
+      endorsingOrganizations: ['FoodAndCivilSuppliesMSP']
+    });
 
     const history = await client.getLotHistoryAsync('LOT-1');
-    expect(evaluateTransaction).toHaveBeenCalledWith('GetLotHistory', JSON.stringify({ lotId: 'LOT-1' }));
+    expect(evaluate).toHaveBeenCalledWith('GetLotHistory', {
+      arguments: [JSON.stringify({ lotId: 'LOT-1' })]
+    });
     expect(history).toEqual([{ eventType: 'CreateCommodityLot' }]);
   });
 
   it('evaluates VerifyDatabaseHash', async () => {
-    const submitTransaction = vi.fn();
-    const evaluateTransaction = vi
+    const submit = vi.fn();
+    const evaluate = vi
       .fn()
       .mockResolvedValue(Buffer.from(JSON.stringify({ match: true, ledgerDigest: 'abc' })));
 
     vi.spyOn(connectionModule, 'createFabricGatewayConnection').mockResolvedValue({
       client: { close: vi.fn() } as never,
-      gateway: { close: vi.fn() } as never,
-      contract: { submitTransaction, evaluateTransaction } as never,
+      gateway: {
+        close: vi.fn(),
+        getNetwork: vi.fn().mockReturnValue({
+          getContract: vi.fn().mockReturnValue({ submit, evaluate })
+        })
+      } as never,
+      contract: { submit, evaluate } as never,
       close: vi.fn()
     });
 

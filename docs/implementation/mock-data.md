@@ -1,6 +1,6 @@
 # Mock Data and Fixtures
 
-PDS-Chain keeps all canonical mock and seed data in the repository `mock/` folder. Application code loads this data through the `@pds/fixtures` package instead of embedding records in source files.
+ViksitPDS keeps all canonical mock and seed data in the repository `mock/` folder. Application code loads this data through the `@pds/fixtures` package instead of embedding records in source files.
 
 This separation makes it straightforward to:
 
@@ -44,8 +44,8 @@ Minimal bootstrap payload shared by:
 
 Contains:
 
-- `initialLot` — starting rice lot at procurement
-- `initialEntitlement` — unrationed monthly balance for the demo ration card
+- `initialLots` — starting procurement lots for Rice, Wheat, Dal, Sugar, Cooking Oil, and Kerosene
+- `initialEntitlements` — monthly demo ration-card balances for all supported commodities
 - `rationCard` and `beneficiaryRegistry` — off-chain mock registry rows
 
 Stakeholders for backend seed come from `mock/entities/stakeholders.json`.

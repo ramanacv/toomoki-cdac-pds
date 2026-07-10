@@ -15,7 +15,7 @@ export class DistributionsController {
 
   @Post('/distributions')
   distribute(@Body() body: DistributionDto) {
-    return this.ledger.recordDistribution(body);
+    return this.ledger.recordDistributionPersisted(body);
   }
 
   @Get('/distributions/:distributionId')

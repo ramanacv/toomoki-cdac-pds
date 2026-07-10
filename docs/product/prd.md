@@ -1,8 +1,8 @@
-# Product Requirements Document: PDS-Chain MVP
+# Product Requirements Document: ViksitPDS MVP
 
 ## Product Vision
 
-PDS-Chain provides a blockchain-enabled trust layer for PDS transactions so government departments, FPS dealers, godowns, auditors, and beneficiaries can verify commodity movement and ration delivery events without relying only on mutable operational databases.
+ViksitPDS provides a blockchain-enabled trust layer for PDS transactions so government departments, FPS dealers, godowns, auditors, and beneficiaries can verify commodity movement and ration delivery events without relying only on mutable operational databases.
 
 ## Product Goals
 
@@ -28,7 +28,7 @@ PDS-Chain provides a blockchain-enabled trust layer for PDS transactions so gove
 
 ### Stakeholder Onboarding
 
-An admin registers procurement centre, miller, godowns, FPS dealer, and auditor. Each stakeholder receives an active status and role-appropriate permissions.
+An admin registers procurement centre, FCI, state godown, issue point, FPS dealer, transporter, DSO, and auditor. Each stakeholder receives an active status and role-appropriate permissions.
 
 ### Commodity Lot Creation
 
@@ -55,7 +55,7 @@ An auditor views lot history, distribution receipts, pending receipts, duplicate
 ### Stakeholder Registry
 
 - Register stakeholders with ID, type, name, location, license/reference number, and status.
-- Support stakeholder types for procurement centre, miller, transporter, godown, FPS, department, and auditor.
+- Support stakeholder types for procurement centre, FCI, transporter, state godown, issue point, FPS, DSO, and auditor.
 - Block inactive stakeholders from performing transactions.
 
 ### Commodity Lot Management
@@ -75,7 +75,7 @@ An auditor views lot history, distribution receipts, pending receipts, duplicate
 
 ### FPS Allocation
 
-- Allocate commodity stock from block godown to FPS.
+- Allocate commodity stock from issue point to FPS.
 - Prevent allocation above available stock.
 - Confirm FPS receipt.
 - Track FPS opening, received, distributed, and closing stock.

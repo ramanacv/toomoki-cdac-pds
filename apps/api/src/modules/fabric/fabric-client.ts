@@ -6,7 +6,6 @@ import type { LedgerEvent } from '@pds/shared-types';
 export type FabricOperationName =
   | 'RegisterStakeholder'
   | 'CreateCommodityLot'
-  | 'TransformLot'
   | 'DispatchLot'
   | 'ReceiveLot'
   | 'AllocateToFPS'
@@ -64,7 +63,6 @@ export const toFabricTransactionEnvelope = (event: LedgerEvent): FabricTransacti
   const operationByEventType: Record<LedgerEvent['eventType'], FabricOperationName> = {
     RegisterStakeholder: 'RegisterStakeholder',
     CreateCommodityLot: 'CreateCommodityLot',
-    TransformLot: 'TransformLot',
     AuthorizeMovement: 'RecordLedgerProof',
     DispatchLot: 'DispatchLot',
     ReceiveLot: 'ReceiveLot',
@@ -74,18 +72,23 @@ export const toFabricTransactionEnvelope = (event: LedgerEvent): FabricTransacti
     CreateMonthlyEntitlement: 'CreateMonthlyEntitlement',
     RecordDistribution: 'RecordDistribution',
     RaiseAuditFlag: 'RaiseAuditFlag',
-    ResolveAuditFlag: 'ResolveAuditFlag'
+    ResolveAuditFlag: 'ResolveAuditFlag',
+    // Reset clears app/Postgres state and starts a new ID series; Fabric stays
+    // append-only. Record a proof envelope, then CreateCommodityLot events follow.
+    ResetTransactionalData: 'RecordLedgerProof'
   } as Record<LedgerEvent['eventType'], FabricOperationName>;
 
+  const operation = operationByEventType[event.eventType] ?? 'VerifyDatabaseHash';
   return {
     network: 'pds-chain-fabric-network',
     channel: 'pdschannel',
     chaincode: 'pds-chaincode',
-    operation: operationByEventType[event.eventType] ?? 'VerifyDatabaseHash',
+    operation,
     entityType: event.entityType,
     entityId: event.entityId,
     txId: `fabric-${randomUUID()}`,
-    payload: event.payload,
+    // RecordLedgerProof replays LedgerEvent envelopes, not only inner payloads.
+    payload: operation === 'RecordLedgerProof' ? (event as unknown as Record<string, unknown>) : event.payload,
     timestamp: event.timestamp
   };
 };

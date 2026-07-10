@@ -1,0 +1,27 @@
+# Port-forward overlays for CouchDB Fauxton (dev only).
+# Included from docker-compose.yml. Start with:
+#   docker compose --profile fabric --profile fabric-debug up -d
+# Do not use on shared or production hosts.
+
+services:
+  couchdb0-fauxton:
+    profiles: [fabric-debug]
+    image: alpine/socat:1.0.5
+    command: TCP-LISTEN:5984,fork,reuseaddr TCP:couchdb0:5984
+    ports:
+      - '5984:5984'
+    depends_on:
+      - couchdb0
+    networks:
+      - pds-fabric
+
+  couchdb1-fauxton:
+    profiles: [fabric-debug]
+    image: alpine/socat:1.0.5
+    command: TCP-LISTEN:5984,fork,reuseaddr TCP:couchdb1:5984
+    ports:
+      - '6984:5984'
+    depends_on:
+      - couchdb1
+    networks:
+      - pds-fabric

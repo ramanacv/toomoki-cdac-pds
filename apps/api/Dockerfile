@@ -44,6 +44,10 @@ COPY --from=builder /app/packages/shared-types/dist ./packages/shared-types/dist
 COPY --from=builder /app/packages/shared-types/package.json ./packages/shared-types/package.json
 COPY --from=builder /app/packages/fixtures/dist ./packages/fixtures/dist
 COPY --from=builder /app/packages/fixtures/package.json ./packages/fixtures/package.json
+# @pds/fixtures resolves demo JSON fixtures relative to itself at runtime
+# (../../../mock/...), so the repo-root mock/ directory must ship too —
+# without it, seedDemoData()/resetTransactionalData() crash on first use.
+COPY --from=builder /app/mock ./mock
 COPY --from=builder /app/blockchain/chaincode/pds-chaincode/dist ./blockchain/chaincode/pds-chaincode/dist
 COPY --from=builder /app/blockchain/chaincode/pds-chaincode/package.json ./blockchain/chaincode/pds-chaincode/package.json
 COPY --from=builder /app/blockchain/fabric-network ./blockchain/fabric-network

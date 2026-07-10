@@ -38,3 +38,13 @@ if (!globalThis.IntersectionObserver) {
     value: MockIntersectionObserver
   });
 }
+
+// jsdom doesn't implement pointer capture or scrollIntoView, which Radix Select relies on.
+if (!Element.prototype.hasPointerCapture) {
+  Element.prototype.hasPointerCapture = () => false;
+  Element.prototype.setPointerCapture = () => {};
+  Element.prototype.releasePointerCapture = () => {};
+}
+if (!Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = () => {};
+}

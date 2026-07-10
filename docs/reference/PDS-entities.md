@@ -14,8 +14,6 @@ Based on the sources, the supply chain for food distribution is a multi-layered 
 
 ### 4. Retail and Frontline Distribution Endpoints
 *   **Fair Price Shops (FPS):** Also known as Raastabhav Dukane (रास्तभाव दुकाने), these are the primary retail outlets where beneficiaries purchase subsidized foodgrains.
-*   **Shiv Bhojan Eateries:** Specialized government-subsidized centers that provide cooked meals to the public.
-*   **Welfare Institutions:** Non-individual recipients such as **hostels and ashram schools** that receive foodgrains at Below Poverty Line (BPL) rates for their inmates.
 
 ### 5. Regulatory and Oversight Entities
 *   **Legal Metrology Department (Vajne-Mape):** Responsible for ensuring fairness in the system by verifying and stamping **weights and measures** used at distribution points and licensing manufacturers and repairers of weighing equipment.
@@ -44,6 +42,6 @@ Once foodgrains are allocated to a state like Maharashtra, the operational respo
 ### Role of Depots in the Supply Chain
 Depots are the primary units for **Stage-II Stock Movement**, where the following activities are tracked through the **Integrated Aadhaar enabled Supply Chain Management (IAeSCM)** system:
 *   **RO Status:** Monitoring "Release Orders" (RO) which authorize the movement of stock.
-*   **Dispatch and Receipt:** Managing the physical "Dispatch" of goods to Fair Price Shops or Welfare Institutions and recording the "Receipt" of bulk grains from the FCI.
+*   **Dispatch and Receipt:** Managing the physical "Dispatch" of goods to Fair Price Shops and recording the "Receipt" of bulk grains from the FCI.
 *   **Inventory Management:** Maintaining real-time data on **Depot Stock** to ensure there are no shortages at the regional level.
-*   **Issue Points:** Depots often function as the official "Issue Points" where local retailers or welfare agencies collect their allotted commodities.
+*   **Issue Points:** Depots often function as the official "Issue Points" where FPS retailers collect their allotted commodities.

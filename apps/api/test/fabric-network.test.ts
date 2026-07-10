@@ -16,7 +16,7 @@ describe('fabric network scaffold', () => {
     expect(manifest.channel).toBe('pdschannel');
     expect(manifest.chaincode.name).toBe('pds-chaincode');
     expect(manifest.organizations.map((org) => org.role)).toEqual([
-      'DEPARTMENT',
+      'DISTRICT_SUPPLY_OFFICE',
       'PROCUREMENT_CENTER',
       'STATE_GODOWN',
       'FAIR_PRICE_SHOP',

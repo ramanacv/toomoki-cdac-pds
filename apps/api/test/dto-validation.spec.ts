@@ -7,6 +7,7 @@ import { AuthOtpDto, SupervisorExceptionAuthDto } from '../src/modules/auth/dto/
 import { DistributionDto } from '../src/modules/distributions/dto/distribution.dto.js';
 import { EntitlementValidateDto } from '../src/modules/entitlements/dto/entitlement.dto.js';
 import { LotCreateDto } from '../src/modules/lots/dto/lot.dto.js';
+import { ResetLedgerDto } from '../src/modules/admin/dto/reset-ledger.dto.js';
 import { ResolveAuditAlertDto } from '../src/modules/audit/dto/resolve-audit-alert.dto.js';
 import { StakeholderCreateDto } from '../src/modules/stakeholders/dto/stakeholder.dto.js';
 import { DispatchDto, TransferReceiveDto } from '../src/modules/transfers/dto/transfer.dto.js';
@@ -25,7 +26,7 @@ describe('module DTO validation', () => {
     expectValid(
       plainToInstance(StakeholderCreateDto, {
         stakeholderId: 'STK-001',
-        stakeholderType: StakeholderType.DEPARTMENT,
+        stakeholderType: StakeholderType.DISTRICT_SUPPLY_OFFICE,
         name: 'Demo',
         district: 'Demo',
         licenseNo: 'LIC-001',
@@ -79,7 +80,7 @@ describe('module DTO validation', () => {
         transferId: 'TR-001',
         lotId: 'LOT-001',
         fromOrg: 'PROC-001',
-        toOrg: 'MLL-001',
+        toOrg: 'FCI-001',
         dispatchedQtyKg: 50,
         vehicleNo: 'KA01AB0001'
       })
@@ -100,7 +101,7 @@ describe('module DTO validation', () => {
         commodity: 'Rice',
         allocatedQtyKg: 25,
         month: '2026-06',
-        sourceGodownId: 'GODOWN-B-001'
+        sourceGodownId: 'ISSUE-001'
       })
     );
   });
@@ -155,7 +156,7 @@ describe('module DTO validation', () => {
     expectValid(
       plainToInstance(ResolveAuditAlertDto, {
         resolvedBy: 'AUDIT-001',
-        resolutionNote: 'Verified against miller invoice.'
+        resolutionNote: 'Verified against issue-point receipt.'
       })
     );
     expectValid(plainToInstance(ResolveAuditAlertDto, { resolvedBy: 'AUDIT-001' }));
@@ -181,5 +182,14 @@ describe('module DTO validation', () => {
     expectInvalid(plainToInstance(VerifyLedgerDto, { digest: '' }));
     expectInvalid(plainToInstance(VerifyLedgerDto, { digest: 'not-hex!!' }));
     expectInvalid(plainToInstance(VerifyLedgerDto, { digest: 'xyz' }));
+  });
+
+  it('validates the commodity-scoped reset payload', () => {
+    // commodity must be decorated (not just declared) so the global
+    // ValidationPipe's whitelist option doesn't silently strip it from the
+    // body before it reaches the controller.
+    expectValid(plainToInstance(ResetLedgerDto, {}));
+    expectValid(plainToInstance(ResetLedgerDto, { commodity: 'Rice' }));
+    expectInvalid(plainToInstance(ResetLedgerDto, { commodity: 42 }));
   });
 });

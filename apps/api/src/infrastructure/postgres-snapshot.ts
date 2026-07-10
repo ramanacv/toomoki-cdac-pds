@@ -67,6 +67,7 @@ export const mapAllocationRow = (row: Record<string, unknown>): FPSAllocation =>
   commodity: asString(row.commodity),
   allocatedQtyKg: asNumber(row.allocated_qty_kg),
   ...(row.received_qty_kg == null ? {} : { receivedQtyKg: asNumber(row.received_qty_kg) }),
+  ...(row.shortage_qty_kg == null ? {} : { shortageQtyKg: asNumber(row.shortage_qty_kg) }),
   month: asString(row.month),
   sourceGodownId: asString(row.source_godown_id),
   status: asString(row.status) as FPSAllocation['status']
@@ -150,6 +151,10 @@ export const buildSnapshotWritePlan = (state: PdsLedgerState): SqlStatement[] =>
   const statements: SqlStatement[] = [
     { text: 'BEGIN', values: [] },
     {
+      text: 'ALTER TABLE fps_allocations ADD COLUMN IF NOT EXISTS shortage_qty_kg INTEGER',
+      values: []
+    },
+    {
       text: 'TRUNCATE stakeholders, commodity_lots, stock_positions, transfer_orders, fps_allocations, monthly_entitlements, auth_transactions, distribution_transactions, audit_alerts, ledger_events, ledger_tx_index RESTART IDENTITY CASCADE',
       values: []
     }
@@ -190,13 +195,14 @@ export const buildSnapshotWritePlan = (state: PdsLedgerState): SqlStatement[] =>
 
   for (const allocation of state.allocations) {
     statements.push({
-      text: 'INSERT INTO fps_allocations (allocation_id, fps_id, commodity, allocated_qty_kg, received_qty_kg, month, source_godown_id, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (allocation_id) DO UPDATE SET fps_id = EXCLUDED.fps_id, commodity = EXCLUDED.commodity, allocated_qty_kg = EXCLUDED.allocated_qty_kg, received_qty_kg = EXCLUDED.received_qty_kg, month = EXCLUDED.month, source_godown_id = EXCLUDED.source_godown_id, status = EXCLUDED.status',
+      text: 'INSERT INTO fps_allocations (allocation_id, fps_id, commodity, allocated_qty_kg, received_qty_kg, shortage_qty_kg, month, source_godown_id, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) ON CONFLICT (allocation_id) DO UPDATE SET fps_id = EXCLUDED.fps_id, commodity = EXCLUDED.commodity, allocated_qty_kg = EXCLUDED.allocated_qty_kg, received_qty_kg = EXCLUDED.received_qty_kg, shortage_qty_kg = EXCLUDED.shortage_qty_kg, month = EXCLUDED.month, source_godown_id = EXCLUDED.source_godown_id, status = EXCLUDED.status',
       values: [
         allocation.allocationId,
         allocation.fpsId,
         allocation.commodity,
         allocation.allocatedQtyKg,
         allocation.receivedQtyKg ?? null,
+        allocation.shortageQtyKg ?? null,
         allocation.month,
         allocation.sourceGodownId,
         allocation.status

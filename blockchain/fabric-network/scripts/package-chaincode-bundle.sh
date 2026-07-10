@@ -26,21 +26,27 @@ cat > "${OUT}/package.json" <<'EOF'
     "start": "fabric-chaincode-node start"
   },
   "dependencies": {
+    "@pds/shared-types": "file:./vendor/shared-types",
     "fabric-contract-api": "^2.5.8",
     "fabric-shim": "^2.5.8"
   }
 }
 EOF
 
-# @pds/shared-types is the only workspace dep the chaincode needs on the Fabric
-# runtime path. @pds/fixtures is intentionally excluded (T6.5): demo seeding is
-# lazy-loaded via createRequire inside seedDemoData, which the Fabric server
-# path never invokes, so the bundle stays lean and fixture-free.
-mkdir -p "${OUT}/node_modules/@pds/shared-types"
-cp -r "${REPO_ROOT}/packages/shared-types/dist" "${OUT}/node_modules/@pds/shared-types/dist"
-cp "${REPO_ROOT}/packages/shared-types/package.json" "${OUT}/node_modules/@pds/shared-types/package.json"
+# Vendor the workspace package so npm install preserves it in the Fabric image.
+mkdir -p "${OUT}/vendor/shared-types"
+cp -r "${REPO_ROOT}/packages/shared-types/dist" "${OUT}/vendor/shared-types/dist"
+cp "${REPO_ROOT}/packages/shared-types/package.json" "${OUT}/vendor/shared-types/package.json"
 
 # Install runtime deps inside bundle (no workspace hoisting)
 npm install --prefix "${OUT}" --omit=dev
+
+# npm installs local file dependencies as symlinks. Fabric's external builder
+# copies the package into a container image where those symlinks can be lost, so
+# make the vendored workspace dependency a real directory in node_modules.
+rm -rf "${OUT}/node_modules/@pds/shared-types"
+mkdir -p "${OUT}/node_modules/@pds/shared-types"
+cp -r "${OUT}/vendor/shared-types/dist" "${OUT}/node_modules/@pds/shared-types/dist"
+cp "${OUT}/vendor/shared-types/package.json" "${OUT}/node_modules/@pds/shared-types/package.json"
 
 echo "Bundle ready: ${OUT}"

@@ -10,14 +10,14 @@ export class TraceController {
 
   @Get('/trace/lots/:lotId')
   lotTrace(@Param('lotId') lotId: string) {
-    return this.ledger.getTraceForLot(lotId);
+    return this.ledger.getTraceForLotFromChain(lotId);
   }
 
   @Get('/trace/distributions/:distributionId')
-  distributionTrace(@Param('distributionId') distributionId: string) {
+  async distributionTrace(@Param('distributionId') distributionId: string) {
     return {
       distribution: this.ledger.getDistributionReceipt(distributionId),
-      history: this.ledger.getDistributionHistoryFromChain(distributionId)
+      history: await this.ledger.getDistributionHistoryFromChainAsync(distributionId)
     };
   }
 

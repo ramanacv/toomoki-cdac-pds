@@ -58,12 +58,22 @@ export class PdsControlContract extends Contract {
   async RegisterStakeholder(ctx: Context, payloadJson: string): Promise<string> {
     assertAuthorized('RegisterStakeholder', identityFromContext(ctx));
     const txId = ctx.stub.getTxID();
+    const payload = JSON.parse(payloadJson) as Stakeholder;
     const [stakeholders, events] = await Promise.all([
       loadCollection<Stakeholder>(ctx, 'stakeholders'),
       loadCollection<LedgerEvent>(ctx, 'events')
     ]);
+    const existing = stakeholders.find((stakeholder) => stakeholder.stakeholderId === payload.stakeholderId);
+    if (existing) {
+      if (JSON.stringify(existing) !== JSON.stringify(payload)) {
+        throw new Error(`Stakeholder ${payload.stakeholderId} already exists`);
+      }
+      const out = { stakeholder: existing, ledgerTxId: txId };
+      emitAndLog(ctx, 'control', 'RegisterStakeholder', txId, out);
+      return JSON.stringify(out);
+    }
     const engine = buildEngine({ stakeholders, events });
-    const result = engine.registerStakeholder(JSON.parse(payloadJson) as Stakeholder);
+    const result = engine.registerStakeholder(payload);
     const state = engine.exportState();
     await Promise.all([
       saveCollection(ctx, 'stakeholders', state.stakeholders),
@@ -309,32 +319,6 @@ export class PdsDataContract extends Contract {
     return JSON.stringify(out);
   }
 
-  async TransformLot(ctx: Context, payloadJson: string): Promise<string> {
-    assertAuthorized('TransformLot', identityFromContext(ctx));
-    const txId = ctx.stub.getTxID();
-    const isoTimestamp = getTxTimestamp(ctx);
-    const payload = { ...JSON.parse(payloadJson), transformedAt: isoTimestamp };
-    const [stakeholders, lots, stock, events] = await Promise.all([
-      loadCollection<Stakeholder>(ctx, 'stakeholders'),
-      loadCollection<CommodityLot>(ctx, 'lots'),
-      loadCollection<[StockKey, number]>(ctx, 'stock'),
-      loadCollection<LedgerEvent>(ctx, 'events')
-    ]);
-    const engine = buildEngine({ stakeholders, lots, stock, events });
-    const result = engine.transformLot(payload);
-    const state = engine.exportState();
-    const lotKey = ctx.stub.createCompositeKey('lot', [result.lotId]);
-    await Promise.all([
-      saveCollection(ctx, 'lots', state.lots),
-      saveCollection(ctx, 'stock', state.stock),
-      saveCollection(ctx, 'events', state.events),
-      ctx.stub.putState(lotKey, Buffer.from(JSON.stringify({ ...result, fabricTxId: txId, fabricTimestamp: isoTimestamp })))
-    ]);
-    const out = { ...result, ledgerTxId: txId };
-    emitAndLog(ctx, 'data', 'TransformLot', txId, out);
-    return JSON.stringify(out);
-  }
-
   async ReceiveLot(ctx: Context, payloadJson: string): Promise<string> {
     assertAuthorized('ReceiveLot', identityFromContext(ctx));
     const txId = ctx.stub.getTxID();
@@ -391,18 +375,20 @@ export class PdsDataContract extends Contract {
     const txId = ctx.stub.getTxID();
     const isoTimestamp = getTxTimestamp(ctx);
     const payload = { ...JSON.parse(payloadJson), receiveTimestamp: isoTimestamp };
-    const [allocations, stock, events] = await Promise.all([
+    const [allocations, stock, alerts, events] = await Promise.all([
       loadCollection<FPSAllocation>(ctx, 'allocations'),
       loadCollection<[StockKey, number]>(ctx, 'stock'),
+      loadCollection<AuditAlert>(ctx, 'alerts'),
       loadCollection<LedgerEvent>(ctx, 'events')
     ]);
-    const engine = buildEngine({ allocations, stock, events });
+    const engine = buildEngine({ allocations, stock, alerts, events });
     const result = engine.recordFpsReceipt(payload);
     const state = engine.exportState();
     const allocationKey = ctx.stub.createCompositeKey('allocation', [result.allocationId]);
     await Promise.all([
       saveCollection(ctx, 'allocations', state.allocations),
       saveCollection(ctx, 'stock', state.stock),
+      saveCollection(ctx, 'alerts', state.alerts),
       saveCollection(ctx, 'events', state.events),
       ctx.stub.putState(allocationKey, Buffer.from(JSON.stringify({ ...result, fabricTxId: txId })))
     ]);

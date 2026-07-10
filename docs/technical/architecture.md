@@ -1,8 +1,8 @@
-# Technical Architecture: PDS-Chain MVP
+# Technical Architecture: ViksitPDS MVP
 
 ## Architecture Summary
 
-PDS-Chain is a permissioned blockchain trust layer backed by an operational database and business API. PostgreSQL stores current workflow state and dashboard-optimized data. Hyperledger Fabric stores immutable transaction proofs, custody history, distribution receipts, and audit evidence.
+ViksitPDS is a permissioned blockchain trust layer backed by an operational database and business API. PostgreSQL stores current workflow state and dashboard-optimized data. Hyperledger Fabric stores immutable transaction proofs, custody history, distribution receipts, and audit evidence.
 
 The MVP runs with mock data and simulated integrations. It is designed so real SMART-PDS, state PDS, ePoS, and authentication integrations can be added later through adapters.
 
@@ -165,7 +165,7 @@ MVP network (implemented):
 Documented consortium (5 orgs in `network-manifest.json`):
 
 - Org1: Food and Civil Supplies Department.
-- Org2: Procurement/Miller.
+- Org2: Procurement/FCI.
 - Org3: Godown/Warehouse.
 - Org4: Fair Price Shop.
 - Org5: Auditor/Inspection Authority.

@@ -1,14 +1,31 @@
+import { useState } from 'react';
 import type {
   AuditAlert,
   AuthTransaction,
+  CommodityLot,
+  CommodityName,
   DistributionTransaction,
   FPSAllocation,
   MonthlyEntitlement,
   Stakeholder,
   TransferOrder
 } from '@pds/shared-types';
+import { COMMODITIES, LotStatus } from '@pds/shared-types';
 import { Panel } from '@/components/Panel';
 import { CardTopline, DefinitionList, EntityCard } from '@/components/Entity';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from '@/components/ui/table';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+import { formatDateTime, stakeholderParticipation } from '@/lib/constants';
+import { cn } from '@/lib/utils';
+import { ParticipationBadge, participationCardClass } from '@/components/ParticipationIndicator';
 
 const alertTone: Record<AuditAlert['riskLevel'], 'low' | 'medium' | 'high'> = {
   LOW: 'low',
@@ -17,45 +34,241 @@ const alertTone: Record<AuditAlert['riskLevel'], 'low' | 'medium' | 'high'> = {
 };
 
 export function StakeholdersPanel({ stakeholders }: { stakeholders: Stakeholder[] }) {
+  const sortedStakeholders = [...stakeholders].sort((left, right) => {
+    const leftActive = stakeholderParticipation(left.stakeholderType) === 'active' ? 0 : 1;
+    const rightActive = stakeholderParticipation(right.stakeholderType) === 'active' ? 0 : 1;
+    return leftActive - rightActive || left.name.localeCompare(right.name);
+  });
+  const activeCount = stakeholders.filter(
+    (stakeholder) => stakeholderParticipation(stakeholder.stakeholderType) === 'active'
+  ).length;
+
   return (
     <Panel
       eyebrow="Stakeholders"
       title="Demo operating network"
       pill={`${stakeholders.length} parties`}
+      lead={`${activeCount} workbench operators and ${stakeholders.length - activeCount} oversight or supporting parties.`}
     >
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
-        {stakeholders.map((stakeholder) => (
-          <EntityCard key={stakeholder.stakeholderId} className="space-y-1">
-            <strong className="block">{stakeholder.name}</strong>
-            <span className="block text-sm text-muted-foreground">{stakeholder.stakeholderType}</span>
-            <p className="text-sm text-muted-foreground">{stakeholder.district}</p>
-            <code className="mt-3 block text-secondary">{stakeholder.stakeholderId}</code>
-          </EntityCard>
-        ))}
+      <div className="mb-4 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+        <span className="inline-flex items-center gap-2">
+          <ParticipationBadge mode="active" />
+          <span>Custody chain actions</span>
+        </span>
+        <span className="inline-flex items-center gap-2">
+          <ParticipationBadge mode="passive" />
+          <span>Policy, audit, or supporting role</span>
+        </span>
+      </div>
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3">
+        {sortedStakeholders.map((stakeholder) => {
+          const mode = stakeholderParticipation(stakeholder.stakeholderType);
+          return (
+            <EntityCard
+              key={stakeholder.stakeholderId}
+              className={cn('space-y-3 rounded-lg', participationCardClass[mode])}
+            >
+              <div className="flex justify-end">
+                <ParticipationBadge mode={mode} />
+              </div>
+              <strong className="block min-w-0 break-words text-lg leading-snug">
+                {stakeholder.name}
+              </strong>
+              <span className="block min-w-0 break-all text-sm text-muted-foreground">
+                {stakeholder.stakeholderType}
+              </span>
+              <p className="text-sm text-muted-foreground">{stakeholder.district}</p>
+              <code className="mt-1 block break-all text-secondary">{stakeholder.stakeholderId}</code>
+            </EntityCard>
+          );
+        })}
       </div>
     </Panel>
   );
 }
 
-export function TransfersPanel({ transfers }: { transfers: TransferOrder[] }) {
+type LotStatusFilter = 'ALL' | 'PENDING' | 'RECEIVED' | 'SHORTAGE';
+type CommodityFilter = CommodityName | 'ALL';
+
+const commodityFilterCounts = <T,>(items: T[], getCommodity: (item: T) => string | undefined) => {
+  const counts = new Map<CommodityFilter, number>([['ALL', items.length]]);
+  for (const def of COMMODITIES) {
+    counts.set(def.name, items.filter((item) => getCommodity(item) === def.name).length);
+  }
+  return counts;
+};
+
+const CommodityFilterTabs = ({
+  value,
+  onChange,
+  counts
+}: {
+  value: CommodityFilter;
+  onChange: (value: CommodityFilter) => void;
+  counts: Map<CommodityFilter, number>;
+}) => (
+  <Tabs value={value} onValueChange={(next) => onChange(next as CommodityFilter)} className="mb-4">
+    <TabsList className="h-auto flex-wrap">
+      <TabsTrigger value="ALL">All ({counts.get('ALL') ?? 0})</TabsTrigger>
+      {COMMODITIES.map((commodity) => (
+        <TabsTrigger key={commodity.slug} value={commodity.name}>
+          {commodity.name} ({counts.get(commodity.name) ?? 0})
+        </TabsTrigger>
+      ))}
+    </TabsList>
+  </Tabs>
+);
+
+const isPendingLot = (lot: CommodityLot) => lot.status === LotStatus.CREATED || lot.status === LotStatus.DISPATCHED;
+const isShortageLot = (lot: CommodityLot) => lot.status === LotStatus.RECEIVED_WITH_SHORTAGE;
+const isReceivedLot = (lot: CommodityLot) => lot.status === LotStatus.RECEIVED || isShortageLot(lot);
+
+export function LotsPanel({
+  lots,
+  onSelectLot
+}: {
+  lots: CommodityLot[];
+  onSelectLot?: (lotId: string) => void;
+}) {
+  const [statusFilter, setStatusFilter] = useState<LotStatusFilter>('ALL');
+  const [commodityFilter, setCommodityFilter] = useState<CommodityFilter>('ALL');
+
+  const commodityCounts = commodityFilterCounts(lots, (lot) => lot.commodity);
+
+  const counts = {
+    ALL: lots.length,
+    PENDING: lots.filter(isPendingLot).length,
+    RECEIVED: lots.filter(isReceivedLot).length,
+    SHORTAGE: lots.filter(isShortageLot).length
+  };
+
+  const visibleLots = lots.filter((lot) => {
+    if (commodityFilter !== 'ALL' && lot.commodity !== commodityFilter) return false;
+    if (statusFilter === 'PENDING') return isPendingLot(lot);
+    if (statusFilter === 'RECEIVED') return isReceivedLot(lot);
+    if (statusFilter === 'SHORTAGE') return isShortageLot(lot);
+    return true;
+  });
+
+  return (
+    <Panel eyebrow="Lots" title="Commodity lots overview" pill={`${lots.length} lots`}>
+      <CommodityFilterTabs value={commodityFilter} onChange={setCommodityFilter} counts={commodityCounts} />
+      <Tabs value={statusFilter} onValueChange={(value) => setStatusFilter(value as LotStatusFilter)} className="mb-4">
+        <TabsList>
+          <TabsTrigger value="ALL">All ({counts.ALL})</TabsTrigger>
+          <TabsTrigger value="PENDING">Pending ({counts.PENDING})</TabsTrigger>
+          <TabsTrigger value="RECEIVED">Received ({counts.RECEIVED})</TabsTrigger>
+          <TabsTrigger value="SHORTAGE">Shortage ({counts.SHORTAGE})</TabsTrigger>
+        </TabsList>
+      </Tabs>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead scope="col">Lot ID</TableHead>
+            <TableHead scope="col">Commodity</TableHead>
+            <TableHead scope="col">Status</TableHead>
+            <TableHead scope="col">Quantity</TableHead>
+            <TableHead scope="col">Current owner</TableHead>
+            <TableHead scope="col">Current location</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {visibleLots.map((lot) => (
+            <TableRow
+              key={lot.lotId}
+              onClick={onSelectLot ? () => onSelectLot(lot.lotId) : undefined}
+              className={onSelectLot ? 'cursor-pointer' : undefined}
+            >
+              <TableCell className="font-semibold">{lot.lotId}</TableCell>
+              <TableCell>{lot.commodity}</TableCell>
+              <TableCell>
+                <Badge variant={isShortageLot(lot) ? 'warning' : 'secondary'}>{lot.status}</Badge>
+              </TableCell>
+              <TableCell>{lot.quantityKg} kg</TableCell>
+              <TableCell>{lot.currentOwner}</TableCell>
+              <TableCell>{lot.currentLocation}</TableCell>
+            </TableRow>
+          ))}
+          {visibleLots.length === 0 && (
+            <TableRow>
+              <TableCell colSpan={6} className="text-center text-muted-foreground">
+                No lots match this filter.
+              </TableCell>
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
+    </Panel>
+  );
+}
+
+export function TransfersPanel({
+  transfers,
+  lots = []
+}: {
+  transfers: TransferOrder[];
+  lots?: CommodityLot[];
+}) {
+  const commodityByLotId = new Map(lots.map((lot) => [lot.lotId, lot.commodity]));
+  const [commodityFilter, setCommodityFilter] = useState<CommodityFilter>('ALL');
+  const transferCommodity = (transfer: TransferOrder) => commodityByLotId.get(transfer.lotId);
+  const commodityCounts = commodityFilterCounts(transfers, transferCommodity);
+  const visibleTransfers =
+    commodityFilter === 'ALL' ? transfers : transfers.filter((transfer) => transferCommodity(transfer) === commodityFilter);
+
   return (
     <Panel eyebrow="Transfers" title="Operational movement log" pill={`${transfers.length} records`}>
-      <div className="grid gap-3 md:grid-cols-2">
-        {transfers.map((transfer) => (
-          <EntityCard key={transfer.transferId}>
-            <CardTopline left={transfer.transferId} right={transfer.status} />
-            <p className="text-muted-foreground">
-              {transfer.fromOrg} → {transfer.toOrg}
-            </p>
-            <DefinitionList
-              entries={[
-                { label: 'Dispatched', value: `${transfer.dispatchedQtyKg} kg` },
-                { label: 'Received', value: `${transfer.receivedQtyKg ?? 'Pending'} kg` }
-              ]}
-            />
-          </EntityCard>
-        ))}
-      </div>
+      <CommodityFilterTabs value={commodityFilter} onChange={setCommodityFilter} counts={commodityCounts} />
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead scope="col">Transfer ID</TableHead>
+            <TableHead scope="col">Commodity</TableHead>
+            <TableHead scope="col">Route</TableHead>
+            <TableHead scope="col">Dispatched</TableHead>
+            <TableHead scope="col">Received</TableHead>
+            <TableHead scope="col">Dispatch time</TableHead>
+            <TableHead scope="col">Receive time</TableHead>
+            <TableHead scope="col">Status</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {visibleTransfers.map((transfer) => (
+            <TableRow key={transfer.transferId}>
+              <TableCell className="font-semibold">{transfer.transferId}</TableCell>
+              <TableCell>{commodityByLotId.get(transfer.lotId) ?? '—'}</TableCell>
+              <TableCell className="text-muted-foreground">
+                {transfer.fromOrg} → {transfer.toOrg}
+              </TableCell>
+              <TableCell>{transfer.dispatchedQtyKg} kg</TableCell>
+              <TableCell>
+                {transfer.receivedQtyKg == null ? 'Pending' : `${transfer.receivedQtyKg} kg`}
+              </TableCell>
+              <TableCell>{formatDateTime(transfer.dispatchTimestamp)}</TableCell>
+              <TableCell>{formatDateTime(transfer.receiveTimestamp)}</TableCell>
+              <TableCell>
+                <span
+                  className={cn(
+                    'rounded-full px-2 py-0.5 text-xs font-semibold',
+                    transfer.status === 'RECEIVED_WITH_SHORTAGE'
+                      ? 'bg-warning/15 text-warning'
+                      : 'bg-secondary/10 text-secondary'
+                  )}
+                >
+                  {transfer.status}
+                </span>
+              </TableCell>
+            </TableRow>
+          ))}
+          {visibleTransfers.length === 0 && (
+            <TableRow>
+              <TableCell colSpan={8} className="text-center text-muted-foreground">
+                No transfers match this filter.
+              </TableCell>
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
     </Panel>
   );
 }
@@ -75,7 +288,8 @@ export function AuthLedgerPanel({ authTransactions }: { authTransactions: AuthTr
             <DefinitionList
               entries={[
                 { label: 'Beneficiary', value: auth.beneficiaryRefHash },
-                { label: 'Auth ref', value: auth.authTxnRefHash }
+                { label: 'Auth ref', value: auth.authTxnRefHash },
+                { label: 'Auth time', value: formatDateTime(auth.timestamp) }
               ]}
             />
           </EntityCard>
@@ -156,7 +370,8 @@ export function DistributionPanel({ distributions }: { distributions: Distributi
             <DefinitionList
               entries={[
                 { label: 'Auth ref', value: distribution.authTxnRefHash },
-                { label: 'Ledger tx', value: distribution.ledgerTxId ?? 'Pending' }
+                { label: 'Ledger tx', value: distribution.ledgerTxId ?? 'Pending' },
+                { label: 'Issued at', value: formatDateTime(distribution.timestamp) }
               ]}
             />
           </EntityCard>
@@ -181,7 +396,9 @@ export function AlertsPanel({ alerts }: { alerts: AuditAlert[] }) {
             <DefinitionList
               entries={[
                 { label: 'Entity', value: alert.entityId },
-                { label: 'Status', value: alert.status }
+                { label: 'Status', value: alert.status },
+                { label: 'Created', value: formatDateTime(alert.createdAt) },
+                ...(alert.resolvedAt ? [{ label: 'Resolved', value: formatDateTime(alert.resolvedAt) }] : [])
               ]}
             />
           </EntityCard>

@@ -63,8 +63,8 @@ const pageShell = (title: string, body: string): string => `<!DOCTYPE html>
 
 export const renderLandingPage = (): string =>
   pageShell(
-    'PDS-Chain API',
-    `<h1>PDS-Chain API</h1>
+    'ViksitPDS API',
+    `<h1>ViksitPDS API</h1>
 <p>Blockchain-enabled trust, traceability, and audit layer for India's Public Distribution System.</p>
 <div class="card">
   <strong>Quick links</strong>
@@ -83,7 +83,7 @@ export const renderSwaggerPage = (): string => `<!DOCTYPE html>
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>PDS-Chain API — Swagger</title>
+  <title>ViksitPDS API — Swagger</title>
   <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui.css" />
   <style>
     body { margin: 0; background: #fafafa; }

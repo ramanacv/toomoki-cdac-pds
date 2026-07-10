@@ -20,7 +20,7 @@ describe('fabric chaincode ledger port', () => {
 
       service.registerStakeholder({
         stakeholderId: 'TEST-CHAIN-001',
-        stakeholderType: StakeholderType.DEPARTMENT,
+        stakeholderType: StakeholderType.DISTRICT_SUPPLY_OFFICE,
         name: 'Chain Test Department',
         district: 'Demo District',
         licenseNo: 'CHAIN-001',

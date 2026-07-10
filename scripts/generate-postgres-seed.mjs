@@ -16,8 +16,8 @@ const stakeholderRows = stakeholders
   )
   .join(',\n');
 
-const lot = backendSeed.initialLot;
-const entitlement = backendSeed.initialEntitlement;
+const lots = backendSeed.initialLots;
+const entitlements = backendSeed.initialEntitlements;
 const beneficiary = backendSeed.beneficiaryRegistry;
 const rationCard = backendSeed.rationCard;
 
@@ -29,10 +29,22 @@ VALUES
 ${stakeholderRows};
 
 INSERT INTO commodity_lots (lot_id, commodity, season, quantity_kg, quality_grade, source, current_owner, current_location, status)
-VALUES ('${sqlEscape(lot.lotId)}', '${sqlEscape(lot.commodity)}', '${sqlEscape(lot.season)}', ${lot.quantityKg}, '${sqlEscape(lot.qualityGrade)}', '${sqlEscape(lot.source)}', '${sqlEscape(lot.currentOwner)}', '${sqlEscape(lot.currentLocation)}', 'CREATED');
+VALUES
+${lots
+  .map(
+    (lot) =>
+      `  ('${sqlEscape(lot.lotId)}', '${sqlEscape(lot.commodity)}', '${sqlEscape(lot.season)}', ${lot.quantityKg}, '${sqlEscape(lot.qualityGrade)}', '${sqlEscape(lot.source)}', '${sqlEscape(lot.currentOwner)}', '${sqlEscape(lot.currentLocation)}', 'CREATED')`
+  )
+  .join(',\n')};
 
 INSERT INTO stock_positions (stakeholder_id, commodity, quantity_kg, lot_id, month)
-VALUES ('${sqlEscape(lot.currentOwner)}', '${sqlEscape(lot.commodity)}', ${lot.quantityKg}, '${sqlEscape(lot.lotId)}', NULL);
+VALUES
+${lots
+  .map(
+    (lot) =>
+      `  ('${sqlEscape(lot.currentOwner)}', '${sqlEscape(lot.commodity)}', ${lot.quantityKg}, '${sqlEscape(lot.lotId)}', NULL)`
+  )
+  .join(',\n')};
 
 INSERT INTO ration_cards_mock (ration_card_hash, household_size, district, status)
 VALUES ('${sqlEscape(rationCard.rationCardHash)}', ${rationCard.householdSize}, '${sqlEscape(rationCard.district)}', '${sqlEscape(rationCard.status)}');
@@ -41,7 +53,13 @@ INSERT INTO beneficiary_registry_mock (beneficiary_ref_hash, name_masked, distri
 VALUES ('${sqlEscape(beneficiary.beneficiaryRefHash)}', '${sqlEscape(beneficiary.nameMasked)}', '${sqlEscape(beneficiary.district)}', '${sqlEscape(beneficiary.rationCardHash)}', TRUE);
 
 INSERT INTO monthly_entitlements (ration_card_hash, commodity, month, monthly_entitlement_kg, already_lifted_kg, available_balance_kg, active)
-VALUES ('${sqlEscape(entitlement.rationCardHash)}', '${sqlEscape(entitlement.commodity)}', '${sqlEscape(entitlement.month)}', ${entitlement.monthlyEntitlementKg}, ${entitlement.alreadyLiftedKg}, ${entitlement.availableBalanceKg}, TRUE);
+VALUES
+${entitlements
+  .map(
+    (entitlement) =>
+      `  ('${sqlEscape(entitlement.rationCardHash)}', '${sqlEscape(entitlement.commodity)}', '${sqlEscape(entitlement.month)}', ${entitlement.monthlyEntitlementKg}, ${entitlement.alreadyLiftedKg}, ${entitlement.availableBalanceKg}, TRUE)`
+  )
+  .join(',\n')};
 `;
 
 writeFileSync(outputPath, `${sql}\n`, 'utf8');

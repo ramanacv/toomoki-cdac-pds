@@ -3,7 +3,7 @@
 set -euo pipefail
 
 NETWORK_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-FABRIC_VERSION="${FABRIC_VERSION:-2.5.13}"
+FABRIC_VERSION="${FABRIC_VERSION:-2.5.15}"
 IMAGE="hyperledger/fabric-tools:${FABRIC_VERSION}"
 DOCKER_NETWORK="${FABRIC_DOCKER_NETWORK:-pds-fabric}"
 

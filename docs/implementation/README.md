@@ -1,4 +1,4 @@
-# PDS-Chain Implementation Docs
+# ViksitPDS Implementation Docs
 
 This folder contains implementation guidance derived from the product and technical documentation.
 

@@ -5,7 +5,7 @@
       "org": "FoodAndCivilSupplies",
       "mspId": "FoodAndCivilSuppliesMSP",
       "peer": "peer0.food.example.com",
-      "role": "DEPARTMENT"
+      "role": "DISTRICT_SUPPLY_OFFICE"
     },
     {
       "org": "ProcurementMiller",

@@ -1,8 +1,8 @@
-# Business Requirements Document: PDS-Chain
+# Business Requirements Document: ViksitPDS
 
 ## Executive Summary
 
-PDS-Chain is a blockchain-enabled trust and audit layer for the Public Distribution System. It creates an immutable, privacy-preserving, and verifiable record of high-risk PDS events across commodity procurement, milling, godown movement, Fair Price Shop allocation, beneficiary authentication, entitlement validation, and ration delivery.
+ViksitPDS is a blockchain-enabled trust and audit layer for the Public Distribution System. It creates an immutable, privacy-preserving, and verifiable record of high-risk PDS events across commodity procurement, milling, godown movement, Fair Price Shop allocation, beneficiary authentication, entitlement validation, and ration delivery.
 
 The 2-week MVP demonstrates a complete rice distribution journey using mock data and simulated integrations. The platform is not intended to replace SMART-PDS, state PDS systems, or ePoS devices. It provides an independent audit trail and reconciliation layer that can later integrate with those systems.
 
@@ -33,10 +33,10 @@ The core requirement is to enhance transparency, accountability, and efficiency 
 
 - Food and Civil Supplies Department.
 - Procurement centre.
-- Miller.
 - Transporter.
+- FCI.
 - State godown.
-- Block godown.
+- Issue point.
 - Fair Price Shop dealer.
 - Beneficiary.
 - Inspector or auditor.
@@ -45,7 +45,7 @@ The core requirement is to enhance transparency, accountability, and efficiency 
 
 ## Proposed Solution
 
-PDS-Chain will maintain:
+ViksitPDS will maintain:
 
 - Operational state in PostgreSQL for current stock, workflows, users, dashboard queries, and mock beneficiary records.
 - Immutable transaction proofs and custody history in Hyperledger Fabric.
@@ -57,7 +57,7 @@ PDS-Chain will maintain:
 The MVP demonstrates one complete commodity journey:
 
 ```text
-Procurement Centre -> Miller -> State Godown -> Block Godown -> FPS -> Beneficiary -> Audit
+Procurement Centre -> FCI -> State Godown -> Issue Point -> FPS -> Beneficiary -> Audit
 ```
 
 MVP example:

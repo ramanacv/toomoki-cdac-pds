@@ -5,8 +5,8 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 NETWORK_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SCRIPTS="${NETWORK_ROOT}/scripts"
-FABRIC_VERSION="${FABRIC_VERSION:-2.5.13}"
-FABRIC_TOOLS_IMAGE="${FABRIC_TOOLS_IMAGE:-hyperledger/fabric-tools:2.5.13}"
+FABRIC_VERSION="${FABRIC_VERSION:-2.5.15}"
+FABRIC_TOOLS_IMAGE="${FABRIC_TOOLS_IMAGE:-hyperledger/fabric-tools:2.5.15}"
 
 echo "==> PDS Fabric bootstrap (Docker tools, Fabric ${FABRIC_VERSION})"
 
@@ -15,10 +15,14 @@ if ! docker info >/dev/null 2>&1; then
   exit 1
 fi
 
-FABRIC_TOOLS_IMAGE="${FABRIC_TOOLS_IMAGE:-hyperledger/fabric-tools:2.5.13}"
+FABRIC_TOOLS_IMAGE="${FABRIC_TOOLS_IMAGE:-hyperledger/fabric-tools:2.5.15}"
 
 echo "==> Pulling fabric-tools image..."
 docker pull "${FABRIC_TOOLS_IMAGE}" >/dev/null
+
+echo "==> Step 0: stop Fabric containers (clear in-container ledger state)"
+cd "${REPO_ROOT}"
+docker compose --profile fabric down 2>/dev/null || true
 
 echo "==> Step 1: crypto + channel block + connection profiles"
 bash "${SCRIPTS}/generate-crypto.sh"

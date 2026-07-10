@@ -48,6 +48,21 @@ export type AdminNetworkInfo = {
   };
 };
 
+export type AdminStockPosition = {
+  entityId: string;
+  commodity: string;
+  quantityKg: number;
+};
+
+export type AdminEntitlementSummary = {
+  totalMonthlyEntitlementKg: number;
+  totalLiftedKg: number;
+  totalAvailableKg: number;
+  utilizationPct: number;
+  activeCount: number;
+  recordCount: number;
+};
+
 export type AdminMetrics = {
   stakeholders: number;
   lots: number;
@@ -72,6 +87,13 @@ export type AdminActivityFeed = {
   eventCount: number;
 };
 
+export type AdminResetResult = {
+  ledgerTxId: string;
+  message: string;
+  seriesId: string;
+  lots: Array<{ lotId: string; commodity: string; quantityKg: number }>;
+};
+
 export type AdminOverview = {
   generatedAt: string;
   readOnly: true;
@@ -86,6 +108,8 @@ export type AdminOverview = {
     byRiskLevel: Record<string, number>;
     recent: AuditAlert[];
   };
+  stock: AdminStockPosition[];
+  entitlementSummary: AdminEntitlementSummary;
   health: AdminHealthCheck[];
   links: {
     health: string;

@@ -23,6 +23,7 @@ const baseConfig = (dir: string): FabricRuntimeConfig => ({
   peerTlsCertPath: join(dir, 'ca.crt'),
   peerHostAlias: 'peer0.food.example.com',
   mspId: 'FoodAndCivilSuppliesMSP',
+  endorsingOrgs: ['FoodAndCivilSuppliesMSP'],
   certPath: join(dir, 'cert.pem'),
   keyPath: join(dir, 'key.pem')
 });

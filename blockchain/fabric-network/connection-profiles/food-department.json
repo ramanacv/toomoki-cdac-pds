@@ -13,6 +13,28 @@
     "FoodAndCivilSupplies": {
       "mspid": "FoodAndCivilSuppliesMSP",
       "peers": ["peer0.food.example.com"]
+    },
+    "GodownWarehouse": {
+      "mspid": "GodownWarehouseMSP",
+      "peers": ["peer0.godown.example.com"]
+    }
+  },
+  "channels": {
+    "pdschannel": {
+      "peers": {
+        "peer0.food.example.com": {
+          "endorsingPeer": true,
+          "chaincodeQuery": true,
+          "ledgerQuery": true,
+          "eventSource": true
+        },
+        "peer0.godown.example.com": {
+          "endorsingPeer": true,
+          "chaincodeQuery": true,
+          "ledgerQuery": true,
+          "eventSource": true
+        }
+      }
     }
   },
   "peers": {
@@ -24,6 +46,16 @@
       "grpcOptions": {
         "ssl-target-name-override": "peer0.food.example.com",
         "hostnameOverride": "peer0.food.example.com"
+      }
+    },
+    "peer0.godown.example.com": {
+      "url": "grpcs://peer0.godown.example.com:9051",
+      "tlsCACerts": {
+        "path": "../crypto/peerOrganizations/godown.example.com/peers/peer0.godown.example.com/tls/ca.crt"
+      },
+      "grpcOptions": {
+        "ssl-target-name-override": "peer0.godown.example.com",
+        "hostnameOverride": "peer0.godown.example.com"
       }
     }
   }

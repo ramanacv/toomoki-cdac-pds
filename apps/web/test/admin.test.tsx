@@ -1,6 +1,8 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { Toaster } from '@/components/ui/sonner.js';
 
 const adminOverview = vi.hoisted(() => ({
   generatedAt: '2026-06-25T10:00:00.000Z',
@@ -68,6 +70,15 @@ const adminOverview = vi.hoisted(() => ({
       }
     ]
   },
+  stock: [{ entityId: 'GODOWN-S-001', commodity: 'Rice', quantityKg: 500 }],
+  entitlementSummary: {
+    totalMonthlyEntitlementKg: 25,
+    totalLiftedKg: 10,
+    totalAvailableKg: 15,
+    utilizationPct: 40,
+    activeCount: 1,
+    recordCount: 1
+  },
   health: [
     { name: 'api', status: 'ok' as const, detail: 'API up' },
     { name: 'ledger', status: 'ok' as const, detail: 'Ledger ok' }
@@ -77,34 +88,88 @@ const adminOverview = vi.hoisted(() => ({
 
 vi.mock('@/api.js', () => ({
   probeApi: vi.fn().mockResolvedValue(true),
-  buildApiUrl: vi.fn((path: string) => `/api${path}`)
+  fetchApiHealth: vi.fn().mockResolvedValue({ ok: true, ledgerMode: 'demo' }),
+  buildApiUrl: vi.fn((path: string) => `/api${path}`),
+  loadStakeholders: vi.fn().mockResolvedValue([
+    { stakeholderId: 'PROC-001', stakeholderType: 'PROCUREMENT_CENTER', name: 'Procurement Centre 01', district: 'Demo District', licenseNo: 'LIC-1', status: 'ACTIVE' }
+  ]),
+  createStockLot: vi.fn().mockResolvedValue({
+    lotId: 'LOT-RICE-123',
+    commodity: 'Rice',
+    quantityKg: 5000,
+    currentOwner: 'PROC-001'
+  }),
+  loadLots: vi.fn().mockResolvedValue([
+    {
+      lotId: 'LOT-RICE-2026-001',
+      commodity: 'Rice',
+      season: '2026-KHARIF',
+      quantityKg: 5000,
+      qualityGrade: 'A',
+      source: 'Procurement Yard',
+      currentOwner: 'PROC-001',
+      currentLocation: 'Procurement Yard',
+      status: 'CREATED'
+    }
+  ])
 }));
 
 vi.mock('@/admin-api.js', () => ({
   getStoredAdminToken: vi.fn(() => 'token'),
   setStoredAdminToken: vi.fn(),
-  loadAdminOverview: vi.fn().mockResolvedValue(adminOverview)
+  loadAdminOverview: vi.fn().mockResolvedValue(adminOverview),
+  resetAdminLedger: vi.fn().mockResolvedValue({ ledgerTxId: 'TX-RESET-1', message: 'Ledger reset.' })
 }));
 
-import { AdminDashboard } from '@/pages/AdminDashboard.js';
+import { AdminLayout } from '@/pages/AdminLayout.js';
+import { AdminOverviewPage } from '@/pages/admin/AdminOverviewPage.js';
+import { AdminNetworkPage } from '@/pages/admin/AdminNetworkPage.js';
+import { AdminLedgerPage } from '@/pages/admin/AdminLedgerPage.js';
+import { AdminAlertsPage } from '@/pages/admin/AdminAlertsPage.js';
+import { AdminToolsPage } from '@/pages/admin/AdminToolsPage.js';
 
 beforeEach(() => {
   vi.clearAllMocks();
 });
 
-describe('AdminDashboard', () => {
-  it('renders the admin overview metrics, network info and recent events table', async () => {
-    render(<AdminDashboard />);
+function renderAdmin(initialPath: string) {
+  return render(
+    <MemoryRouter initialEntries={[initialPath]}>
+      <Toaster />
+      <Routes>
+        <Route path="/admin" element={<AdminLayout />}>
+          <Route path="overview" element={<AdminOverviewPage />} />
+          <Route path="network" element={<AdminNetworkPage />} />
+          <Route path="ledger" element={<AdminLedgerPage />} />
+          <Route path="alerts" element={<AdminAlertsPage />} />
+          <Route path="tools" element={<AdminToolsPage />} />
+        </Route>
+      </Routes>
+    </MemoryRouter>
+  );
+}
 
-    expect(await screen.findByText('Ledger and persistence')).toBeInTheDocument();
-    expect(screen.getByText('5')).toBeInTheDocument();
-    expect(screen.getByText('Recent ledger events')).toBeInTheDocument();
-    expect(screen.getByText('LOT_CREATED')).toBeInTheDocument();
+describe('Admin console', () => {
+  it('renders overview metrics', async () => {
+    renderAdmin('/admin/overview');
+    expect(await screen.findByText('5')).toBeInTheDocument();
   });
 
-  it('uses scoped column headers in the recent events table', async () => {
-    render(<AdminDashboard />);
-    const table = await screen.findByRole('table');
+  it('renders network info and health checks', async () => {
+    renderAdmin('/admin/network');
+    expect(await screen.findByText('Ledger and persistence')).toBeInTheDocument();
+    expect(screen.getByText('Subsystem checks')).toBeInTheDocument();
+  });
+
+  it('renders the recent ledger events table with scoped column headers', async () => {
+    renderAdmin('/admin/ledger');
+    expect(await screen.findByText('Recent ledger events')).toBeInTheDocument();
+    expect(screen.getByText('LOT_CREATED')).toBeInTheDocument();
+    const tables = screen.getAllByRole('table');
+    const table = tables.find((candidate) => within(candidate).queryByText('Timestamp'));
+    if (!table) {
+      throw new Error('Recent ledger events table not found');
+    }
     const headerCells = within(table).getAllByRole('columnheader');
     expect(headerCells.length).toBeGreaterThan(0);
     for (const cell of headerCells) {
@@ -115,24 +180,89 @@ describe('AdminDashboard', () => {
   });
 
   it('exposes a skip link targeting admin content', async () => {
-    render(<AdminDashboard />);
+    renderAdmin('/admin/overview');
     const skip = screen.getByRole('link', { name: /skip to admin content/i });
     expect(skip).toHaveAttribute('href', '#admin-main');
     expect(document.getElementById('admin-main')).not.toBeNull();
   });
 
   it('shows the open audit alert with its risk level', async () => {
-    render(<AdminDashboard />);
+    renderAdmin('/admin/alerts');
     expect(await screen.findByText('Short receipt detected')).toBeInTheDocument();
     expect(screen.getByText('HIGH')).toBeInTheDocument();
   });
 
-  it('allows refreshing the overview', async () => {
+  it('allows refreshing the overview from admin tools', async () => {
     const user = userEvent.setup();
-    render(<AdminDashboard />);
+    renderAdmin('/admin/tools');
     const refresh = await screen.findByRole('button', { name: 'Refresh' });
     await user.click(refresh);
-    // No error thrown + overview still present.
-    expect(await screen.findByText('Recent ledger events')).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Add stock' })).toBeInTheDocument();
+  });
+
+  it('submits a new stock lot via the add-stock form and surfaces a toast', async () => {
+    const { createStockLot } = await import('@/api.js');
+    const user = userEvent.setup();
+    renderAdmin('/admin/tools');
+
+    await user.click(await screen.findByLabelText('Commodity'));
+    await user.click(await screen.findByRole('option', { name: 'Wheat' }));
+    const addStock = await screen.findByRole('button', { name: 'Add stock' });
+    await user.click(addStock);
+
+    expect(createStockLot).toHaveBeenCalledWith(
+      expect.objectContaining({ commodity: 'Wheat', quantityKg: 7000, currentOwner: 'PROC-001' })
+    );
+    expect((await screen.findAllByText(/Created LOT-RICE-123/)).length).toBeGreaterThan(0);
+    expect(await screen.findByText('Stock added')).toBeInTheDocument();
+  });
+
+  it('lists issued stock lots and refreshes the list after adding stock', async () => {
+    const { loadLots } = await import('@/api.js');
+    const user = userEvent.setup();
+    renderAdmin('/admin/tools');
+
+    expect(await screen.findByText('Issued stock lots')).toBeInTheDocument();
+    expect(await screen.findByText('LOT-RICE-2026-001')).toBeInTheDocument();
+
+    const addStock = await screen.findByRole('button', { name: 'Add stock' });
+    const callsBefore = (loadLots as ReturnType<typeof vi.fn>).mock.calls.length;
+    await user.click(addStock);
+
+    expect(await screen.findByText('Stock added')).toBeInTheDocument();
+    expect((loadLots as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(callsBefore);
+  });
+
+  it('confirms before resetting the ledger and surfaces a toast', async () => {
+    const { resetAdminLedger } = await import('@/admin-api.js');
+    const user = userEvent.setup();
+    renderAdmin('/admin/tools');
+
+    const resetTrigger = await screen.findByRole('button', { name: 'Reset ledger' });
+    await user.click(resetTrigger);
+
+    const confirm = await screen.findByRole('button', { name: 'Confirm reset' });
+    await user.click(confirm);
+
+    expect(resetAdminLedger).toHaveBeenCalledWith(undefined);
+    expect((await screen.findAllByText('Ledger reset.')).length).toBeGreaterThan(0);
+    expect(await screen.findByText('Ledger reset')).toBeInTheDocument();
+  });
+
+  it('scopes the reset to a single commodity when selected', async () => {
+    const { resetAdminLedger } = await import('@/admin-api.js');
+    const user = userEvent.setup();
+    renderAdmin('/admin/tools');
+
+    await user.click(await screen.findByLabelText('Scope'));
+    await user.click(await screen.findByRole('option', { name: 'Wheat only' }));
+
+    const resetTrigger = await screen.findByRole('button', { name: 'Reset Wheat' });
+    await user.click(resetTrigger);
+
+    const confirm = await screen.findByRole('button', { name: 'Confirm reset' });
+    await user.click(confirm);
+
+    expect(resetAdminLedger).toHaveBeenCalledWith('Wheat');
   });
 });

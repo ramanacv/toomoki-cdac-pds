@@ -1,3 +1,6 @@
+include:
+  - path: ./blockchain/fabric-network/docker-compose.fabric-debug.yml
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -49,9 +52,11 @@ services:
       PDS_FABRIC_KEY_PATH: ${PDS_FABRIC_KEY_PATH:-/app/blockchain/fabric-network/crypto/peerOrganizations/food.example.com/users/User1@food.example.com/msp/keystore}
       PDS_FABRIC_CHANNEL: ${PDS_FABRIC_CHANNEL:-pdschannel}
       PDS_FABRIC_CHAINCODE: ${PDS_FABRIC_CHAINCODE:-pds-chaincode}
+      PDS_FABRIC_ENDORSING_ORGS: ${PDS_FABRIC_ENDORSING_ORGS:-}
       PDS_DEV_AUTH_TOKEN: ${PDS_DEV_AUTH_TOKEN:-}
       PDS_DEV_AUTH_ROLE: ${PDS_DEV_AUTH_ROLE:-department}
       PDS_DEV_AUTH_SUBJECT: ${PDS_DEV_AUTH_SUBJECT:-fabric-smoke}
+      PDS_ADMIN_TOKEN: ${PDS_ADMIN_TOKEN:-}
     ports:
       - '3000:3000'
     depends_on:

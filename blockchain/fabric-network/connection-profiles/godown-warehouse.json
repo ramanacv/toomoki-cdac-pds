@@ -15,6 +15,18 @@
       "peers": ["peer0.godown.example.com"]
     }
   },
+  "channels": {
+    "pdschannel": {
+      "peers": {
+        "peer0.godown.example.com": {
+          "endorsingPeer": true,
+          "chaincodeQuery": true,
+          "ledgerQuery": true,
+          "eventSource": true
+        }
+      }
+    }
+  },
   "peers": {
     "peer0.godown.example.com": {
       "url": "grpcs://peer0.godown.example.com:9051",

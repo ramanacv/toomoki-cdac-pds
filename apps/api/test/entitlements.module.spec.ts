@@ -27,4 +27,23 @@ describe('EntitlementsModule', () => {
     expect(validation.rationCardHash).toBe('demo-ration-card-hash');
     expect(validation.availableBalanceKg).toBeGreaterThan(0);
   });
+
+  it('creates or updates an entitlement through the public controller', async () => {
+    fixture = await createDemoLedgerFixture();
+    controller = await createControllerWithFacade(EntitlementsController, fixture.facade);
+
+    const entitlement = await controller.create({
+      rationCardHash: 'demo-ration-card-hash',
+      commodity: 'Rice',
+      month: '2026-07',
+      monthlyEntitlementKg: 5000,
+      alreadyLiftedKg: 0,
+      availableBalanceKg: 5000,
+      active: true
+    });
+
+    expect(entitlement.month).toBe('2026-07');
+    expect(entitlement.availableBalanceKg).toBe(5000);
+    expect(controller.entitlements('demo-ration-card-hash', 'Rice', '2026-07').monthlyEntitlementKg).toBe(5000);
+  });
 });

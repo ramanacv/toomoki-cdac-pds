@@ -1,4 +1,4 @@
-import { IsEnum, IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { IsEnum, IsInt, IsISO8601, IsOptional, IsString, Min } from 'class-validator';
 import { AuthMode, AuthResult } from '@pds/shared-types';
 
 export class DistributionDto {
@@ -40,4 +40,8 @@ export class DistributionDto {
   @IsOptional()
   @IsString()
   exceptionReason?: string;
+
+  @IsOptional()
+  @IsISO8601()
+  timestamp?: string;
 }

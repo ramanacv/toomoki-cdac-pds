@@ -12,7 +12,7 @@ describe('TraceModule', () => {
     fixture = await createDemoLedgerFixture();
     controller = await createControllerWithFacade(TraceController, fixture.facade);
 
-    const trace = controller.lotTrace('LOT-RICE-2026-001');
+    const trace = await controller.lotTrace('LOT-RICE-2026-001');
     expect(trace.lot.lotId).toBe('LOT-RICE-2026-001');
     expect(trace.history.length).toBeGreaterThan(0);
 

@@ -1,8 +1,10 @@
 {
-  "trackedStockKg": 10700,
-  "activeLots": 1,
+  "trackedStockKg": 23700,
+  "activeLots": 6,
   "completedDistributions": 1,
   "pendingReceipts": 0,
+  "pendingTransferReceipts": 0,
+  "pendingFpsAllocations": 0,
   "openAlerts": 1,
   "highRiskFps": ["FPS-101"]
 }

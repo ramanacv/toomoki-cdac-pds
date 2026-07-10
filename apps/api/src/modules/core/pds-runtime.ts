@@ -31,6 +31,7 @@ export class PdsRuntime extends PdsLedgerEngine {
   private persistedEventCount = 0;
   private bootstrapped = false;
   private pendingPersist: Promise<void> = Promise.resolve();
+  private suppressPersist = false;
 
   constructor(
     seed = true,
@@ -75,85 +76,170 @@ export class PdsRuntime extends PdsLedgerEngine {
 
   override registerStakeholder(...args: Parameters<PdsLedgerEngine['registerStakeholder']>) {
     const result = super.registerStakeholder(...args);
-    void this.persist();
+    this.persistAfterMutation();
     return result;
   }
 
   override createCommodityLot(...args: Parameters<PdsLedgerEngine['createCommodityLot']>) {
     const result = super.createCommodityLot(...args);
-    void this.persist();
-    return result;
-  }
-
-  override transformLot(...args: Parameters<PdsLedgerEngine['transformLot']>) {
-    const result = super.transformLot(...args);
-    void this.persist();
+    this.persistAfterMutation();
     return result;
   }
 
   override dispatchLot(...args: Parameters<PdsLedgerEngine['dispatchLot']>) {
     const result = super.dispatchLot(...args);
-    void this.persist();
+    this.persistAfterMutation();
     return result;
   }
 
   override authorizeMovement(...args: Parameters<PdsLedgerEngine['authorizeMovement']>) {
     const result = super.authorizeMovement(...args);
-    void this.persist();
+    this.persistAfterMutation();
     return result;
   }
 
   override receiveLot(...args: Parameters<PdsLedgerEngine['receiveLot']>) {
     const result = super.receiveLot(...args);
-    void this.persist();
+    this.persistAfterMutation();
     return result;
   }
 
   override allocateToFps(...args: Parameters<PdsLedgerEngine['allocateToFps']>) {
     const result = super.allocateToFps(...args);
-    void this.persist();
+    this.persistAfterMutation();
     return result;
   }
 
   override recordFpsReceipt(...args: Parameters<PdsLedgerEngine['recordFpsReceipt']>) {
     const result = super.recordFpsReceipt(...args);
-    void this.persist();
+    this.persistAfterMutation();
     return result;
   }
 
   override simulateAuthentication(...args: Parameters<PdsLedgerEngine['simulateAuthentication']>) {
     const result = super.simulateAuthentication(...args);
-    void this.persist();
+    this.persistAfterMutation();
     return result;
   }
 
   override createOrUpdateEntitlement(...args: Parameters<PdsLedgerEngine['createOrUpdateEntitlement']>) {
     const result = super.createOrUpdateEntitlement(...args);
-    void this.persist();
+    this.persistAfterMutation();
     return result;
   }
 
   override recordDistribution(...args: Parameters<PdsLedgerEngine['recordDistribution']>) {
     const result = super.recordDistribution(...args);
-    void this.persist();
+    this.persistAfterMutation();
     return result;
   }
 
   override reconcileAlerts(...args: Parameters<PdsLedgerEngine['reconcileAlerts']>) {
     const result = super.reconcileAlerts(...args);
-    void this.persist();
+    this.persistAfterMutation();
     return result;
   }
 
   override resolveAuditAlert(...args: Parameters<PdsLedgerEngine['resolveAuditAlert']>) {
     const result = super.resolveAuditAlert(...args);
-    void this.persist();
+    this.persistAfterMutation();
     return result;
   }
 
   override raiseAuditFlag(...args: Parameters<PdsLedgerEngine['raiseAuditFlag']>) {
     const result = super.raiseAuditFlag(...args);
-    void this.persist();
+    this.persistAfterMutation();
+    return result;
+  }
+
+  override resetTransactionalData(...args: Parameters<PdsLedgerEngine['resetTransactionalData']>) {
+    const result = this.withSuppressedPersist(() => super.resetTransactionalData(...args));
+    this.persistedEventCount = 0;
+    this.persistAfterMutation();
+    return result;
+  }
+
+  async registerStakeholderPersisted(...args: Parameters<PdsLedgerEngine['registerStakeholder']>) {
+    const result = this.registerStakeholder(...args);
+    await this.flushPersist();
+    return result;
+  }
+
+  async createCommodityLotPersisted(...args: Parameters<PdsLedgerEngine['createCommodityLot']>) {
+    const result = this.createCommodityLot(...args);
+    await this.flushPersist();
+    return result;
+  }
+
+  async dispatchLotPersisted(...args: Parameters<PdsLedgerEngine['dispatchLot']>) {
+    const result = this.dispatchLot(...args);
+    await this.flushPersist();
+    return result;
+  }
+
+  async authorizeMovementPersisted(...args: Parameters<PdsLedgerEngine['authorizeMovement']>) {
+    const result = this.authorizeMovement(...args);
+    await this.flushPersist();
+    return result;
+  }
+
+  async receiveLotPersisted(...args: Parameters<PdsLedgerEngine['receiveLot']>) {
+    const result = this.receiveLot(...args);
+    await this.flushPersist();
+    return result;
+  }
+
+  async allocateToFpsPersisted(...args: Parameters<PdsLedgerEngine['allocateToFps']>) {
+    const result = this.allocateToFps(...args);
+    await this.flushPersist();
+    return result;
+  }
+
+  async recordFpsReceiptPersisted(...args: Parameters<PdsLedgerEngine['recordFpsReceipt']>) {
+    const result = this.recordFpsReceipt(...args);
+    await this.flushPersist();
+    return result;
+  }
+
+  async simulateAuthenticationPersisted(...args: Parameters<PdsLedgerEngine['simulateAuthentication']>) {
+    const result = this.simulateAuthentication(...args);
+    await this.flushPersist();
+    return result;
+  }
+
+  async createOrUpdateEntitlementPersisted(...args: Parameters<PdsLedgerEngine['createOrUpdateEntitlement']>) {
+    const result = this.createOrUpdateEntitlement(...args);
+    await this.flushPersist();
+    return result;
+  }
+
+  async recordDistributionPersisted(...args: Parameters<PdsLedgerEngine['recordDistribution']>) {
+    const result = this.recordDistribution(...args);
+    await this.flushPersist();
+    return result;
+  }
+
+  async reconcileAlertsPersisted(...args: Parameters<PdsLedgerEngine['reconcileAlerts']>) {
+    const result = this.reconcileAlerts(...args);
+    await this.flushPersist();
+    return result;
+  }
+
+  async resolveAuditAlertPersisted(...args: Parameters<PdsLedgerEngine['resolveAuditAlert']>) {
+    const result = this.resolveAuditAlert(...args);
+    await this.flushPersist();
+    return result;
+  }
+
+  async raiseAuditFlagPersisted(...args: Parameters<PdsLedgerEngine['raiseAuditFlag']>) {
+    const result = this.raiseAuditFlag(...args);
+    await this.flushPersist();
+    return result;
+  }
+
+  async resetTransactionalDataPersisted(...args: Parameters<PdsLedgerEngine['resetTransactionalData']>) {
+    const result = this.resetTransactionalData(...args);
+    await this.flushPersist();
     return result;
   }
 
@@ -173,8 +259,26 @@ export class PdsRuntime extends PdsLedgerEngine {
     };
   }
 
+  async getTraceForLotFromChain(lotId: string) {
+    const trace = super.getTraceForLot(lotId);
+    if (!this.chainQuery) {
+      return trace;
+    }
+    return {
+      ...trace,
+      history: await this.chainQuery.getLotHistory(lotId),
+      verificationSource: 'chaincode'
+    };
+  }
+
   getDistributionHistoryFromChain(distributionId: string) {
     return this.chainQuery?.getDistributionHistory(distributionId) ?? this.getDistributionHistory(distributionId);
+  }
+
+  async getDistributionHistoryFromChainAsync(distributionId: string) {
+    return this.chainQuery
+      ? await this.chainQuery.getDistributionHistory(distributionId)
+      : this.getDistributionHistory(distributionId);
   }
 
   verifyLedgerDigest(digest: string) {
@@ -196,6 +300,22 @@ export class PdsRuntime extends PdsLedgerEngine {
       .then(() => this.port.saveState(state))
       .then(() => this.port.appendEvents(newEvents));
     return this.pendingPersist;
+  }
+
+  private persistAfterMutation(): void {
+    if (!this.suppressPersist) {
+      void this.persist().catch(() => undefined);
+    }
+  }
+
+  private withSuppressedPersist<T>(callback: () => T): T {
+    const previous = this.suppressPersist;
+    this.suppressPersist = true;
+    try {
+      return callback();
+    } finally {
+      this.suppressPersist = previous;
+    }
   }
 
   /** Await any in-flight persist so tests can assert on persisted files. */

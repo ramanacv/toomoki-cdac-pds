@@ -9,6 +9,7 @@ export {
   distributions,
   authTransactions,
   entitlements,
+  commodities,
   backendSeed,
   dashboardSummary,
   getScenarioFixture,
@@ -16,3 +17,4 @@ export {
   getScenarioDashboardSummary,
   getWorkspaceSnapshot
 } from './data.js';
+export { demoQuantities } from './quantities.js';

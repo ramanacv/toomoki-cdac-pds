@@ -1,14 +1,15 @@
 export const OPENAPI_SPEC = {
   openapi: '3.0.0',
   info: {
-    title: 'PDS-Chain API',
+    title: 'ViksitPDS API',
     version: '0.1.0',
-    description: 'Local OpenAPI document for the PDS-Chain MVP API'
+    description: 'Local OpenAPI document for the ViksitPDS MVP API'
   },
   servers: [{ url: '/', description: 'Current host' }],
   paths: {
     '/health': { get: { summary: 'Health check' } },
     '/dashboard/summary': { get: { summary: 'Get dashboard summary' } },
+    '/stock': { get: { summary: 'List stock positions by org and commodity' } },
     '/stakeholders': {
       get: { summary: 'List stakeholders' },
       post: { summary: 'Register stakeholder' }
@@ -17,7 +18,6 @@ export const OPENAPI_SPEC = {
       get: { summary: 'List commodity lots' },
       post: { summary: 'Create commodity lot' }
     },
-    '/lots/transform': { post: { summary: 'Transform parent lot into child lot' } },
     '/lots/{lotId}': { get: { summary: 'Get commodity lot' } },
     '/lots/{lotId}/history': { get: { summary: 'Get lot history' } },
     '/transfers': {

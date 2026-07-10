@@ -16,7 +16,7 @@ describe('AuditModule', () => {
       transferId: 'TR-AUDIT-001',
       lotId: 'LOT-RICE-2026-001',
       fromOrg: 'PROC-001',
-      toOrg: 'MLL-001',
+      toOrg: 'FCI-001',
       dispatchedQtyKg: 500,
       vehicleNo: 'KA01AU0001'
     });
@@ -25,13 +25,13 @@ describe('AuditModule', () => {
     const alerts = controller.alerts();
     expect(alerts.some((alert) => alert.alertType === 'SHORT_RECEIPT')).toBe(true);
 
-    const reconciled = controller.reconcile();
+    const reconciled = await controller.reconcile();
     expect(reconciled.length).toBeGreaterThanOrEqual(0);
 
     const alert = alerts.find((item) => item.alertType === 'SHORT_RECEIPT');
     expect(alert).toBeDefined();
 
-    const resolved = controller.resolveAlert(alert!.alertId, {
+    const resolved = await controller.resolveAlert(alert!.alertId, {
       resolvedBy: 'AUD-001',
       resolutionNote: 'Investigated shortage'
     });

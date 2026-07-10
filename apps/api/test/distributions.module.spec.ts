@@ -22,7 +22,7 @@ describe('DistributionsModule', () => {
       authResult: AuthResult.SUCCESS
     });
 
-    const distribution = controller.distribute({
+    const distribution = await controller.distribute({
       distributionId: 'DIST-MOD-001',
       fpsId: 'FPS-101',
       rationCardHash: 'demo-ration-card-hash',
@@ -32,7 +32,8 @@ describe('DistributionsModule', () => {
       authMode: auth.authMode,
       authResult: auth.authResult,
       authTxnRefHash: auth.authTxnRefHash,
-      dealerId: 'DEALER-001'
+      dealerId: 'DEALER-001',
+      timestamp: '2026-06-09T10:10:00.000Z'
     });
 
     expect(distribution.distributionId).toBe('DIST-MOD-001');
@@ -45,7 +46,7 @@ describe('DistributionsModule', () => {
     prepareFpsStock(fixture.facade, 'ALLOC-DIST-DUP', 100);
     controller = await createControllerWithFacade(DistributionsController, fixture.facade);
 
-    controller.distribute({
+    await controller.distribute({
       distributionId: 'DIST-MOD-DUP-001',
       fpsId: 'FPS-101',
       rationCardHash: 'demo-ration-card-hash',
@@ -55,10 +56,11 @@ describe('DistributionsModule', () => {
       authMode: AuthMode.MOCK_OTP,
       authResult: AuthResult.SUCCESS,
       authTxnRefHash: 'auth-ref-dup-1',
-      dealerId: 'DEALER-001'
+      dealerId: 'DEALER-001',
+      timestamp: '2026-06-09T10:10:00.000Z'
     });
 
-    expect(() =>
+    await expect(
       controller.distribute({
         distributionId: 'DIST-MOD-DUP-002',
         fpsId: 'FPS-101',
@@ -69,9 +71,10 @@ describe('DistributionsModule', () => {
         authMode: AuthMode.MOCK_OTP,
         authResult: AuthResult.SUCCESS,
         authTxnRefHash: 'auth-ref-dup-2',
-        dealerId: 'DEALER-001'
+        dealerId: 'DEALER-001',
+        timestamp: '2026-06-09T10:11:00.000Z'
       })
-    ).toThrow(/exceeds balance/);
+    ).rejects.toThrow(/exceeds balance/);
 
     expect(fixture.facade.getAlerts().some((alert) => alert.alertType === AlertType.DUPLICATE_CLAIM)).toBe(true);
   });
@@ -90,7 +93,7 @@ describe('DistributionsModule', () => {
     });
     controller = await createControllerWithFacade(DistributionsController, fixture.facade);
 
-    const distribution = controller.distribute({
+    const distribution = await controller.distribute({
       distributionId: 'DIST-MOD-EXCEPTION',
       fpsId: 'FPS-101',
       rationCardHash: 'exception-ration-card-hash',
@@ -102,7 +105,8 @@ describe('DistributionsModule', () => {
       authTxnRefHash: 'auth-ref-exception',
       dealerId: 'DEALER-001',
       approvedBy: 'SUPERVISOR-101',
-      exceptionReason: 'Biometric failure'
+      exceptionReason: 'Biometric failure',
+      timestamp: '2026-06-09T10:10:00.000Z'
     });
 
     expect(distribution.distributionId).toBe('DIST-MOD-EXCEPTION');

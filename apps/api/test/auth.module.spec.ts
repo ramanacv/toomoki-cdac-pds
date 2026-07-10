@@ -13,7 +13,7 @@ describe('AuthModule', () => {
     fixture = await createDemoLedgerFixture();
     controller = await createControllerWithFacade(AuthController, fixture.facade);
 
-    const otp = controller.authOtp({
+    const otp = await controller.authOtp({
       authTxnId: 'AUTH-MOD-001',
       beneficiaryRefHash: 'beneficiary-hash',
       rationCardHash: 'demo-ration-card-hash',
@@ -23,7 +23,7 @@ describe('AuthModule', () => {
     expect(otp.authMode).toBe(AuthMode.MOCK_OTP);
     expect(controller.authTransaction('AUTH-MOD-001').authTxnId).toBe('AUTH-MOD-001');
 
-    const biometric = controller.authBiometric({
+    const biometric = await controller.authBiometric({
       authTxnId: 'AUTH-MOD-002',
       beneficiaryRefHash: 'beneficiary-hash',
       rationCardHash: 'demo-ration-card-hash',
@@ -31,7 +31,7 @@ describe('AuthModule', () => {
     });
     expect(biometric.authMode).toBe(AuthMode.SIMULATED_BIOMETRIC);
 
-    const exception = controller.authException({
+    const exception = await controller.authException({
       authTxnId: 'AUTH-MOD-003',
       beneficiaryRefHash: 'beneficiary-hash',
       rationCardHash: 'demo-ration-card-hash',

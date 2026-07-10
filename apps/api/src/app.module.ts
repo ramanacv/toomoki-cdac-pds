@@ -16,6 +16,7 @@ import { DistributionsModule } from './modules/distributions/distributions.modul
 import { TraceModule } from './modules/trace/trace.module.js';
 import { AuditModule } from './modules/audit/audit.module.js';
 import { AdminModule } from './modules/admin/admin.module.js';
+import { StockModule } from './modules/stock/stock.module.js';
 import { PdsLoggingInterceptor } from './infrastructure/logging.interceptor.js';
 
 @Module({
@@ -35,7 +36,8 @@ import { PdsLoggingInterceptor } from './infrastructure/logging.interceptor.js';
     DistributionsModule,
     TraceModule,
     AuditModule,
-    AdminModule
+    AdminModule,
+    StockModule
   ],
   providers: [
     {

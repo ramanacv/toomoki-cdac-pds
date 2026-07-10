@@ -26,8 +26,14 @@ import {
   TransferOrder,
   TransferStatus,
   AuditAlert,
+  getCommodityRouteTemplate,
+  isCommodityRouteEdgeAllowed,
   hashReference,
-  makeTimestamp
+  makeTimestamp,
+  INITIAL_DEMO_SERIES_ID,
+  buildSeedLotId,
+  generateResetSeriesId,
+  COMMODITIES
 } from '@pds/shared-types';
 
 type StockKey = `${string}:${string}`;
@@ -46,6 +52,8 @@ export type PdsLedgerState = {
   rationCards: RationCard[];
   grievances: Grievance[];
   entitlementRules: EntitlementRule[];
+  /** Current demo/run series for reseeded workflow ids. Bootstrap uses POC. */
+  seriesId?: string;
 };
 
 const keyFor = (entityId: string, commodity: string): StockKey => `${entityId}:${commodity}`;
@@ -65,7 +73,6 @@ const sortByTime = <T>(entries: T[]): T[] =>
 const ALLOWED_LEDGER_EVENT_TYPES = new Set([
   'RegisterStakeholder',
   'CreateCommodityLot',
-  'TransformLot',
   'AuthorizeMovement',
   'DispatchLot',
   'ReceiveLot',
@@ -86,7 +93,8 @@ const ALLOWED_LEDGER_EVENT_TYPES = new Set([
   'EscalateOverdueGrievances',
   'ProposeEntitlementRule',
   'ApproveEntitlementRule',
-  'RolloverUnclaimedQuota'
+  'RolloverUnclaimedQuota',
+  'ResetTransactionalData'
 ]);
 
 const assertAllowedLedgerEventType = (eventType: string): void => {
@@ -108,6 +116,23 @@ const assertNoPiiInPayload = (payload: Record<string, unknown>): void => {
       throw new Error(`Payload contains prohibited PII field: ${field}`);
     }
   }
+};
+
+const FULL_RESET_PRESERVED_ENTITY_TYPES = new Set<LedgerEvent['entityType']>([
+  'stakeholder',
+  'rationcard',
+  'grievance',
+  'entitlementrule'
+]);
+
+const defaultSeasonForCommodity = (commodity: string): string => {
+  if (commodity === 'Rice' || commodity === 'Dal') {
+    return 'Kharif 2026';
+  }
+  if (commodity === 'Wheat') {
+    return 'Rabi 2026';
+  }
+  return '2026';
 };
 
 /**
@@ -156,6 +181,7 @@ export class PdsLedgerEngine {
   private rationCards = new Map<string, RationCard>();
   private grievances = new Map<string, Grievance>();
   private entitlementRules = new Map<string, EntitlementRule>();
+  private seriesId: string = INITIAL_DEMO_SERIES_ID;
 
   constructor(seed = true) {
     if (seed) {
@@ -177,7 +203,8 @@ export class PdsLedgerEngine {
       stock: [...this.stock.entries()],
       rationCards: [...this.rationCards.values()],
       grievances: [...this.grievances.values()],
-      entitlementRules: [...this.entitlementRules.values()]
+      entitlementRules: [...this.entitlementRules.values()],
+      seriesId: this.seriesId
     };
   }
 
@@ -195,6 +222,28 @@ export class PdsLedgerEngine {
     this.rationCards = new Map((state.rationCards ?? []).map((item) => [item.rationCardHash, item]));
     this.grievances = new Map((state.grievances ?? []).map((item) => [item.grievanceId, item]));
     this.entitlementRules = new Map((state.entitlementRules ?? []).map((item) => [item.ruleId, item]));
+    this.seriesId = state.seriesId ?? this.deriveSeriesIdFromLots(state.lots) ?? INITIAL_DEMO_SERIES_ID;
+  }
+
+  getSeriesId(): string {
+    return this.seriesId;
+  }
+
+  private deriveSeriesIdFromLots(lots: CommodityLot[]): string | undefined {
+    const seedLot = [...lots].sort((a, b) => b.lotId.localeCompare(a.lotId)).find((lot) => /-\d{3}$/.test(lot.lotId));
+    if (!seedLot) {
+      return undefined;
+    }
+    // Inline parse to avoid circular timing; mirrors seriesIdFromLotId for seed lots.
+    for (const definition of [...COMMODITIES].sort((a, b) => b.slug.length - a.slug.length)) {
+      const prefix = `LOT-${definition.slug}-`;
+      if (!seedLot.lotId.startsWith(prefix)) continue;
+      const rest = seedLot.lotId.slice(prefix.length);
+      const match = /^(.*)-(\d{3})$/.exec(rest);
+      if (!match?.[1]) continue;
+      return match[1] === '2026' ? INITIAL_DEMO_SERIES_ID : match[1];
+    }
+    return undefined;
   }
 
   seedDemoData(): DemoSnapshot {
@@ -205,17 +254,184 @@ export class PdsLedgerEngine {
     // Lazy-load demo fixtures so the Fabric runtime path (which never seeds)
     // does not require @pds/fixtures at module load — keeps the chaincode
     // bundle lean (T6.5) and avoids a hard dep on the fixtures package.
-    const require = createRequire(import.meta.url);
-    const { backendSeed, stakeholders: fixtureStakeholders } = require('@pds/fixtures') as typeof import('@pds/fixtures');
+    const { stakeholders: fixtureStakeholders } = this.loadFixtures();
 
     fixtureStakeholders.forEach((stakeholder) =>
       this.stakeholders.set(stakeholder.stakeholderId, { ...stakeholder })
     );
 
-    this.createCommodityLot({ ...backendSeed.initialLot });
-    this.createOrUpdateEntitlement({ ...backendSeed.initialEntitlement });
+    const { backendSeed } = this.loadFixtures();
+    backendSeed.initialLots.forEach((lot) => this.createCommodityLot({ ...lot }));
+    backendSeed.initialEntitlements.forEach((entitlement) =>
+      this.createOrUpdateEntitlement({ ...entitlement })
+    );
 
     return this.snapshot();
+  }
+
+  private loadFixtures(): typeof import('@pds/fixtures') {
+    const require = createRequire(import.meta.url);
+    return require('@pds/fixtures') as typeof import('@pds/fixtures');
+  }
+
+  /**
+   * Build reset seed lot inputs from shared commodity definitions. The deployed
+   * Fabric chaincode bundle intentionally does not carry @pds/fixtures.
+   */
+  private buildSeriesSeedLots(seriesId: string, commodity?: string): Array<Omit<CommodityLot, 'status'>> {
+    const definitions = commodity
+      ? COMMODITIES.filter((definition) => definition.name === commodity)
+      : COMMODITIES;
+    return definitions.map((definition) => {
+      return {
+        lotId: buildSeedLotId(definition.slug, seriesId),
+        commodity: definition.name,
+        season: defaultSeasonForCommodity(definition.name),
+        quantityKg: definition.defaultTopUpQuantityKg,
+        qualityGrade: definition.defaultQualityGrade,
+        source: 'Procurement Centre 01',
+        currentOwner: 'PROC-001',
+        currentLocation: 'Procurement Yard'
+      };
+    });
+  }
+
+  private preservesFullResetHistory(event: LedgerEvent): boolean {
+    return FULL_RESET_PRESERVED_ENTITY_TYPES.has(event.entityType);
+  }
+
+  private ensureStakeholderRegistryEvents(): void {
+    const registered = new Set(
+      this.events
+        .filter((event) => event.eventType === 'RegisterStakeholder')
+        .map((event) => event.entityId)
+    );
+    for (const stakeholder of sortByTime([...this.stakeholders.values()])) {
+      if (!registered.has(stakeholder.stakeholderId)) {
+        this.recordEvent('stakeholder', stakeholder.stakeholderId, 'RegisterStakeholder', stakeholder);
+        registered.add(stakeholder.stakeholderId);
+      }
+    }
+  }
+
+  /**
+   * Shared by resetTransactionalData() and its replay projection. Clears
+   * movement/quantity collections without reseeding — the caller installs a
+   * new ID series afterward. Returns entity ids removed for event filtering.
+   */
+  private applyTransactionalReset(commodity?: string): Set<string> {
+    if (!commodity) {
+      const affectedEntityIds = new Set([
+        ...this.lots.keys(),
+        ...this.transfers.keys(),
+        ...this.allocations.keys(),
+        ...this.distributions.keys(),
+        ...this.alerts.keys()
+      ]);
+      this.lots.clear();
+      this.transfers.clear();
+      this.allocations.clear();
+      this.authTransactions.clear();
+      this.distributions.clear();
+      this.alerts.clear();
+      this.stock.clear();
+
+      for (const entitlement of this.entitlements.values()) {
+        entitlement.alreadyLiftedKg = 0;
+        entitlement.availableBalanceKg = entitlement.monthlyEntitlementKg;
+      }
+
+      return affectedEntityIds;
+    }
+
+    const affectedLotIds = new Set(
+      [...this.lots.values()].filter((lot) => lot.commodity === commodity).map((lot) => lot.lotId)
+    );
+    const affectedAllocationIds = new Set(
+      [...this.allocations.values()]
+        .filter((allocation) => allocation.commodity === commodity)
+        .map((allocation) => allocation.allocationId)
+    );
+    const affectedDistributionIds = new Set(
+      [...this.distributions.values()]
+        .filter((distribution) => distribution.commodity === commodity)
+        .map((distribution) => distribution.distributionId)
+    );
+    const affectedTransferIds = new Set(
+      [...this.transfers.values()]
+        .filter((transfer) => affectedLotIds.has(transfer.lotId))
+        .map((transfer) => transfer.transferId)
+    );
+
+    for (const lotId of affectedLotIds) this.lots.delete(lotId);
+    for (const transferId of affectedTransferIds) this.transfers.delete(transferId);
+    for (const allocationId of affectedAllocationIds) this.allocations.delete(allocationId);
+    for (const distributionId of affectedDistributionIds) this.distributions.delete(distributionId);
+
+    for (const key of [...this.stock.keys()]) {
+      if (key.slice(key.lastIndexOf(':') + 1) === commodity) {
+        this.stock.delete(key);
+      }
+    }
+
+    const affectedEntityIds = new Set([
+      ...affectedLotIds,
+      ...affectedTransferIds,
+      ...affectedAllocationIds,
+      ...affectedDistributionIds
+    ]);
+    for (const [alertId, alert] of this.alerts) {
+      if (affectedEntityIds.has(alert.entityId)) this.alerts.delete(alertId);
+    }
+
+    for (const entitlement of this.entitlements.values()) {
+      if (entitlement.commodity === commodity) {
+        entitlement.alreadyLiftedKg = 0;
+        entitlement.availableBalanceKg = entitlement.monthlyEntitlementKg;
+      }
+    }
+
+    return affectedEntityIds;
+  }
+
+  /**
+   * Wipe movement/quantity data and reseed with a new ID series so Fabric
+   * never reuses lot/transfer identities. Stakeholders, ration cards,
+   * grievances, and entitlement rule definitions stay intact.
+   *
+   * Emits ResetTransactionalData plus CreateCommodityLot for each reseeded
+   * lot (so dual-write can create the lots on-chain). Pass a commodity to
+   * scope the reset; omit it for a full wipe of movement history.
+   */
+  resetTransactionalData(commodity?: string): {
+    ledgerTxId: string;
+    seriesId: string;
+    lots: CommodityLot[];
+  } {
+    const seriesId = generateResetSeriesId(new Date(), randomUUID().slice(0, 4));
+    this.seriesId = seriesId;
+    const seedLots = this.buildSeriesSeedLots(seriesId, commodity);
+    const affectedEntityIds = this.applyTransactionalReset(commodity);
+    this.events = commodity
+      ? this.events.filter((event) => !affectedEntityIds.has(event.entityId))
+      : this.events.filter((event) => this.preservesFullResetHistory(event));
+    if (!commodity) {
+      this.ensureStakeholderRegistryEvents();
+    }
+
+    const { ledgerTxId } = this.recordEvent('workflow', 'ledger', 'ResetTransactionalData', {
+      resetAt: makeTimestamp(),
+      seriesId,
+      lots: seedLots,
+      ...(commodity ? { commodity } : {})
+    });
+
+    const created: CommodityLot[] = [];
+    for (const seedLot of seedLots) {
+      created.push(this.createCommodityLot(seedLot));
+    }
+
+    return { ledgerTxId, seriesId, lots: created };
   }
 
   snapshot(): DemoSnapshot {
@@ -251,59 +467,17 @@ export class PdsLedgerEngine {
     if (this.lots.has(input.lotId)) {
       throw new Error(`Lot ${input.lotId} already exists`);
     }
-    const lot: CommodityLot = { ...input, status: LotStatus.CREATED };
+    const lot: CommodityLot = {
+      ...input,
+      status: LotStatus.CREATED,
+      createdAt: input.createdAt ?? makeTimestamp()
+    };
     this.lots.set(lot.lotId, lot);
     // Open the stock position for the originating owner so getCurrentStock is correct
     // immediately after creation (previously stock only came from seed).
     this.addStock(lot.currentOwner, lot.commodity, lot.quantityKg);
     this.recordEvent('lot', lot.lotId, 'CreateCommodityLot', lot);
     return lot;
-  }
-
-  transformLot(input: {
-    parentLotId: string;
-    childLotId: string;
-    transformedBy: string;
-    commodity: string;
-    season?: string;
-    quantityKg: number;
-    qualityGrade: string;
-    source?: string;
-    transformedAt?: string;
-  }): CommodityLot {
-    if (this.lots.has(input.childLotId)) {
-      throw new Error(`Lot ${input.childLotId} already exists`);
-    }
-    if (input.quantityKg <= 0) {
-      throw new Error('quantityKg must be positive');
-    }
-    const parent = this.mustGetLot(input.parentLotId);
-    this.assertActiveStakeholder(input.transformedBy);
-    if (parent.currentOwner !== input.transformedBy) {
-      throw new Error(`Lot ${parent.lotId} is owned by ${parent.currentOwner}, not ${input.transformedBy}`);
-    }
-    this.consumeStock(input.transformedBy, parent.commodity, input.quantityKg);
-    const child: CommodityLot = {
-      lotId: input.childLotId,
-      commodity: input.commodity,
-      season: input.season ?? parent.season,
-      quantityKg: input.quantityKg,
-      qualityGrade: input.qualityGrade,
-      source: input.source ?? parent.lotId,
-      currentOwner: input.transformedBy,
-      currentLocation: input.transformedBy,
-      status: LotStatus.CREATED,
-      transformedFromLotId: parent.lotId
-    };
-    this.lots.set(child.lotId, child);
-    this.addStock(child.currentOwner, child.commodity, child.quantityKg);
-    this.recordEvent('lot', child.lotId, 'TransformLot', {
-      ...child,
-      parentLotId: parent.lotId,
-      transformedBy: input.transformedBy,
-      transformedAt: input.transformedAt ?? makeTimestamp()
-    });
-    return child;
   }
 
   dispatchLot(input: {
@@ -329,11 +503,18 @@ export class PdsLedgerEngine {
     if (lot.status === LotStatus.DISPATCHED) {
       throw new Error(`Lot ${lot.lotId} is already in transit (DISPATCHED); cannot re-dispatch until received`);
     }
-    if (lot.currentOwner !== input.fromOrg) {
-      throw new Error(`Lot ${lot.lotId} is owned by ${lot.currentOwner}, not ${input.fromOrg}`);
-    }
     if (input.dispatchedQtyKg <= 0) {
       throw new Error('dispatchedQtyKg must be positive');
+    }
+    const lotKind = lot.transformedFromLotId ? 'transformed' : 'source';
+    if (!isCommodityRouteEdgeAllowed(lot.commodity, input.fromOrg, input.toOrg, lotKind)) {
+      throw new Error(
+        `${lot.commodity} route does not allow movement from ${input.fromOrg} to ${input.toOrg}`
+      );
+    }
+    const senderStock = this.stock.get(keyFor(input.fromOrg, lot.commodity)) ?? 0;
+    if (lot.currentOwner !== input.fromOrg && senderStock < input.dispatchedQtyKg) {
+      throw new Error(`Lot ${lot.lotId} is owned by ${lot.currentOwner}, not ${input.fromOrg}`);
     }
     const priorAuthorization = this.events.find(
       (event) =>
@@ -432,6 +613,12 @@ export class PdsLedgerEngine {
     if (transfer.status !== TransferStatus.DISPATCHED) {
       throw new Error(`Transfer ${transfer.transferId} already received`);
     }
+    if (input.receivedQtyKg <= 0) {
+      throw new Error('receivedQtyKg must be positive');
+    }
+    if (input.receivedQtyKg > transfer.dispatchedQtyKg) {
+      throw new Error(`receivedQtyKg cannot exceed dispatchedQtyKg for transfer ${transfer.transferId}`);
+    }
 
     const shortageQtyKg = Math.max(0, transfer.dispatchedQtyKg - input.receivedQtyKg);
     const status = shortageQtyKg > 0 ? TransferStatus.RECEIVED_WITH_SHORTAGE : TransferStatus.RECEIVED;
@@ -477,8 +664,27 @@ export class PdsLedgerEngine {
     if (this.allocations.has(input.allocationId)) {
       throw new Error(`Allocation ${input.allocationId} already exists`);
     }
+    if (input.allocatedQtyKg <= 0) {
+      throw new Error('allocatedQtyKg must be positive');
+    }
     this.assertActiveStakeholder(input.fpsId);
     this.assertActiveStakeholder(input.sourceGodownId);
+    const availableStockKg = this.stock.get(keyFor(input.sourceGodownId, input.commodity)) ?? 0;
+    if (availableStockKg < input.allocatedQtyKg) {
+      this.raiseAuditFlag({
+        alertType: AlertType.UNAUTHORIZED_TRANSACTION,
+        entityId: input.allocationId,
+        message: `Allocation ${input.allocationId} blocked: insufficient stock at ${input.sourceGodownId}`,
+        evidence: {
+          allocationId: input.allocationId,
+          sourceGodownId: input.sourceGodownId,
+          commodity: input.commodity,
+          requestedQtyKg: input.allocatedQtyKg,
+          availableQtyKg: availableStockKg
+        }
+      });
+      throw new Error(`Insufficient stock for ${input.sourceGodownId} ${input.commodity}`);
+    }
     this.consumeStock(input.sourceGodownId, input.commodity, input.allocatedQtyKg);
     const allocation: FPSAllocation = { ...input, status: 'ALLOCATED' };
     this.allocations.set(allocation.allocationId, allocation);
@@ -491,11 +697,52 @@ export class PdsLedgerEngine {
     if (allocation.status !== 'ALLOCATED') {
       throw new Error(`Allocation ${allocation.allocationId} already received`);
     }
+    if (input.receivedQtyKg <= 0) {
+      throw new Error('receivedQtyKg must be positive');
+    }
+    if (input.receivedQtyKg > allocation.allocatedQtyKg) {
+      this.raiseAuditFlag({
+        alertType: AlertType.UNAUTHORIZED_TRANSACTION,
+        entityId: allocation.allocationId,
+        message: `FPS receipt blocked: received quantity exceeds allocation for ${allocation.allocationId}`,
+        evidence: {
+          allocationId: allocation.allocationId,
+          allocatedQtyKg: allocation.allocatedQtyKg,
+          receivedQtyKg: input.receivedQtyKg
+        }
+      });
+      throw new Error(
+        `receivedQtyKg cannot exceed allocatedQtyKg for allocation ${allocation.allocationId}`
+      );
+    }
 
-    const updated: FPSAllocation = { ...allocation, receivedQtyKg: input.receivedQtyKg, status: 'RECEIVED' };
+    const shortageQtyKg = Math.max(0, allocation.allocatedQtyKg - input.receivedQtyKg);
+    const updated: FPSAllocation = {
+      ...allocation,
+      receivedQtyKg: input.receivedQtyKg,
+      ...(shortageQtyKg > 0 ? { shortageQtyKg } : {}),
+      status: shortageQtyKg > 0 ? 'RECEIVED_WITH_SHORTAGE' : 'RECEIVED'
+    };
     this.allocations.set(updated.allocationId, updated);
     this.addStock(updated.fpsId, updated.commodity, input.receivedQtyKg);
     this.recordEvent('allocation', updated.allocationId, 'RecordFPSReceipt', updated);
+
+    if (shortageQtyKg > 0) {
+      this.raiseAuditFlag({
+        alertType: AlertType.SHORT_RECEIPT,
+        entityId: updated.allocationId,
+        message: `FPS received ${input.receivedQtyKg}kg against allocated ${allocation.allocatedQtyKg}kg`,
+        evidence: {
+          allocationId: updated.allocationId,
+          fpsId: updated.fpsId,
+          sourceGodownId: updated.sourceGodownId,
+          commodity: updated.commodity,
+          allocatedQtyKg: allocation.allocatedQtyKg,
+          receivedQtyKg: input.receivedQtyKg,
+          shortageQtyKg
+        }
+      });
+    }
     return updated;
   }
 
@@ -544,13 +791,8 @@ export class PdsLedgerEngine {
       }
     }
     const key = this.entitlementKey(input.rationCardHash, input.commodity, input.month);
-    const isUpdate = this.entitlements.has(key);
     this.entitlements.set(key, input);
-    if (!isUpdate) {
-      // Emit a ledger event only on create to keep the entitlement auditable without
-      // double-counting updates (each create gets one EntitlementCreated event).
-      this.recordEvent('distribution', input.rationCardHash, 'CreateMonthlyEntitlement', input);
-    }
+    this.recordEvent('distribution', input.rationCardHash, 'CreateMonthlyEntitlement', input);
     return input;
   }
 
@@ -588,6 +830,9 @@ export class PdsLedgerEngine {
     }
     if (input.authResult === AuthResult.FAILURE) {
       throw new Error('Distribution cannot proceed after failed authentication');
+    }
+    if (input.deliveredKg <= 0) {
+      throw new Error('deliveredKg must be positive');
     }
     validateHashFormat(input.rationCardHash, 'rationCardHash');
     validateHashFormat(input.beneficiaryRefHash, 'beneficiaryRefHash');
@@ -1116,11 +1361,19 @@ export class PdsLedgerEngine {
   }
 
   getDashboardSummary(): DashboardSummary {
+    const pendingTransferReceipts = [...this.transfers.values()].filter(
+      (transfer) => transfer.status === TransferStatus.DISPATCHED
+    ).length;
+    const pendingFpsAllocations = [...this.allocations.values()].filter(
+      (allocation) => allocation.status === 'ALLOCATED'
+    ).length;
     return {
       trackedStockKg: [...this.stock.values()].reduce((total, qty) => total + qty, 0),
       activeLots: [...this.lots.values()].filter((lot) => lot.status === LotStatus.CREATED || lot.status === LotStatus.DISPATCHED).length,
       completedDistributions: this.distributions.size,
-      pendingReceipts: [...this.allocations.values()].filter((allocation) => allocation.status === 'ALLOCATED').length + [...this.transfers.values()].filter((transfer) => transfer.status === TransferStatus.DISPATCHED).length,
+      pendingTransferReceipts,
+      pendingFpsAllocations,
+      pendingReceipts: pendingTransferReceipts + pendingFpsAllocations,
       openAlerts: [...this.alerts.values()].filter((alert) => alert.status !== 'RESOLVED').length,
       highRiskFps: [...new Set([...this.alerts.values()].filter((alert) => alert.riskLevel === 'HIGH').map((alert) => alert.entityId))]
     };
@@ -1246,12 +1499,6 @@ export class PdsLedgerEngine {
         this.stock.set(keyFor(lot.currentOwner, lot.commodity), lot.quantityKg);
         break;
       }
-      case 'TransformLot': {
-        const lot = payload as unknown as CommodityLot;
-        this.lots.set(lot.lotId, lot);
-        this.stock.set(keyFor(lot.currentOwner, lot.commodity), lot.quantityKg);
-        break;
-      }
       case 'AuthorizeMovement':
         // Authorization events are control-plane evidence. If the transfer
         // already exists, stamp it; otherwise dispatch validation can still
@@ -1336,6 +1583,22 @@ export class PdsLedgerEngine {
       case 'RolloverUnclaimedQuota':
         // Rollover updates multiple entitlements; projection not applicable for replay.
         break;
+      case 'ResetTransactionalData': {
+        const commodity = typeof payload.commodity === 'string' ? payload.commodity : undefined;
+        const seriesId =
+          typeof payload.seriesId === 'string' ? payload.seriesId : INITIAL_DEMO_SERIES_ID;
+        this.seriesId = seriesId;
+        const affectedEntityIds = this.applyTransactionalReset(commodity);
+        // Mirror resetTransactionalData()'s end state. Lots are recreated by
+        // subsequent CreateCommodityLot events (live path and Fabric dual-write).
+        // A full reset makes this replay event the sole history entry until those
+        // creates are also applied; a commodity-scoped reset only drops events
+        // tied to the affected entities (push already happened in applyLedgerEvent).
+        this.events = commodity
+          ? this.events.filter((candidate) => candidate === event || !affectedEntityIds.has(candidate.entityId))
+          : this.events.filter((candidate) => candidate === event || this.preservesFullResetHistory(candidate));
+        break;
+      }
       default:
         // applyLedgerEvent pre-validates against the allowlist, so reaching here
         // means an internal inconsistency — fail loudly rather than silently drop.

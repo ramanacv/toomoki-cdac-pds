@@ -43,7 +43,6 @@ export const getFabricOperationByApiRoute = (route: string): FabricOperationName
   const mapping: Record<string, FabricOperationName> = {
     '/stakeholders': 'RegisterStakeholder',
     '/lots': 'CreateCommodityLot',
-    '/lots/transform': 'TransformLot',
     '/transfers/:transferId/authorize': 'RecordLedgerProof',
     '/transfers': 'DispatchLot',
     '/transfers/:transferId/receive': 'ReceiveLot',
