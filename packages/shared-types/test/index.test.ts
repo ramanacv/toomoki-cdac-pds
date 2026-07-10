@@ -4,7 +4,16 @@ import {
   getCommodityRouteTemplate,
   hashReference,
   maskHash,
-  StakeholderType
+  StakeholderType,
+  INITIAL_DEMO_SERIES_ID,
+  buildSeedLotId,
+  buildTransferId,
+  buildAllocationId,
+  buildDistributionId,
+  buildCommodityRouteForSeries,
+  seriesIdFromLotId,
+  generateResetSeriesId,
+  createdAtFromLotId
 } from '../src/index.js';
 
 describe('shared types', () => {
@@ -53,5 +62,41 @@ describe('shared types', () => {
     ]);
     expect(rice?.requiresTransformation).toBe(false);
     expect(rice?.fpsDelivery?.fpsId).toBe('FPS-101');
+  });
+});
+
+describe('reset series id helpers', () => {
+  it('builds POC bootstrap ids matching fixtures', () => {
+    expect(buildSeedLotId('KEROSENE', INITIAL_DEMO_SERIES_ID)).toBe('LOT-KEROSENE-2026-001');
+    expect(buildTransferId(INITIAL_DEMO_SERIES_ID, 'KEROSENE', 'PROC-FCI')).toBe('TR-POC-KEROSENE-PROC-FCI');
+    expect(buildAllocationId(INITIAL_DEMO_SERIES_ID, 'KEROSENE')).toBe('ALLOC-POC-KEROSENE-FPS');
+    expect(buildDistributionId(INITIAL_DEMO_SERIES_ID, 'RICE', '001')).toBe('DIST-POC-001');
+  });
+
+  it('builds unique series-scoped ids after reset', () => {
+    const seriesId = 'R20260710-165432-ab12';
+    expect(buildSeedLotId('KEROSENE', seriesId)).toBe('LOT-KEROSENE-R20260710-165432-ab12-001');
+    expect(buildTransferId(seriesId, 'KEROSENE', 'PROC-FCI')).toBe('TR-R20260710-165432-ab12-KEROSENE-PROC-FCI');
+    expect(seriesIdFromLotId('LOT-KEROSENE-R20260710-165432-ab12-001')).toBe(seriesId);
+    expect(seriesIdFromLotId('LOT-RICE-2026-001')).toBe(INITIAL_DEMO_SERIES_ID);
+  });
+
+  it('clones commodity routes onto a new series', () => {
+    const route = buildCommodityRouteForSeries('Kerosene', 'R20260710-165432-ab12');
+    expect(route?.sourceLotId).toBe('LOT-KEROSENE-R20260710-165432-ab12-001');
+    expect(route?.legs[0]?.id).toBe('TR-R20260710-165432-ab12-KEROSENE-PROC-FCI');
+    expect(route?.fpsDelivery?.allocationId).toBe('ALLOC-R20260710-165432-ab12-KEROSENE-FPS');
+  });
+
+  it('derives a readable created time from reset series lot ids', () => {
+    expect(createdAtFromLotId('LOT-KEROSENE-R20260710-165432-ab12-001')).toBe('2026-07-10T16:54:32.000Z');
+    expect(createdAtFromLotId('LOT-RICE-2026-001')).toBeUndefined();
+  });
+
+  it('generates distinct series ids', () => {
+    const a = generateResetSeriesId(new Date('2026-07-10T11:00:00.000Z'), 'aaaa');
+    const b = generateResetSeriesId(new Date('2026-07-10T11:00:00.000Z'), 'bbbb');
+    expect(a).not.toBe(b);
+    expect(a.startsWith('R20260710-110000-')).toBe(true);
   });
 });

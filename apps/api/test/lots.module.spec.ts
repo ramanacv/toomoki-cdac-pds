@@ -14,7 +14,7 @@ describe('LotsModule', () => {
     controller = await createControllerWithFacade(LotsController, fixture.facade);
 
     const initialCount = controller.lots().length;
-    const created = controller.createLot({
+    const created = await controller.createLot({
       lotId: 'LOT-TEST-001',
       commodity: 'Wheat',
       season: 'Rabi 2026',

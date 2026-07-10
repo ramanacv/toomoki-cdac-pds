@@ -1,7 +1,7 @@
 import { Plane } from '../../infrastructure/plane.decorator.js';
 import { Body, Controller, Get, Inject, Param, Post, Query } from '@nestjs/common';
 import { PdsLedgerFacade } from '../core/pds-ledger.facade.js';
-import { EntitlementValidateDto } from './dto/entitlement.dto.js';
+import { EntitlementCreateDto, EntitlementValidateDto } from './dto/entitlement.dto.js';
 
 @Plane('control')
 @Controller()
@@ -26,6 +26,11 @@ export class EntitlementsController {
   @Get('/entitlements')
   entitlementList() {
     return this.ledger.listEntitlements();
+  }
+
+  @Post('/entitlements')
+  create(@Body() body: EntitlementCreateDto) {
+    return this.ledger.createOrUpdateEntitlementPersisted(body);
   }
 
   @Post('/entitlements/validate')

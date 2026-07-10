@@ -29,7 +29,11 @@ import {
   getCommodityRouteTemplate,
   isCommodityRouteEdgeAllowed,
   hashReference,
-  makeTimestamp
+  makeTimestamp,
+  INITIAL_DEMO_SERIES_ID,
+  buildSeedLotId,
+  generateResetSeriesId,
+  COMMODITIES
 } from '@pds/shared-types';
 
 type StockKey = `${string}:${string}`;
@@ -48,6 +52,8 @@ export type PdsLedgerState = {
   rationCards: RationCard[];
   grievances: Grievance[];
   entitlementRules: EntitlementRule[];
+  /** Current demo/run series for reseeded workflow ids. Bootstrap uses POC. */
+  seriesId?: string;
 };
 
 const keyFor = (entityId: string, commodity: string): StockKey => `${entityId}:${commodity}`;
@@ -112,6 +118,23 @@ const assertNoPiiInPayload = (payload: Record<string, unknown>): void => {
   }
 };
 
+const FULL_RESET_PRESERVED_ENTITY_TYPES = new Set<LedgerEvent['entityType']>([
+  'stakeholder',
+  'rationcard',
+  'grievance',
+  'entitlementrule'
+]);
+
+const defaultSeasonForCommodity = (commodity: string): string => {
+  if (commodity === 'Rice' || commodity === 'Dal') {
+    return 'Kharif 2026';
+  }
+  if (commodity === 'Wheat') {
+    return 'Rabi 2026';
+  }
+  return '2026';
+};
+
 /**
  * Validate that a hash reference looks like a hash rather than a raw identifier
  * (T6.4). Real hashes (hex/base58 digests) and the demo placeholders
@@ -158,6 +181,7 @@ export class PdsLedgerEngine {
   private rationCards = new Map<string, RationCard>();
   private grievances = new Map<string, Grievance>();
   private entitlementRules = new Map<string, EntitlementRule>();
+  private seriesId: string = INITIAL_DEMO_SERIES_ID;
 
   constructor(seed = true) {
     if (seed) {
@@ -179,7 +203,8 @@ export class PdsLedgerEngine {
       stock: [...this.stock.entries()],
       rationCards: [...this.rationCards.values()],
       grievances: [...this.grievances.values()],
-      entitlementRules: [...this.entitlementRules.values()]
+      entitlementRules: [...this.entitlementRules.values()],
+      seriesId: this.seriesId
     };
   }
 
@@ -197,6 +222,28 @@ export class PdsLedgerEngine {
     this.rationCards = new Map((state.rationCards ?? []).map((item) => [item.rationCardHash, item]));
     this.grievances = new Map((state.grievances ?? []).map((item) => [item.grievanceId, item]));
     this.entitlementRules = new Map((state.entitlementRules ?? []).map((item) => [item.ruleId, item]));
+    this.seriesId = state.seriesId ?? this.deriveSeriesIdFromLots(state.lots) ?? INITIAL_DEMO_SERIES_ID;
+  }
+
+  getSeriesId(): string {
+    return this.seriesId;
+  }
+
+  private deriveSeriesIdFromLots(lots: CommodityLot[]): string | undefined {
+    const seedLot = [...lots].sort((a, b) => b.lotId.localeCompare(a.lotId)).find((lot) => /-\d{3}$/.test(lot.lotId));
+    if (!seedLot) {
+      return undefined;
+    }
+    // Inline parse to avoid circular timing; mirrors seriesIdFromLotId for seed lots.
+    for (const definition of [...COMMODITIES].sort((a, b) => b.slug.length - a.slug.length)) {
+      const prefix = `LOT-${definition.slug}-`;
+      if (!seedLot.lotId.startsWith(prefix)) continue;
+      const rest = seedLot.lotId.slice(prefix.length);
+      const match = /^(.*)-(\d{3})$/.exec(rest);
+      if (!match?.[1]) continue;
+      return match[1] === '2026' ? INITIAL_DEMO_SERIES_ID : match[1];
+    }
+    return undefined;
   }
 
   seedDemoData(): DemoSnapshot {
@@ -228,35 +275,59 @@ export class PdsLedgerEngine {
   }
 
   /**
-   * Recreate the demo's starting lots without emitting their own ledger events —
-   * ResetTransactionalData is meant to be the sole history entry left behind
-   * by a reset (see the replay projection below), so this mutates state
-   * directly rather than going through createCommodityLot(). The frontend's
-   * scripted workflow (apps/web/src/workflow-actions.ts) hardcodes the rice
-   * lot id, so it must exist again after the lot map is cleared —
-   * otherwise every scripted dispatch/transform 404s with "Lot ... not found".
+   * Build reset seed lot inputs from shared commodity definitions. The deployed
+   * Fabric chaincode bundle intentionally does not carry @pds/fixtures.
    */
-  private reseedInitialLots(): void {
-    const { backendSeed } = this.loadFixtures();
-    for (const seedLot of backendSeed.initialLots) {
-      const lot: CommodityLot = { ...seedLot, status: LotStatus.CREATED };
-      this.lots.set(lot.lotId, lot);
-      this.addStock(lot.currentOwner, lot.commodity, lot.quantityKg);
+  private buildSeriesSeedLots(seriesId: string, commodity?: string): Array<Omit<CommodityLot, 'status'>> {
+    const definitions = commodity
+      ? COMMODITIES.filter((definition) => definition.name === commodity)
+      : COMMODITIES;
+    return definitions.map((definition) => {
+      return {
+        lotId: buildSeedLotId(definition.slug, seriesId),
+        commodity: definition.name,
+        season: defaultSeasonForCommodity(definition.name),
+        quantityKg: definition.defaultTopUpQuantityKg,
+        qualityGrade: definition.defaultQualityGrade,
+        source: 'Procurement Centre 01',
+        currentOwner: 'PROC-001',
+        currentLocation: 'Procurement Yard'
+      };
+    });
+  }
+
+  private preservesFullResetHistory(event: LedgerEvent): boolean {
+    return FULL_RESET_PRESERVED_ENTITY_TYPES.has(event.entityType);
+  }
+
+  private ensureStakeholderRegistryEvents(): void {
+    const registered = new Set(
+      this.events
+        .filter((event) => event.eventType === 'RegisterStakeholder')
+        .map((event) => event.entityId)
+    );
+    for (const stakeholder of sortByTime([...this.stakeholders.values()])) {
+      if (!registered.has(stakeholder.stakeholderId)) {
+        this.recordEvent('stakeholder', stakeholder.stakeholderId, 'RegisterStakeholder', stakeholder);
+        registered.add(stakeholder.stakeholderId);
+      }
     }
   }
 
   /**
-   * Shared by resetTransactionalData() and its replay projection. With no
-   * commodity, wipes every movement/quantity collection. With a commodity,
-   * only removes lots of that commodity, transfers of those lots, allocations
-   * and distributions tagged with that commodity, their stock positions, and
-   * any audit alerts referencing one of those entities — other commodities'
-   * data is untouched. Auth transactions carry no commodity field, so a
-   * commodity-scoped reset never clears them. Returns the set of entity ids
-   * removed, so the caller can also drop ledger events referencing them.
+   * Shared by resetTransactionalData() and its replay projection. Clears
+   * movement/quantity collections without reseeding — the caller installs a
+   * new ID series afterward. Returns entity ids removed for event filtering.
    */
   private applyTransactionalReset(commodity?: string): Set<string> {
     if (!commodity) {
+      const affectedEntityIds = new Set([
+        ...this.lots.keys(),
+        ...this.transfers.keys(),
+        ...this.allocations.keys(),
+        ...this.distributions.keys(),
+        ...this.alerts.keys()
+      ]);
       this.lots.clear();
       this.transfers.clear();
       this.allocations.clear();
@@ -270,8 +341,7 @@ export class PdsLedgerEngine {
         entitlement.availableBalanceKg = entitlement.monthlyEntitlementKg;
       }
 
-      this.reseedInitialLots();
-      return new Set();
+      return affectedEntityIds;
     }
 
     const affectedLotIds = new Set(
@@ -321,39 +391,47 @@ export class PdsLedgerEngine {
       }
     }
 
-    const { backendSeed } = this.loadFixtures();
-    for (const seedLot of backendSeed.initialLots.filter((lot) => lot.commodity === commodity)) {
-      const lot: CommodityLot = { ...seedLot, status: LotStatus.CREATED };
-      this.lots.set(lot.lotId, lot);
-      this.addStock(lot.currentOwner, lot.commodity, lot.quantityKg);
-    }
-
     return affectedEntityIds;
   }
 
   /**
-   * Wipe movement/quantity data so testing can restart from a clean slate
-   * after a calculation bug produced bad figures downstream. Stakeholders,
-   * ration cards, grievances, and entitlement rule definitions (policy
-   * config, not accumulated quantities) are always left intact.
+   * Wipe movement/quantity data and reseed with a new ID series so Fabric
+   * never reuses lot/transfer identities. Stakeholders, ration cards,
+   * grievances, and entitlement rule definitions stay intact.
    *
-   * Pass a commodity to scope the reset to just that commodity's lots,
-   * transfers, allocations, distributions, stock, and related alerts —
-   * other commodities' data and ledger history are left untouched. Omit it
-   * to wipe everything (the original full-reset behavior), which also clears
-   * all ledger event history down to this single reset event.
+   * Emits ResetTransactionalData plus CreateCommodityLot for each reseeded
+   * lot (so dual-write can create the lots on-chain). Pass a commodity to
+   * scope the reset; omit it for a full wipe of movement history.
    */
-  resetTransactionalData(commodity?: string): { ledgerTxId: string } {
+  resetTransactionalData(commodity?: string): {
+    ledgerTxId: string;
+    seriesId: string;
+    lots: CommodityLot[];
+  } {
+    const seriesId = generateResetSeriesId(new Date(), randomUUID().slice(0, 4));
+    this.seriesId = seriesId;
+    const seedLots = this.buildSeriesSeedLots(seriesId, commodity);
     const affectedEntityIds = this.applyTransactionalReset(commodity);
     this.events = commodity
       ? this.events.filter((event) => !affectedEntityIds.has(event.entityId))
-      : [];
+      : this.events.filter((event) => this.preservesFullResetHistory(event));
+    if (!commodity) {
+      this.ensureStakeholderRegistryEvents();
+    }
 
     const { ledgerTxId } = this.recordEvent('workflow', 'ledger', 'ResetTransactionalData', {
       resetAt: makeTimestamp(),
+      seriesId,
+      lots: seedLots,
       ...(commodity ? { commodity } : {})
     });
-    return { ledgerTxId };
+
+    const created: CommodityLot[] = [];
+    for (const seedLot of seedLots) {
+      created.push(this.createCommodityLot(seedLot));
+    }
+
+    return { ledgerTxId, seriesId, lots: created };
   }
 
   snapshot(): DemoSnapshot {
@@ -389,7 +467,11 @@ export class PdsLedgerEngine {
     if (this.lots.has(input.lotId)) {
       throw new Error(`Lot ${input.lotId} already exists`);
     }
-    const lot: CommodityLot = { ...input, status: LotStatus.CREATED };
+    const lot: CommodityLot = {
+      ...input,
+      status: LotStatus.CREATED,
+      createdAt: input.createdAt ?? makeTimestamp()
+    };
     this.lots.set(lot.lotId, lot);
     // Open the stock position for the originating owner so getCurrentStock is correct
     // immediately after creation (previously stock only came from seed).
@@ -686,13 +768,8 @@ export class PdsLedgerEngine {
       }
     }
     const key = this.entitlementKey(input.rationCardHash, input.commodity, input.month);
-    const isUpdate = this.entitlements.has(key);
     this.entitlements.set(key, input);
-    if (!isUpdate) {
-      // Emit a ledger event only on create to keep the entitlement auditable without
-      // double-counting updates (each create gets one EntitlementCreated event).
-      this.recordEvent('distribution', input.rationCardHash, 'CreateMonthlyEntitlement', input);
-    }
+    this.recordEvent('distribution', input.rationCardHash, 'CreateMonthlyEntitlement', input);
     return input;
   }
 
@@ -1485,14 +1562,18 @@ export class PdsLedgerEngine {
         break;
       case 'ResetTransactionalData': {
         const commodity = typeof payload.commodity === 'string' ? payload.commodity : undefined;
+        const seriesId =
+          typeof payload.seriesId === 'string' ? payload.seriesId : INITIAL_DEMO_SERIES_ID;
+        this.seriesId = seriesId;
         const affectedEntityIds = this.applyTransactionalReset(commodity);
-        // Mirror resetTransactionalData()'s end state. A full reset makes this
-        // replay event the sole history entry; a commodity-scoped reset only
-        // drops events tied to the affected entities (push already happened
-        // in applyLedgerEvent, so `event` itself is kept either way).
+        // Mirror resetTransactionalData()'s end state. Lots are recreated by
+        // subsequent CreateCommodityLot events (live path and Fabric dual-write).
+        // A full reset makes this replay event the sole history entry until those
+        // creates are also applied; a commodity-scoped reset only drops events
+        // tied to the affected entities (push already happened in applyLedgerEvent).
         this.events = commodity
           ? this.events.filter((candidate) => candidate === event || !affectedEntityIds.has(candidate.entityId))
-          : [event];
+          : this.events.filter((candidate) => candidate === event || this.preservesFullResetHistory(candidate));
         break;
       }
       default:

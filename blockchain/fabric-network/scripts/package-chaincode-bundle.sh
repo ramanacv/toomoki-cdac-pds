@@ -41,4 +41,12 @@ cp "${REPO_ROOT}/packages/shared-types/package.json" "${OUT}/vendor/shared-types
 # Install runtime deps inside bundle (no workspace hoisting)
 npm install --prefix "${OUT}" --omit=dev
 
+# npm installs local file dependencies as symlinks. Fabric's external builder
+# copies the package into a container image where those symlinks can be lost, so
+# make the vendored workspace dependency a real directory in node_modules.
+rm -rf "${OUT}/node_modules/@pds/shared-types"
+mkdir -p "${OUT}/node_modules/@pds/shared-types"
+cp -r "${OUT}/vendor/shared-types/dist" "${OUT}/node_modules/@pds/shared-types/dist"
+cp "${OUT}/vendor/shared-types/package.json" "${OUT}/node_modules/@pds/shared-types/package.json"
+
 echo "Bundle ready: ${OUT}"

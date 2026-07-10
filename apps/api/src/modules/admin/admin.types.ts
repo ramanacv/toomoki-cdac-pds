@@ -90,6 +90,8 @@ export type AdminActivityFeed = {
 export type AdminResetResult = {
   ledgerTxId: string;
   message: string;
+  seriesId: string;
+  lots: Array<{ lotId: string; commodity: string; quantityKg: number }>;
 };
 
 export type AdminOverview = {

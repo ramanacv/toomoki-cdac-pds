@@ -5,13 +5,13 @@ import { StakeholderType } from '@pds/shared-types';
 export type ParticipationMode = 'active' | 'passive';
 
 export const roleOrder: DemoRole[] = [
-  'MANAGEMENT',
-  'CONTROL_OFFICE',
   'PROCUREMENT',
   'FCI_DEPOT',
   'GODOWN',
+  'CONTROL_OFFICE',
   'DEPOT',
   'FPS',
+  'MANAGEMENT',
   'AUDITOR'
 ];
 

@@ -20,7 +20,7 @@ export class LotsController {
 
   @Post('/lots')
   createLot(@Body() body: LotCreateDto) {
-    return this.ledger.createCommodityLot(body);
+    return this.ledger.createCommodityLotPersisted(body);
   }
 
   @Get('/lots/:lotId/history')

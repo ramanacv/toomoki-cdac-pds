@@ -15,6 +15,6 @@ export class StakeholdersController {
 
   @Post('/stakeholders')
   registerStakeholder(@Body() body: StakeholderCreateDto) {
-    return this.ledger.registerStakeholder(body);
+    return this.ledger.registerStakeholderPersisted(body);
   }
 }

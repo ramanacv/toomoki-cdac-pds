@@ -60,23 +60,25 @@ export function StakeholdersPanel({ stakeholders }: { stakeholders: Stakeholder[
           <span>Policy, audit, or supporting role</span>
         </span>
       </div>
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3">
         {sortedStakeholders.map((stakeholder) => {
           const mode = stakeholderParticipation(stakeholder.stakeholderType);
           return (
             <EntityCard
               key={stakeholder.stakeholderId}
-              className={cn('space-y-2', participationCardClass[mode])}
+              className={cn('space-y-3 rounded-lg', participationCardClass[mode])}
             >
-              <div className="flex items-start justify-between gap-2">
-                <strong className="block leading-snug">{stakeholder.name}</strong>
+              <div className="flex justify-end">
                 <ParticipationBadge mode={mode} />
               </div>
-              <span className="block break-words text-sm text-muted-foreground">
+              <strong className="block min-w-0 break-words text-lg leading-snug">
+                {stakeholder.name}
+              </strong>
+              <span className="block min-w-0 break-all text-sm text-muted-foreground">
                 {stakeholder.stakeholderType}
               </span>
               <p className="text-sm text-muted-foreground">{stakeholder.district}</p>
-              <code className="mt-1 block text-secondary">{stakeholder.stakeholderId}</code>
+              <code className="mt-1 block break-all text-secondary">{stakeholder.stakeholderId}</code>
             </EntityCard>
           );
         })}

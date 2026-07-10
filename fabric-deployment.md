@@ -204,6 +204,151 @@ This runs build, all tests, demo smoke, fabric smoke, and opt-in fabric e2e test
 
 ---
 
+## Verifying Fabric writes
+
+Writes flow through the API → Fabric Gateway → peer → `pds-chaincode` on `pdschannel`, with an operational mirror in Postgres. Use the checks below to confirm data landed on the **live ledger**, not just in the database.
+
+### What gets written where
+
+```text
+Web UI action
+  → API (PDS_LEDGER_MODE=fabric)
+      → Fabric Gateway → peer0.food / peer0.godown
+          → chaincode pds-chaincode (channel pdschannel)
+              → world state in CouchDB (pds.* keys)
+              → block on the orderer ledger
+      → (dual-write) Postgres snapshot (ledger_events, etc.)
+```
+
+| Layer | What it proves |
+|-------|----------------|
+| `/health` → `ledgerMode: "fabric"` | API is configured for live Fabric, not demo mode |
+| `/trace/lots/:id` → `verificationSource: "chaincode"` | API read chaincode on the peer (strongest app-level proof) |
+| Workflow success → `Ledger tx …` | A Fabric transaction ID was returned for the write |
+| Peer logs → `"operation"` + `txId` | Chaincode executed and logged on the peer |
+| CouchDB Fauxton → `pds.*` documents | Raw world-state keys (dev only) |
+| `peer channel getinfo` | Block height increases after writes |
+
+### 1. Confirm Fabric mode
+
+```bash
+curl -s http://localhost:3000/health | jq '.ledgerMode'
+# expected: "fabric"
+```
+
+If you see `"demo"`, copy `.env.fabric.example` → `.env` and restart with `--profile fabric`.
+
+### 2. Confirm chaincode reads (trace endpoint)
+
+```bash
+curl -s http://localhost:3000/trace/lots/LOT-RICE-2026-001 | jq '{verificationSource, history: (.history | length)}'
+```
+
+Expected: `"verificationSource": "chaincode"`. In demo mode this field is absent and history comes from the in-process engine only.
+
+After a mutating workflow, re-run the trace call — `history` length should grow.
+
+### 3. Web UI indicators
+
+| Location | What to look for |
+|----------|------------------|
+| Status badge (top bar) | **Live API (Fabric)** |
+| Workflow action success | `Ledger tx <id>` in the toast |
+| **Trace Explorer** (Lots page) | Lot/receipt trail for the selected lot |
+| **Admin → Ledger activity** (`/admin/ledger`) | Recent events with tx IDs (needs admin token) |
+
+The Trace Explorer and admin ledger pages show **business records** via the API. They do not show raw Fabric blocks or CouchDB rows.
+
+### 4. Peer logs (chaincode execution)
+
+Every chaincode write emits a structured log line (see `contract-base.ts`):
+
+```bash
+docker logs peer0.food.example.com 2>&1 | grep '"operation"'
+```
+
+Example line:
+
+```json
+{"level":"info","plane":"data","operation":"RecordDistribution","txId":"<fabric-tx-id>","ts":"..."}
+```
+
+Match the `txId` to the **Ledger tx** shown in the web UI or API response.
+
+### 5. Query chaincode directly (peer CLI)
+
+Use the helper script (runs a read-only query inside `peer0.food.example.com`):
+
+```bash
+chmod +x blockchain/fabric-network/scripts/query-chaincode.sh
+
+./blockchain/fabric-network/scripts/query-chaincode.sh \
+  GetLotHistory '{"lotId":"LOT-RICE-2026-001"}'
+
+./blockchain/fabric-network/scripts/query-chaincode.sh GetCurrentStock
+```
+
+Check channel block height (should increase after writes):
+
+```bash
+docker cp blockchain/fabric-network/crypto/peerOrganizations/food.example.com/users/Admin@food.example.com/msp \
+  peer0.food.example.com:/tmp/admin-msp
+
+docker exec -e CORE_PEER_MSPCONFIGPATH=/tmp/admin-msp peer0.food.example.com \
+  peer channel getinfo -c pdschannel
+```
+
+### 6. Browse world state in CouchDB Fauxton (dev only)
+
+By default CouchDB ports are **not** exposed to the host. For local debugging, start with the `fabric-debug` profile:
+
+```bash
+docker compose --profile fabric --profile fabric-debug up -d
+```
+
+| Instance | Fauxton URL | Peer |
+|----------|-------------|------|
+| couchdb0 | http://localhost:5984/_utils | peer0.food |
+| couchdb1 | http://localhost:6984/_utils | peer0.godown |
+
+Login: `pds_couch` / `changeme-couch` (override via `PDS_COUCHDB_USER` / `PDS_COUCHDB_PASSWORD` in `.env`).
+
+Open database **`pdschannel_pds-chaincode`** and look for document IDs such as:
+
+| Document `_id` | Contents |
+|----------------|----------|
+| `pds.lots` | All commodity lots |
+| `pds.events` | Ledger events |
+| `pds.distributions` | Distribution records |
+| `pds.stock` | Stock positions |
+| `pds.stakeholders` | Registered stakeholders |
+
+Composite keys (e.g. `rationcard~<hash>`) appear as separate documents.
+
+**Security:** do not enable `fabric-debug` on shared or production hosts — it exposes raw ledger state.
+
+### 7. Hyperledger Explorer (not included)
+
+This repo does not ship [Hyperledger Explorer](https://github.com/hyperledger-labs/blockchain-explorer). For a full block-and-transaction browser UI (blocks, endorsements, chaincode invocations), you would add Explorer as a separate stack pointed at `pdschannel` / `pds-chaincode`.
+
+### Quick verification checklist
+
+```bash
+# 1. Fabric mode
+curl -sf http://localhost:3000/health | jq -e '.ledgerMode == "fabric"'
+
+# 2. Chaincode verification
+curl -sf http://localhost:3000/trace/lots/LOT-RICE-2026-001 | jq -e '.verificationSource == "chaincode"'
+
+# 3. Automated smoke (register + trace)
+PDS_DEV_AUTH_TOKEN=dev-mvp-token npm run smoke:fabric
+
+# 4. Peer query
+./blockchain/fabric-network/scripts/query-chaincode.sh GetCurrentStock
+```
+
+---
+
 ## Step 6 — Test in the Web UI
 
 1. Open **http://localhost:4173**
@@ -311,6 +456,7 @@ docker compose --profile fabric up --build -d
 | `ECONNREFUSED` to postgres | `docker compose up postgres -d`; host port is **5433** |
 | Web shows mock/fixture data | API not reachable — check `curl localhost:3000/health`; badge should say "Live API (Fabric)" |
 | Port conflicts | Stop other services on 3000/4173/7051 or change ports in compose files |
+| Need to browse CouchDB world state | `docker compose --profile fabric --profile fabric-debug up -d`, then Fauxton at http://localhost:5984/_utils |
 
 ### JoinChain / MSP / certificate errors
 
@@ -387,6 +533,8 @@ docker compose --profile fabric up --build -d
 curl -s http://localhost:3000/health
 PDS_DEV_AUTH_TOKEN=dev-mvp-token npm run smoke:fabric
 # Then open http://localhost:4173, save token dev-mvp-token, test workflows
+# Optional: expose CouchDB for world-state inspection
+# docker compose --profile fabric --profile fabric-debug up -d
 ```
 
 ---

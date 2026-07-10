@@ -52,7 +52,7 @@ export class FabricGatewayClient implements FabricClient, ChainQueryPort {
     const contract = await this.getContract(operation);
     const resultBytes = await contract.submit(operation, {
       arguments: [JSON.stringify(payload)],
-      endorsingOrganizations: [this.config.mspId]
+      endorsingOrganizations: this.config.endorsingOrgs
     });
     const resultJson = utf8Decoder.decode(resultBytes);
     return resultJson.length > 0 ? JSON.parse(resultJson) : null;
@@ -65,8 +65,7 @@ export class FabricGatewayClient implements FabricClient, ChainQueryPort {
   async evaluateAsync(operation: FabricOperationName, payload: Record<string, unknown>): Promise<unknown> {
     const contract = await this.getContract(operation);
     const resultBytes = await contract.evaluate(operation, {
-      arguments: [JSON.stringify(payload)],
-      endorsingOrganizations: [this.config.mspId]
+      arguments: [JSON.stringify(payload)]
     });
     const resultJson = utf8Decoder.decode(resultBytes);
     return resultJson.length > 0 ? JSON.parse(resultJson) : null;

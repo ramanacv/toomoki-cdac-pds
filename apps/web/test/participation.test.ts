@@ -16,6 +16,14 @@ describe('participation helpers', () => {
     expect(activeParticipantRoles.has('CONTROL_OFFICE')).toBe(true);
     expect(activeRolesInOrder()).not.toContain('MANAGEMENT');
     expect(activeRolesInOrder()).not.toContain('AUDITOR');
+    expect(activeRolesInOrder()).toEqual([
+      'PROCUREMENT',
+      'FCI_DEPOT',
+      'GODOWN',
+      'CONTROL_OFFICE',
+      'DEPOT',
+      'FPS'
+    ]);
   });
 
   it('classifies oversight roles as passive', () => {

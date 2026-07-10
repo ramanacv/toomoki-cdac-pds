@@ -20,6 +20,7 @@ const baseConfig = (): FabricRuntimeConfig => ({
   peerTlsCertPath: '/tmp/ca.crt',
   peerHostAlias: 'peer0.food.example.com',
   mspId: 'FoodAndCivilSuppliesMSP',
+  endorsingOrgs: ['FoodAndCivilSuppliesMSP'],
   certPath: '/tmp/cert.pem',
   keyPath: '/tmp/key.pem'
 });
@@ -52,8 +53,7 @@ describe('FabricGatewayClient', () => {
 
     const history = await client.getLotHistoryAsync('LOT-1');
     expect(evaluate).toHaveBeenCalledWith('GetLotHistory', {
-      arguments: [JSON.stringify({ lotId: 'LOT-1' })],
-      endorsingOrganizations: ['FoodAndCivilSuppliesMSP']
+      arguments: [JSON.stringify({ lotId: 'LOT-1' })]
     });
     expect(history).toEqual([{ eventType: 'CreateCommodityLot' }]);
   });

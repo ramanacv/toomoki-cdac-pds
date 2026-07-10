@@ -13,7 +13,7 @@ describe('AllocationsModule', () => {
     moveLotToIssuePoint(fixture.facade);
     controller = await createControllerWithFacade(AllocationsController, fixture.facade);
 
-    const allocation = controller.allocate({
+    const allocation = await controller.allocate({
       allocationId: 'ALLOC-MOD-001',
       fpsId: 'FPS-101',
       commodity: 'Rice',
@@ -25,7 +25,7 @@ describe('AllocationsModule', () => {
     expect(allocation.allocationId).toBe('ALLOC-MOD-001');
     expect(controller.allocations().some((item) => item.allocationId === 'ALLOC-MOD-001')).toBe(true);
 
-    const receipt = controller.fpsReceipt('ALLOC-MOD-001', { receivedQtyKg: 75 });
+    const receipt = await controller.fpsReceipt('ALLOC-MOD-001', { receivedQtyKg: 75 });
     expect(receipt.receivedQtyKg).toBe(75);
     expect(controller.allocation('ALLOC-MOD-001').status).toBe('RECEIVED');
   });

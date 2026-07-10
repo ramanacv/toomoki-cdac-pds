@@ -136,6 +136,123 @@ export const COMMODITY_ROUTE_TEMPLATES: CommodityRouteTemplate[] = [
   canonicalFpsRoute('Kerosene', 'KEROSENE', 'LOT-KEROSENE-2026-001')
 ];
 
+/** Bootstrap / first-seed series. Fixture lot ids use `2026` in place of this token. */
+export const INITIAL_DEMO_SERIES_ID = 'POC';
+
+const commoditySlugsLongestFirst = (): string[] =>
+  [...COMMODITIES.map((commodity) => commodity.slug)].sort((left, right) => right.length - left.length);
+
+const seriesToken = (seriesId: string): string =>
+  seriesId === INITIAL_DEMO_SERIES_ID ? 'POC' : seriesId;
+
+/** Build a seed lot id for a commodity slug and run series. */
+export const buildSeedLotId = (slug: string, seriesId: string, seq = '001'): string => {
+  if (seriesId === INITIAL_DEMO_SERIES_ID) {
+    return `LOT-${slug}-2026-${seq}`;
+  }
+  return `LOT-${slug}-${seriesId}-${seq}`;
+};
+
+/** Extract the run series embedded in a lot id (`POC` for bootstrap `…-2026-001` lots). */
+export const seriesIdFromLotId = (lotId: string): string => {
+  for (const slug of commoditySlugsLongestFirst()) {
+    const prefix = `LOT-${slug}-`;
+    if (!lotId.startsWith(prefix)) {
+      continue;
+    }
+    const rest = lotId.slice(prefix.length);
+    const match = /^(.*)-(\d{3})$/.exec(rest);
+    if (!match?.[1]) {
+      continue;
+    }
+    return match[1] === '2026' ? INITIAL_DEMO_SERIES_ID : match[1];
+  }
+  return INITIAL_DEMO_SERIES_ID;
+};
+
+/** Best-effort created time from a reset series id (`RyyyyMMdd-HHmmss-…`). */
+export const createdAtFromLotId = (lotId: string): string | undefined => {
+  const series = seriesIdFromLotId(lotId);
+  if (series === INITIAL_DEMO_SERIES_ID) {
+    return undefined;
+  }
+  const match = /^R(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})/.exec(series);
+  if (!match) {
+    return undefined;
+  }
+  return `${match[1]}-${match[2]}-${match[3]}T${match[4]}:${match[5]}:${match[6]}.000Z`;
+};
+
+export type TransferLegSuffix = 'PROC-FCI' | 'FCI-DEPOT' | 'DEPOT-ISSUE';
+
+export const buildTransferId = (seriesId: string, slug: string, leg: TransferLegSuffix): string =>
+  `TR-${seriesToken(seriesId)}-${slug}-${leg}`;
+
+export const buildAllocationId = (seriesId: string, slug: string): string =>
+  `ALLOC-${seriesToken(seriesId)}-${slug}-FPS`;
+
+export const buildDistributionId = (
+  seriesId: string,
+  slug: string,
+  kind: '001' | '002' | 'EXCEPTION' = '001'
+): string => {
+  const token = seriesToken(seriesId);
+  if (token === 'POC' && slug === 'RICE') {
+    if (kind === 'EXCEPTION') return 'DIST-POC-EXCEPTION';
+    return kind === '001' ? 'DIST-POC-001' : 'DIST-POC-002';
+  }
+  if (kind === 'EXCEPTION') return `DIST-${token}-${slug}-EXCEPTION`;
+  return `DIST-${token}-${slug}-${kind}`;
+};
+
+/** UTC timestamp series id, e.g. `R20260710-165432-a1b2`. */
+export const generateResetSeriesId = (date: Date = new Date(), entropy = ''): string => {
+  const pad = (value: number, width = 2) => String(value).padStart(width, '0');
+  const stamp = `${date.getUTCFullYear()}${pad(date.getUTCMonth() + 1)}${pad(date.getUTCDate())}-${pad(date.getUTCHours())}${pad(date.getUTCMinutes())}${pad(date.getUTCSeconds())}`;
+  const suffix = (entropy || Math.random().toString(36).slice(2, 6)).slice(0, 4);
+  return `R${stamp}-${suffix}`;
+};
+
+/** Clone the canonical route template with series-scoped lot / transfer / allocation ids. */
+export const buildCommodityRouteForSeries = (
+  commodity: string,
+  seriesId: string,
+  sourceLotId?: string
+): CommodityRouteTemplate | undefined => {
+  const base = getCommodityRouteTemplate(commodity);
+  if (!base) {
+    return undefined;
+  }
+  const definition = COMMODITIES.find((item) => item.name === commodity);
+  if (!definition) {
+    return undefined;
+  }
+  const slug = definition.slug;
+  const lotId = sourceLotId ?? buildSeedLotId(slug, seriesId);
+  const legSuffix = (legId: string): TransferLegSuffix => {
+    if (legId.endsWith('PROC-FCI')) return 'PROC-FCI';
+    if (legId.endsWith('FCI-DEPOT')) return 'FCI-DEPOT';
+    return 'DEPOT-ISSUE';
+  };
+  return {
+    ...base,
+    sourceLotId: lotId,
+    activeLotId: lotId,
+    ...(base.fpsDelivery
+      ? {
+          fpsDelivery: {
+            ...base.fpsDelivery,
+            allocationId: buildAllocationId(seriesId, slug)
+          }
+        }
+      : {}),
+    legs: base.legs.map((leg) => ({
+      ...leg,
+      id: buildTransferId(seriesId, slug, legSuffix(leg.id))
+    }))
+  };
+};
+
 export const getCommodityRouteTemplate = (commodity: string): CommodityRouteTemplate | undefined =>
   COMMODITY_ROUTE_TEMPLATES.find((template) => template.commodity === commodity);
 
@@ -262,6 +379,8 @@ export type CommodityLot = {
   currentLocation: string;
   status: LotStatus;
   transformedFromLotId?: string;
+  /** ISO timestamp when the lot was created on the ledger. */
+  createdAt?: string;
 };
 
 export type TransferOrder = {

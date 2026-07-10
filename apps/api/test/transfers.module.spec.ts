@@ -13,7 +13,7 @@ describe('TransfersModule', () => {
     fixture = await createDemoLedgerFixture();
     controller = await createControllerWithFacade(TransfersController, fixture.facade);
 
-    const transfer = controller.dispatch({
+    const transfer = await controller.dispatch({
       transferId: 'TR-MOD-001',
       lotId: 'LOT-RICE-2026-001',
       fromOrg: 'PROC-001',
@@ -25,7 +25,7 @@ describe('TransfersModule', () => {
     expect(transfer.status).toBe(TransferStatus.DISPATCHED);
     expect(controller.transfers().some((item) => item.transferId === 'TR-MOD-001')).toBe(true);
 
-    const received = controller.receive('TR-MOD-001', { receivedQtyKg: 250 });
+    const received = await controller.receive('TR-MOD-001', { receivedQtyKg: 250 });
     expect(received.status).toBe(TransferStatus.RECEIVED);
     expect(controller.transfer('TR-MOD-001').receivedQtyKg).toBe(250);
   });
@@ -34,7 +34,7 @@ describe('TransfersModule', () => {
     fixture = await createDemoLedgerFixture();
     controller = await createControllerWithFacade(TransfersController, fixture.facade);
 
-    const approval = controller.authorize('TR-MOD-STAGE-II', {
+    const approval = await controller.authorize('TR-MOD-STAGE-II', {
       authorizedBy: 'DSO-001',
       roRef: 'RO-DSO-MOD-001',
       remarks: 'POC approval'
@@ -44,7 +44,7 @@ describe('TransfersModule', () => {
     expect(controller.ledgerEvents().some((event) => event.eventType === 'AuthorizeMovement')).toBe(true);
     fixture.facade.addStockForTest('GODOWN-S-001', 'Wheat', 250);
 
-    const transfer = controller.dispatch({
+    const transfer = await controller.dispatch({
       transferId: 'TR-MOD-STAGE-II',
       lotId: 'LOT-WHEAT-2026-001',
       fromOrg: 'GODOWN-S-001',
@@ -66,7 +66,7 @@ describe('TransfersModule', () => {
     controller = await createControllerWithFacade(TransfersController, fixture.facade);
     fixture.facade.addStockForTest('GODOWN-S-001', 'Wheat', 250);
 
-    expect(() =>
+    await expect(
       controller.dispatch({
         transferId: 'TR-MOD-STAGE-II-BLOCK',
         lotId: 'LOT-WHEAT-2026-001',
@@ -76,6 +76,6 @@ describe('TransfersModule', () => {
         vehicleNo: 'KA01TR0003',
         stage: 'II'
       })
-    ).toThrow(/Stage-II dispatch requires/);
+    ).rejects.toThrow(/Stage-II dispatch requires/);
   });
 });

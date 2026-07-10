@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { COMMODITIES, LotStatus, type CommodityLot } from '@pds/shared-types';
+import { COMMODITIES, LotStatus, createdAtFromLotId, type CommodityLot } from '@pds/shared-types';
+import { formatDateTime } from '@/lib/constants.js';
 import { getStoredAdminToken, resetAdminLedger, setStoredAdminToken } from '@/admin-api.js';
 import { createStockLot, loadLots } from '@/api.js';
 import { Panel } from '@/components/Panel.js';
@@ -24,6 +25,11 @@ import { useAdminContext } from '@/hooks/use-admin-context.js';
 
 const getCommodityDefaults = (commodity: string) =>
   COMMODITIES.find((item) => item.name === commodity) ?? COMMODITIES[0]!;
+
+const formatLotCreatedAt = (lot: CommodityLot): string => {
+  const iso = lot.createdAt ?? createdAtFromLotId(lot.lotId);
+  return iso ? formatDateTime(iso) : '—';
+};
 
 export function AdminToolsPage() {
   const { apiOnline, stakeholders, refresh } = useAdminContext();
@@ -109,8 +115,13 @@ export function AdminToolsPage() {
     setResetError(null);
     try {
       const result = await resetAdminLedger(resetCommodity === 'ALL' ? undefined : resetCommodity);
-      setResetMessage(result.message);
-      toast.success('Ledger reset', { description: result.message });
+      const lotPreview = result.lots?.slice(0, 3).map((lot) => lot.lotId).join(', ') ?? '';
+      const seriesNote = result.seriesId
+        ? ` New series ${result.seriesId} — workbench will use new lot/transfer ids${lotPreview ? ` (e.g. ${lotPreview})` : ''}.`
+        : '';
+      const message = `${result.message}${seriesNote}`;
+      setResetMessage(message);
+      toast.success('Ledger reset', { description: `Series ${result.seriesId}` });
       await Promise.all([refresh(), refreshLots()]);
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : 'Failed to reset ledger';
@@ -131,6 +142,18 @@ export function AdminToolsPage() {
           deployments.
         </p>
       </header>
+
+      {!apiOnline && (
+        <Alert variant="destructive">
+          <AlertTitle>API offline — showing demo fixtures</AlertTitle>
+          <AlertDescription>
+            The orange <strong>Demo data</strong> badge means the backend is unreachable. The lots
+            table below is static mock data (<code className="text-xs">LOT-*-2026-001</code>), not
+            the live ledger. <strong>Add stock</strong> and <strong>Reset ledger</strong> stay
+            disabled until the API is back (for example <code className="text-xs">docker compose up -d api</code>).
+          </AlertDescription>
+        </Alert>
+      )}
 
       <Panel eyebrow="Access" title="Admin token" wide>
         <p className="mb-4 text-sm text-muted-foreground">
@@ -233,6 +256,9 @@ export function AdminToolsPage() {
           <Button type="button" onClick={() => void addStock()} disabled={!apiOnline || stockSubmitting}>
             {stockSubmitting ? 'Adding stock…' : 'Add stock'}
           </Button>
+          {!apiOnline && (
+            <p className="text-sm text-muted-foreground">Disabled while API is offline (Demo data mode).</p>
+          )}
           {stockMessage && <p className="text-sm text-muted-foreground">{stockMessage}</p>}
         </div>
         {stockError && (
@@ -245,7 +271,9 @@ export function AdminToolsPage() {
 
       <Panel eyebrow="Test data" title="Issued stock lots" pill={`${issuedLots.length} lots`} wide>
         <p className="mb-4 text-sm text-muted-foreground">
-          Commodity lots currently on the ledger, most recently created first.
+          {apiOnline
+            ? 'Commodity lots currently on the live ledger, most recently created first.'
+            : 'Fixture lots from demo data (API offline). Start the API to see live ledger lots after reset.'}
         </p>
         <Table>
           <TableHeader>
@@ -256,6 +284,7 @@ export function AdminToolsPage() {
               <TableHead scope="col">Quantity</TableHead>
               <TableHead scope="col">Owner</TableHead>
               <TableHead scope="col">Location</TableHead>
+              <TableHead scope="col">Created</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -271,11 +300,12 @@ export function AdminToolsPage() {
                 <TableCell>{lot.quantityKg.toLocaleString()} kg</TableCell>
                 <TableCell>{lot.currentOwner}</TableCell>
                 <TableCell>{lot.currentLocation}</TableCell>
+                <TableCell>{formatLotCreatedAt(lot)}</TableCell>
               </TableRow>
             ))}
             {!lotsLoading && issuedLots.length === 0 && (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground">
+                <TableCell colSpan={7} className="text-center text-muted-foreground">
                   No stock lots issued yet.
                 </TableCell>
               </TableRow>
@@ -287,7 +317,8 @@ export function AdminToolsPage() {
       <Panel eyebrow="Danger zone" title="Reset ledger" wide>
         <p className="mb-4 text-sm text-muted-foreground">
           Clears movements, allocations, distributions, stock, and related audit alerts, then
-          reseeds initial lots and resets entitlement balances back to their monthly limits.
+          reseeds initial lots under a <strong>new ID series</strong> (so Fabric never reuses lot
+          or transfer identities) and resets entitlement balances back to their monthly limits.
           Stakeholders, ration cards, and entitlement rules are always left untouched. Scope this
           to one commodity to leave every other commodity's data and ledger history in place, or
           reset everything for a fully clean run.

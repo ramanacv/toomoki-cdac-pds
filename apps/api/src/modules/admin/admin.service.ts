@@ -80,13 +80,20 @@ export class AdminService {
     return this.buildStakeholderSummary();
   }
 
-  resetLedger(commodity?: string): AdminResetResult {
-    const { ledgerTxId } = this.ledger.resetTransactionalData(commodity);
+  async resetLedger(commodity?: string): Promise<AdminResetResult> {
+    const { ledgerTxId, seriesId, lots } = await this.ledger.resetTransactionalDataPersisted(commodity);
+    const lotSummary = lots.map((lot) => ({
+      lotId: lot.lotId,
+      commodity: lot.commodity,
+      quantityKg: lot.quantityKg
+    }));
     return {
       ledgerTxId,
+      seriesId,
+      lots: lotSummary,
       message: commodity
-        ? `Movement data, allocations, distributions, stock, and related audit alerts for ${commodity} were cleared. Its initial lot was reseeded and its entitlement balances were reset to their monthly limits. Other commodities, stakeholders, ration cards, and entitlement rules were left untouched.`
-        : 'Movement data, allocations, distributions, audit alerts, stock, and ledger events were cleared. Initial commodity lots were reseeded and entitlement balances were reset to their monthly limits. Stakeholders, ration cards, and entitlement rules were left untouched.'
+        ? `Movement data for ${commodity} was cleared and reseeded under series ${seriesId}. New lot ids were created (and written as CreateCommodityLot events for Fabric). Other commodities, stakeholders, ration cards, and entitlement rules were left untouched.`
+        : `Movement data was cleared and reseeded under series ${seriesId}. New lot ids were created (and written as CreateCommodityLot events for Fabric). Stakeholders, ration cards, and entitlement rules were left untouched.`
     };
   }
 

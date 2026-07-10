@@ -58,12 +58,22 @@ export class PdsControlContract extends Contract {
   async RegisterStakeholder(ctx: Context, payloadJson: string): Promise<string> {
     assertAuthorized('RegisterStakeholder', identityFromContext(ctx));
     const txId = ctx.stub.getTxID();
+    const payload = JSON.parse(payloadJson) as Stakeholder;
     const [stakeholders, events] = await Promise.all([
       loadCollection<Stakeholder>(ctx, 'stakeholders'),
       loadCollection<LedgerEvent>(ctx, 'events')
     ]);
+    const existing = stakeholders.find((stakeholder) => stakeholder.stakeholderId === payload.stakeholderId);
+    if (existing) {
+      if (JSON.stringify(existing) !== JSON.stringify(payload)) {
+        throw new Error(`Stakeholder ${payload.stakeholderId} already exists`);
+      }
+      const out = { stakeholder: existing, ledgerTxId: txId };
+      emitAndLog(ctx, 'control', 'RegisterStakeholder', txId, out);
+      return JSON.stringify(out);
+    }
     const engine = buildEngine({ stakeholders, events });
-    const result = engine.registerStakeholder(JSON.parse(payloadJson) as Stakeholder);
+    const result = engine.registerStakeholder(payload);
     const state = engine.exportState();
     await Promise.all([
       saveCollection(ctx, 'stakeholders', state.stakeholders),

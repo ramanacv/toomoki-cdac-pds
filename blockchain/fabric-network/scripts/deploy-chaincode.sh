@@ -7,9 +7,14 @@ CHANNEL="${PDS_FABRIC_CHANNEL:-pdschannel}"
 CC_NAME="${PDS_FABRIC_CHAINCODE:-pds-chaincode}"
 CC_VERSION="${CC_VERSION:-1.0}"
 CC_SEQUENCE="${CC_SEQUENCE:-1}"
+CC_SIGNATURE_POLICY="${CC_SIGNATURE_POLICY:-}"
 FABRIC_TOOLS_IMAGE="${FABRIC_TOOLS_IMAGE:-hyperledger/fabric-tools:2.5.15}"
 PACKAGE_DIR="${NETWORK_ROOT}/chaincode-packages"
 CC_LABEL="${CC_NAME}_${CC_VERSION}"
+POLICY_ARGS=()
+if [[ -n "${CC_SIGNATURE_POLICY}" ]]; then
+  POLICY_ARGS=(--signature-policy "${CC_SIGNATURE_POLICY}")
+fi
 
 peer_admin() {
   local container="$1"
@@ -82,19 +87,22 @@ peer_admin_exec peer0.food.example.com "${FOOD_ADMIN}" lifecycle chaincode appro
   -o orderer.pds.example.com:7050 --ordererTLSHostnameOverride orderer.pds.example.com \
   --tls --cafile /tmp/orderer-ca.pem \
   --channelID "${CHANNEL}" --name "${CC_NAME}" --version "${CC_VERSION}" \
-  --package-id "${PACKAGE_ID}" --sequence "${CC_SEQUENCE}"
+  --package-id "${PACKAGE_ID}" --sequence "${CC_SEQUENCE}" \
+  "${POLICY_ARGS[@]}"
 
 peer_admin_exec peer0.godown.example.com "${GODOWN_ADMIN}" lifecycle chaincode approveformyorg \
   -o orderer.pds.example.com:7050 --ordererTLSHostnameOverride orderer.pds.example.com \
   --tls --cafile /tmp/orderer-ca.pem \
   --channelID "${CHANNEL}" --name "${CC_NAME}" --version "${CC_VERSION}" \
-  --package-id "${PACKAGE_ID}" --sequence "${CC_SEQUENCE}"
+  --package-id "${PACKAGE_ID}" --sequence "${CC_SEQUENCE}" \
+  "${POLICY_ARGS[@]}"
 
 peer_admin_exec peer0.food.example.com "${FOOD_ADMIN}" lifecycle chaincode commit \
   -o orderer.pds.example.com:7050 --ordererTLSHostnameOverride orderer.pds.example.com \
   --tls --cafile /tmp/orderer-ca.pem \
   --channelID "${CHANNEL}" --name "${CC_NAME}" --version "${CC_VERSION}" \
   --sequence "${CC_SEQUENCE}" \
+  "${POLICY_ARGS[@]}" \
   --peerAddresses peer0.food.example.com:7051 --tlsRootCertFiles /tmp/food-peer-ca.crt \
   --peerAddresses peer0.godown.example.com:9051 --tlsRootCertFiles /tmp/godown-peer-ca.crt
 

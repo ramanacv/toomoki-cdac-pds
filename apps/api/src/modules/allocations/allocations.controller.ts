@@ -21,11 +21,11 @@ export class AllocationsController {
 
   @Post('/fps-allocations')
   allocate(@Body() body: AllocationDto) {
-    return this.ledger.allocateToFps(body);
+    return this.ledger.allocateToFpsPersisted(body);
   }
 
   @Post('/fps-allocations/:allocationId/receipt')
   fpsReceipt(@Param('allocationId') allocationId: string, @Body() body: TransferReceiveDto) {
-    return this.ledger.recordFpsReceipt({ allocationId, receivedQtyKg: body.receivedQtyKg });
+    return this.ledger.recordFpsReceiptPersisted({ allocationId, receivedQtyKg: body.receivedQtyKg });
   }
 }

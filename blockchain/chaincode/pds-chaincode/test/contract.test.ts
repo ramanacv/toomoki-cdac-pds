@@ -67,6 +67,19 @@ describe('PdsControlContract / PdsDataContract authorization (T1.5)', () => {
     );
   });
 
+  it('treats duplicate identical stakeholder replay as idempotent', async () => {
+    const msp = { mspId: 'FoodAndCivilSuppliesMSP' };
+    const ctx = makeContext(msp);
+    const control = new PdsControlContract();
+    const payload = stakeholder('PROC-001', 'PROCUREMENT_CENTER');
+
+    await expect(control.RegisterStakeholder(ctx, JSON.stringify(payload))).resolves.toBeDefined();
+    await expect(control.RegisterStakeholder(ctx, JSON.stringify(payload))).resolves.toBeDefined();
+    await expect(
+      control.RegisterStakeholder(ctx, JSON.stringify({ ...payload, name: 'Different Name' }))
+    ).rejects.toThrow(/already exists/);
+  });
+
   it('RecordLedgerProof is gated to audit/department MSPs and rejects unknown event types', async () => {
     const msp = { mspId: 'FairPriceShopMSP' };
     const ctx = makeContext(msp);

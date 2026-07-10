@@ -23,6 +23,7 @@ const fabricConfigFixture = (overrides: Partial<FabricRuntimeConfig> = {}): Fabr
   peerTlsCertPath: '/tmp/tls/ca.crt',
   peerHostAlias: 'peer0.food.example.com',
   mspId: 'FoodAndCivilSuppliesMSP',
+  endorsingOrgs: ['FoodAndCivilSuppliesMSP'],
   certPath: '/tmp/cert.pem',
   keyPath: '/tmp/keystore',
   ...overrides
@@ -64,7 +65,7 @@ describe('AdminModule', () => {
     const beforeReset = controller.overview();
     expect(beforeReset.metrics.lots).toBeGreaterThan(0);
 
-    const resetResult = controller.reset({});
+    const resetResult = await controller.reset({});
     expect(resetResult.ledgerTxId).toMatch(/^TX-/);
 
     const afterReset = controller.overview();
@@ -90,7 +91,7 @@ describe('AdminModule', () => {
 
     controller = moduleRef.get(AdminController);
 
-    const result = controller.reset({ commodity: 'Rice' });
+    const result = await controller.reset({ commodity: 'Rice' });
     expect(result.ledgerTxId).toMatch(/^TX-/);
     expect(result.message).toContain('Rice');
 

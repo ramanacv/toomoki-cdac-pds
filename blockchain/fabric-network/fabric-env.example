@@ -15,3 +15,5 @@ PDS_FABRIC_CERT_PATH=./blockchain/fabric-network/crypto/peerOrganizations/food.e
 PDS_FABRIC_KEY_PATH=./blockchain/fabric-network/crypto/peerOrganizations/food.example.com/users/User1@food.example.com/msp/keystore
 PDS_FABRIC_CHANNEL=pdschannel
 PDS_FABRIC_CHAINCODE=pds-chaincode
+# Optional override; values can be MSP IDs or profile org names.
+# PDS_FABRIC_ENDORSING_ORGS=FoodAndCivilSuppliesMSP,GodownWarehouseMSP

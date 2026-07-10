@@ -15,12 +15,12 @@ export class AuditController {
 
   @Post('/audit-alerts/reconcile')
   reconcile() {
-    return this.ledger.reconcileAlerts();
+    return this.ledger.reconcileAlertsPersisted();
   }
 
   @Post('/audit-alerts/:alertId/resolve')
   resolveAlert(@Param('alertId') alertId: string, @Body() body: ResolveAuditAlertDto) {
-    return this.ledger.resolveAuditAlert({
+    return this.ledger.resolveAuditAlertPersisted({
       alertId,
       resolvedBy: body.resolvedBy,
       resolutionNote: body.resolutionNote ?? ''

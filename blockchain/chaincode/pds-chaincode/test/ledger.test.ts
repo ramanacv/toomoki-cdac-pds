@@ -61,7 +61,18 @@ describe('PdsLedgerEngine', () => {
         ['PROC-001:Kerosene', 1000]
       ])
     );
-    expect(engine.exportState().events.map((event) => event.eventType)).toEqual(['ResetTransactionalData']);
+    const eventTypes = engine.exportState().events.map((event) => event.eventType);
+    const resetIndex = eventTypes.indexOf('ResetTransactionalData');
+    expect(eventTypes[0]).toBe('RegisterStakeholder');
+    expect(resetIndex).toBeGreaterThan(0);
+    expect(eventTypes.slice(resetIndex + 1)).toEqual([
+      'CreateCommodityLot',
+      'CreateCommodityLot',
+      'CreateCommodityLot',
+      'CreateCommodityLot',
+      'CreateCommodityLot',
+      'CreateCommodityLot'
+    ]);
   });
 
   it('records a non-rice distribution when stock and entitlement exist', () => {
@@ -588,7 +599,6 @@ describe('PdsLedgerEngine', () => {
     const after = engine.exportState().events;
     expect(after.length).toBe(before + 1);
     expect(after.at(-1)?.eventType).toBe('CreateMonthlyEntitlement');
-    // An update (same key) must NOT emit a second event.
     engine.createOrUpdateEntitlement({
       rationCardHash: 'demo-ration-card-hash',
       commodity: 'Rice',
@@ -598,7 +608,9 @@ describe('PdsLedgerEngine', () => {
       availableBalanceKg: 30,
       active: true
     });
-    expect(engine.exportState().events.length).toBe(after.length);
+    const afterUpdate = engine.exportState().events;
+    expect(afterUpdate.length).toBe(after.length + 1);
+    expect(afterUpdate.at(-1)?.eventType).toBe('CreateMonthlyEntitlement');
   });
 
   it('rejects every PII denylist field and malformed hashes (T6.4)', () => {
@@ -995,21 +1007,27 @@ describe('resetTransactionalData', () => {
     const result = engine.resetTransactionalData();
 
     expect(result.ledgerTxId).toMatch(/^TX-/);
+    expect(result.seriesId).toMatch(/^R\d{8}-\d{6}-/);
+    expect(result.lots).toHaveLength(6);
+    expect(result.lots.every((lot) => lot.lotId.includes(result.seriesId))).toBe(true);
     const state = engine.exportState();
-    // The demo's starting lots are recreated so the scripted rice workflow can
-    // be replayed and the rest of the commodity catalog remains available.
+    // Reseeded under a new series with CreateCommodityLot events for Fabric sync.
+    expect(state.seriesId).toBe(result.seriesId);
     expect(state.lots).toHaveLength(6);
     expect(state.lots.map((lot) => lot.commodity)).toEqual(
       expect.arrayContaining(['Rice', 'Wheat', 'Dal', 'Sugar', 'Cooking Oil', 'Kerosene'])
     );
+    expect(state.lots.every((lot) => lot.lotId.includes(result.seriesId))).toBe(true);
     expect(state.transfers).toHaveLength(0);
     expect(state.allocations).toHaveLength(0);
     expect(state.distributions).toHaveLength(0);
     expect(state.alerts).toHaveLength(0);
     expect(new Map(state.stock).get('PROC-001:Rice')).toBe(10000);
     expect(new Map(state.stock).get('PROC-001:Wheat')).toBe(7000);
-    expect(state.events).toHaveLength(1);
-    expect(state.events[0]?.eventType).toBe('ResetTransactionalData');
+    expect(state.events.some((event) => event.eventType === 'RegisterStakeholder')).toBe(true);
+    expect(state.events.some((event) => event.eventType === 'ResetTransactionalData')).toBe(true);
+    expect(state.events.filter((event) => event.eventType === 'CreateCommodityLot')).toHaveLength(6);
+    expect(state.events).toHaveLength(stakeholderCountBefore + 7);
 
     const entitlement = state.entitlements.find((item) => item.rationCardHash === 'demo-ration-card-hash');
     expect(entitlement?.alreadyLiftedKg).toBe(0);
@@ -1047,22 +1065,27 @@ describe('resetTransactionalData', () => {
       dispatchedQtyKg: 1000,
       vehicleNo: 'KA01AB0102'
     });
-    source.resetTransactionalData();
-    const resetEvent = source.exportState().events[0];
-    expect(resetEvent?.eventType).toBe('ResetTransactionalData');
+    const resetResult = source.resetTransactionalData();
+    const resetEvents = source.exportState().events;
+    expect(resetEvents.some((event) => event.eventType === 'RegisterStakeholder')).toBe(true);
+    expect(resetEvents.some((event) => event.eventType === 'ResetTransactionalData')).toBe(true);
+    expect(resetEvents.filter((event) => event.eventType === 'CreateCommodityLot')).toHaveLength(6);
 
     const replayTarget = new PdsLedgerEngine(true);
-    expect(() => replayTarget.applyLedgerEvent(resetEvent!)).not.toThrow();
+    for (const event of resetEvents) {
+      expect(() => replayTarget.applyLedgerEvent(event)).not.toThrow();
+    }
 
     const replayedState = replayTarget.exportState();
+    expect(replayedState.seriesId).toBe(resetResult.seriesId);
     expect(replayedState.lots).toHaveLength(6);
     expect(replayedState.lots.map((lot) => lot.commodity)).toEqual(
       expect.arrayContaining(['Rice', 'Wheat', 'Dal', 'Sugar', 'Cooking Oil', 'Kerosene'])
     );
+    expect(replayedState.lots.every((lot) => lot.lotId.includes(resetResult.seriesId))).toBe(true);
     expect(new Map(replayedState.stock).get('PROC-001:Rice')).toBe(10000);
     expect(new Map(replayedState.stock).get('PROC-001:Wheat')).toBe(7000);
-    expect(replayedState.events).toHaveLength(1);
-    expect(replayedState.events[0]?.eventType).toBe('ResetTransactionalData');
+    expect(replayedState.events.some((event) => event.eventType === 'ResetTransactionalData')).toBe(true);
     expect(replayedState.stakeholders.length).toBeGreaterThan(0);
   });
 
@@ -1121,9 +1144,10 @@ describe('resetTransactionalData', () => {
     const state = engine.exportState();
     const stock = new Map(state.stock);
 
-    // Rice: cleared and reseeded to its initial lot/stock.
+    // Rice: cleared and reseeded under a new series.
     expect(state.lots.filter((lot) => lot.commodity === 'Rice')).toHaveLength(1);
-    expect(state.lots.find((lot) => lot.commodity === 'Rice')?.lotId).toBe('LOT-RICE-2026-001');
+    expect(state.lots.find((lot) => lot.commodity === 'Rice')?.lotId).toContain(result.seriesId);
+    expect(state.lots.find((lot) => lot.commodity === 'Rice')?.lotId).not.toBe('LOT-RICE-2026-001');
     expect(state.transfers.some((transfer) => transfer.transferId === 'TR-RESET-RICE')).toBe(false);
     expect(state.alerts.some((alert) => alert.entityId === 'TR-RESET-RICE')).toBe(false);
     expect(stock.get('PROC-001:Rice')).toBe(10000);
@@ -1167,9 +1191,17 @@ describe('resetTransactionalData', () => {
       dispatchedQtyKg: 500,
       vehicleNo: 'KA01AB0105'
     });
-    source.resetTransactionalData('Rice');
-    const resetEvent = source.exportState().events.find((event) => event.eventType === 'ResetTransactionalData');
+    const resetResult = source.resetTransactionalData('Rice');
+    const resetEvents = source
+      .exportState()
+      .events.filter(
+        (event) =>
+          event.eventType === 'ResetTransactionalData' ||
+          (event.eventType === 'CreateCommodityLot' && String(event.payload.commodity) === 'Rice')
+      );
+    const resetEvent = resetEvents.find((event) => event.eventType === 'ResetTransactionalData');
     expect(resetEvent?.payload.commodity).toBe('Rice');
+    expect(resetEvent?.payload.seriesId).toBe(resetResult.seriesId);
 
     const replayTarget = new PdsLedgerEngine(true);
     replayTarget.dispatchLot({
@@ -1188,12 +1220,23 @@ describe('resetTransactionalData', () => {
       dispatchedQtyKg: 500,
       vehicleNo: 'KA01AB0105'
     });
-    expect(() => replayTarget.applyLedgerEvent(resetEvent!)).not.toThrow();
+    for (const event of resetEvents) {
+      expect(() => replayTarget.applyLedgerEvent(event)).not.toThrow();
+    }
 
     const replayedState = replayTarget.exportState();
     expect(replayedState.transfers.some((transfer) => transfer.transferId === 'TR-RESET-REPLAY-RICE')).toBe(false);
     expect(replayedState.transfers.some((transfer) => transfer.transferId === 'TR-RESET-REPLAY-WHEAT')).toBe(true);
+    expect(replayedState.lots.find((lot) => lot.commodity === 'Rice')?.lotId).toContain(resetResult.seriesId);
     expect(new Map(replayedState.stock).get('PROC-001:Rice')).toBe(10000);
     expect(new Map(replayedState.stock).get('PROC-001:Wheat')).toBe(6500);
+  });
+
+  it('uses a different series id on each full reset', () => {
+    const engine = new PdsLedgerEngine(true);
+    const first = engine.resetTransactionalData();
+    const second = engine.resetTransactionalData();
+    expect(first.seriesId).not.toBe(second.seriesId);
+    expect(first.lots[0]?.lotId).not.toBe(second.lots[0]?.lotId);
   });
 });

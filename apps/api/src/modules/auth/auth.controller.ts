@@ -21,7 +21,7 @@ export class AuthController {
 
   @Post('/auth/mock-otp')
   authOtp(@Body() body: AuthOtpDto) {
-    return this.ledger.simulateAuthentication({
+    return this.ledger.simulateAuthenticationPersisted({
       ...body,
       authMode: AuthMode.MOCK_OTP
     });
@@ -29,7 +29,7 @@ export class AuthController {
 
   @Post('/auth/simulated-biometric')
   authBiometric(@Body() body: AuthOtpDto) {
-    return this.ledger.simulateAuthentication({
+    return this.ledger.simulateAuthenticationPersisted({
       ...body,
       authMode: AuthMode.SIMULATED_BIOMETRIC
     });
@@ -37,7 +37,7 @@ export class AuthController {
 
   @Post('/auth/supervisor-exception')
   authException(@Body() body: SupervisorExceptionAuthDto) {
-    return this.ledger.simulateAuthentication({
+    return this.ledger.simulateAuthenticationPersisted({
       ...body,
       authMode: AuthMode.SUPERVISOR_EXCEPTION,
       authResult: AuthResult.EXCEPTION_APPROVED

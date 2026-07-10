@@ -23,6 +23,29 @@ describe('fabric client contract', () => {
     expect(envelope.operation).toBe('RecordDistribution');
   });
 
+  it('passes full ledger events for RecordLedgerProof replay operations', () => {
+    const event = {
+      ledgerTxId: 'TX-AUTH-001',
+      entityType: 'transfer' as const,
+      entityId: 'TR-001',
+      eventType: 'AuthorizeMovement' as const,
+      payload: {
+        transferId: 'TR-001',
+        authorizedBy: 'DSO-001',
+        authorizedAt: '2026-07-10T10:00:00.000Z'
+      },
+      timestamp: '2026-07-10T10:00:00.000Z'
+    };
+
+    const envelope = toFabricTransactionEnvelope(event);
+
+    expect(envelope.operation).toBe('RecordLedgerProof');
+    expect(envelope.payload).toMatchObject({
+      eventType: 'AuthorizeMovement',
+      payload: { transferId: 'TR-001', authorizedBy: 'DSO-001' }
+    });
+  });
+
   it('writes submit and evaluate envelopes to disk', () => {
     const tempDir = mkdtempSync(join(tmpdir(), 'pds-fabric-client-'));
     const client = new LocalFabricClient(join(tempDir, 'envelopes.ndjson'));
