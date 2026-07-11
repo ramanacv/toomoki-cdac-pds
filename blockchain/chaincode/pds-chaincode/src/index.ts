@@ -26,7 +26,6 @@ import {
   TransferOrder,
   TransferStatus,
   AuditAlert,
-  getCommodityRouteTemplate,
   isCommodityRouteEdgeAllowed,
   hashReference,
   makeTimestamp,

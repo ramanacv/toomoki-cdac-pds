@@ -1,5 +1,5 @@
 import { Menu } from 'lucide-react';
-import type { DemoRole, DemoScenario } from '@/demo-model.js';
+import type { DemoRole } from '@/demo-model.js';
 import type { LedgerMode } from '@/api.js';
 import { ApiStatusBadge } from '@/components/ApiStatusBadge';
 import { UserMenu } from '@/components/layout/UserMenu';

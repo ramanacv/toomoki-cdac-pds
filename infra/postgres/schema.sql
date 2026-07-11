@@ -51,6 +51,15 @@ CREATE INDEX IF NOT EXISTS idx_commodity_lots_status ON commodity_lots (status);
 CREATE INDEX IF NOT EXISTS idx_commodity_lots_owner_commodity ON commodity_lots (current_owner, commodity);
 CREATE INDEX IF NOT EXISTS idx_commodity_lots_commodity_season ON commodity_lots (commodity, season);
 
+ALTER TABLE commodity_lots ADD COLUMN IF NOT EXISTS root_lot_id TEXT REFERENCES commodity_lots(lot_id);
+ALTER TABLE commodity_lots ADD COLUMN IF NOT EXISTS parent_lot_id TEXT REFERENCES commodity_lots(lot_id);
+ALTER TABLE commodity_lots ADD COLUMN IF NOT EXISTS original_quantity_kg INTEGER CHECK (original_quantity_kg >= 0);
+ALTER TABLE commodity_lots ADD COLUMN IF NOT EXISTS remaining_quantity_kg INTEGER CHECK (remaining_quantity_kg >= 0);
+ALTER TABLE commodity_lots ADD COLUMN IF NOT EXISTS unit TEXT NOT NULL DEFAULT 'KG' CHECK (unit = 'KG');
+ALTER TABLE commodity_lots ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 0;
+CREATE INDEX IF NOT EXISTS idx_commodity_lots_root ON commodity_lots (root_lot_id);
+CREATE INDEX IF NOT EXISTS idx_commodity_lots_parent ON commodity_lots (parent_lot_id);
+
 CREATE TABLE IF NOT EXISTS stock_positions (
   stock_position_id BIGSERIAL PRIMARY KEY,
   stakeholder_id TEXT NOT NULL REFERENCES stakeholders(stakeholder_id) ON DELETE CASCADE,
@@ -235,3 +244,58 @@ CREATE INDEX IF NOT EXISTS idx_ledger_events_entity_id ON ledger_events (entity_
 CREATE INDEX IF NOT EXISTS idx_ledger_events_entity_type_id ON ledger_events (entity_type, entity_id);
 CREATE INDEX IF NOT EXISTS idx_ledger_events_event_type ON ledger_events (event_type);
 CREATE INDEX IF NOT EXISTS idx_ledger_events_timestamp ON ledger_events (timestamp);
+
+CREATE TABLE IF NOT EXISTS ledger_outbox (
+  outbox_id BIGSERIAL PRIMARY KEY,
+  event_payload JSONB NOT NULL,
+  status TEXT NOT NULL,
+  retry_count INTEGER NOT NULL DEFAULT 0,
+  last_error TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE ledger_outbox ADD COLUMN IF NOT EXISTS event_id TEXT;
+ALTER TABLE ledger_outbox ADD COLUMN IF NOT EXISTS operation_id TEXT;
+ALTER TABLE ledger_outbox ADD COLUMN IF NOT EXISTS idempotency_key TEXT;
+ALTER TABLE ledger_outbox ADD COLUMN IF NOT EXISTS schema_version INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE ledger_outbox ADD COLUMN IF NOT EXISTS fabric_tx_id TEXT;
+ALTER TABLE ledger_outbox ADD COLUMN IF NOT EXISTS next_attempt_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+ALTER TABLE ledger_outbox ADD COLUMN IF NOT EXISTS submitting_at TIMESTAMPTZ;
+ALTER TABLE ledger_outbox ADD COLUMN IF NOT EXISTS committed_at TIMESTAMPTZ;
+ALTER TABLE ledger_outbox ADD COLUMN IF NOT EXISTS dead_lettered_at TIMESTAMPTZ;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_ledger_outbox_event_id ON ledger_outbox(event_id) WHERE event_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_ledger_outbox_idempotency_key ON ledger_outbox(idempotency_key) WHERE idempotency_key IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_ledger_outbox_ready ON ledger_outbox(status, next_attempt_at);
+
+CREATE TABLE IF NOT EXISTS workflow_instances (
+  workflow_id TEXT PRIMARY KEY, template_id TEXT NOT NULL, template_version INTEGER NOT NULL,
+  current_state TEXT NOT NULL, related_entity_ids JSONB NOT NULL DEFAULT '{}'::jsonb,
+  failure_reason TEXT, version INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS workflow_transitions (
+  transition_id TEXT PRIMARY KEY, workflow_id TEXT NOT NULL REFERENCES workflow_instances(workflow_id),
+  from_state TEXT NOT NULL, to_state TEXT NOT NULL, idempotency_key TEXT NOT NULL UNIQUE,
+  actor_subject TEXT NOT NULL, actor_role TEXT NOT NULL, failure_reason TEXT,
+  occurred_at TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_workflow_transitions_workflow ON workflow_transitions(workflow_id, occurred_at);
+
+CREATE TABLE IF NOT EXISTS lot_movements (
+  movement_id TEXT PRIMARY KEY, source_lot_id TEXT NOT NULL REFERENCES commodity_lots(lot_id),
+  child_lot_id TEXT NOT NULL UNIQUE REFERENCES commodity_lots(lot_id), quantity_kg INTEGER NOT NULL CHECK(quantity_kg > 0),
+  from_stakeholder_id TEXT NOT NULL REFERENCES stakeholders(stakeholder_id),
+  to_stakeholder_id TEXT NOT NULL REFERENCES stakeholders(stakeholder_id), status TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL, received_at TIMESTAMPTZ
+);
+CREATE TABLE IF NOT EXISTS quantity_adjustments (
+  adjustment_id TEXT PRIMARY KEY, movement_id TEXT REFERENCES lot_movements(movement_id),
+  lot_id TEXT NOT NULL REFERENCES commodity_lots(lot_id), quantity_kg INTEGER NOT NULL CHECK(quantity_kg > 0),
+  reason TEXT NOT NULL, investigation_id TEXT, created_at TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_lot_movements_source ON lot_movements(source_lot_id);
+CREATE INDEX IF NOT EXISTS idx_quantity_adjustments_lot ON quantity_adjustments(lot_id);
+
+CREATE INDEX IF NOT EXISTS idx_ledger_outbox_status ON ledger_outbox (status);
+CREATE INDEX IF NOT EXISTS idx_ledger_outbox_created_at ON ledger_outbox (created_at);

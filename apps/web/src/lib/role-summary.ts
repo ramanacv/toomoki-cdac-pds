@@ -10,7 +10,7 @@ import type {
   Stakeholder,
   TransferOrder
 } from '@pds/shared-types';
-import { StakeholderStatus, TransferStatus } from '@pds/shared-types';
+import { TransferStatus } from '@pds/shared-types';
 import type { DemoRole } from '@/demo-model.js';
 import { getAllCommoditiesRoleQueue } from '@/workflow-actions.js';
 import { stageHints, summaryCardData } from '@/lib/constants.js';

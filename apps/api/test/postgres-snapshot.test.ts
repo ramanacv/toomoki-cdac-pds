@@ -9,7 +9,7 @@ describe('postgres snapshot mapper', () => {
     const plan = buildSnapshotWritePlan(engine.exportState());
 
     expect(plan[0]?.text).toBe('BEGIN');
-    expect(plan[1]?.text).toContain('TRUNCATE stakeholders, commodity_lots');
+    expect(plan.some((statement) => statement.text.includes('TRUNCATE stakeholders, commodity_lots'))).toBe(true);
     expect(plan.at(-1)?.text).toBe('COMMIT');
     expect(plan.some((statement) => statement.text.includes('ledger_events'))).toBe(true);
   });

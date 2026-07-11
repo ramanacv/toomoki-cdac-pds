@@ -1,4 +1,4 @@
-import { Pool, type PoolClient, type QueryResultRow } from 'pg';
+import { Pool, type PoolClient, type QueryConfigValues, type QueryResult, type QueryResultRow } from 'pg';
 import {
   hydratePdsState,
   mapAlertRow,
@@ -26,6 +26,10 @@ const mapRows = <T>(rows: QueryResultRow[], mapper: (row: QueryResultRow) => T):
 
 export class PgPoolSnapshotAdapter implements PostgresSnapshotAdapter {
   constructor(private readonly pool: Pool) {}
+
+  async query(text: string, values?: QueryConfigValues<unknown[]>): Promise<QueryResult> {
+    return this.pool.query(text, values);
+  }
 
   readSnapshotRows(): Promise<PostgresTableRows | null> {
     return readSnapshotRowsFromClient(this.pool);

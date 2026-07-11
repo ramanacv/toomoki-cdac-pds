@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { AuthMode, AuthResult, AlertType, GrievanceType, RationCardType, EntitlementRuleStatus, StakeholderType, StakeholderStatus, TransferStatus } from '@pds/shared-types';
+import { AuthMode, AuthResult, AlertType, GrievanceType, RationCardType, StakeholderType, StakeholderStatus, TransferStatus } from '@pds/shared-types';
 import { PdsLedgerEngine } from '../src/index.js';
 
 const dispatchAndReceive = (

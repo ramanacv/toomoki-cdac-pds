@@ -22,6 +22,7 @@
     "seed": "node scripts/seed.mjs",
     "reset": "node scripts/reset.mjs",
     "test": "npm run test --workspaces --if-present",
+    "test:demo-http": "npm run test --workspace=@pds/api -- --run test/e2e/demo-api.e2e.spec.ts",
     "typecheck": "npm run typecheck --workspaces --if-present"
   },
   "devDependencies": {

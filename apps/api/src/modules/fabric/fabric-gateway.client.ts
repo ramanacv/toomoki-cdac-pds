@@ -5,6 +5,7 @@ import type { FabricRuntimeConfig } from '../config/fabric.config.js';
 import { createFabricGatewayConnection, type FabricGatewayConnection } from './fabric-gateway.connection.js';
 import type { FabricClient, FabricOperationName, FabricTransactionEnvelope } from './fabric-client.js';
 import { toFabricTransactionEnvelope } from './fabric-client.js';
+import { ledgerProofFromEvent } from './ledger-proof.js';
 
 const utf8Decoder = new TextDecoder();
 
@@ -44,16 +45,32 @@ export class FabricGatewayClient implements FabricClient, ChainQueryPort {
    * commit failures. This now surfaces commit errors to the caller.
    */
   async submit(envelope: FabricTransactionEnvelope): Promise<{ txId: string; result?: unknown }> {
-    const result = await this.submitAsync(envelope.operation, envelope.payload);
-    return { txId: envelope.txId, result };
+    return this.submitWithTxId(envelope.operation, envelope.payload);
+  }
+
+  private async submitWithTxId(operation: FabricOperationName, payload: Record<string, unknown>): Promise<{ txId: string; result?: unknown }> {
+    const contract = await this.getContract(operation);
+    const options = {
+      arguments: [JSON.stringify(payload)],
+      ...(this.config.endorsingOrgs.length > 0 ? { endorsingOrganizations: this.config.endorsingOrgs } : {})
+    };
+    const proposal = contract.newProposal(operation, options);
+    const transaction = await proposal.endorse();
+    const txId = transaction.getTransactionId();
+    const resultJson = utf8Decoder.decode(transaction.getResult());
+    const commit = await transaction.submit();
+    const status = await commit.getStatus();
+    if (!status.successful) throw new Error(`Fabric transaction ${txId} failed validation with code ${status.code}`);
+    return { txId, result: resultJson.length > 0 ? JSON.parse(resultJson) : null };
   }
 
   async submitAsync(operation: FabricOperationName, payload: Record<string, unknown>): Promise<unknown> {
     const contract = await this.getContract(operation);
-    const resultBytes = await contract.submit(operation, {
+    const options = {
       arguments: [JSON.stringify(payload)],
-      endorsingOrganizations: this.config.endorsingOrgs
-    });
+      ...(this.config.endorsingOrgs.length > 0 ? { endorsingOrganizations: this.config.endorsingOrgs } : {})
+    };
+    const resultBytes = await contract.submit(operation, options);
     const resultJson = utf8Decoder.decode(resultBytes);
     return resultJson.length > 0 ? JSON.parse(resultJson) : null;
   }
@@ -79,8 +96,12 @@ export class FabricGatewayClient implements FabricClient, ChainQueryPort {
 
   /** Awaited variant used by {@link FabricGatewayLedgerPort.appendEvents} (T2.3). */
   async submitLedgerEventAsync(event: LedgerEvent): Promise<{ txId: string; result?: unknown }> {
-    const envelope = toFabricTransactionEnvelope(event);
-    return this.submit(envelope);
+    const proof = ledgerProofFromEvent(event, {
+      subject: 'pds-api',
+      applicationRole: 'SYSTEM',
+      submittingOrganization: this.config.mspId
+    });
+    return this.submitWithTxId('RecordLedgerProof', proof as unknown as Record<string, unknown>);
   }
 
   getLotHistory(lotId: string): LedgerEvent[] {

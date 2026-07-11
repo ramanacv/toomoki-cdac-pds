@@ -42,6 +42,8 @@ services:
     environment:
       - CORE_PEER_ID=peer0.food.example.com
       - CORE_PEER_ADDRESS=peer0.food.example.com:7051
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0.food.example.com:7051
+      - CORE_PEER_GOSSIP_BOOTSTRAP=peer0.godown.example.com:9051
       - CORE_PEER_LISTENADDRESS=0.0.0.0:7051
       - CORE_PEER_CHAINCODEADDRESS=peer0.food.example.com:7052
       - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:7052
@@ -76,6 +78,8 @@ services:
     environment:
       - CORE_PEER_ID=peer0.godown.example.com
       - CORE_PEER_ADDRESS=peer0.godown.example.com:9051
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0.godown.example.com:9051
+      - CORE_PEER_GOSSIP_BOOTSTRAP=peer0.food.example.com:7051
       - CORE_PEER_LISTENADDRESS=0.0.0.0:9051
       - CORE_PEER_CHAINCODEADDRESS=peer0.godown.example.com:9052
       - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:9052

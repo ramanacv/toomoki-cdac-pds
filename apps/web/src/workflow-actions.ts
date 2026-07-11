@@ -171,7 +171,7 @@ const vehicleForLeg = (leg: CommodityRouteLeg, index: number): string =>
       ? 'FCI01AB2001'
       : `KA01AB${String(2000 + index).padStart(4, '0')}`;
 
-const quantityForLeg = (template: CommodityRouteTemplate, leg: CommodityRouteLeg): number => {
+const quantityForLeg = (template: CommodityRouteTemplate, _leg: CommodityRouteLeg): number => {
   return Math.min(commodityDefinition(template.commodity).defaultTopUpQuantityKg, demoQuantities.stageOneTransferKg);
 };
 

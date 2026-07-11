@@ -3,6 +3,7 @@ import type { Context } from 'fabric-contract-api';
 import { PdsControlContract, PdsDataContract } from '../src/contract.js';
 import { assertAuthorized, type ClientIdentity } from '../src/authorization.js';
 import { EntitlementRuleStatus } from '@pds/shared-types';
+import { createHash } from 'node:crypto';
 
 /**
  * Minimal in-memory fabric Context stub: a key-value store backed by a Map and
@@ -12,10 +13,27 @@ import { EntitlementRuleStatus } from '@pds/shared-types';
 const makeContext = (mspHolder: { mspId: string }): Context => {
   const state = new Map<string, Buffer>();
   let txCounter = 0;
+  const iteratorFor = (entries: Array<[string, Buffer]>) => {
+    let index = 0;
+    return {
+      next: async () => index < entries.length
+        ? { done: false, value: { key: entries[index]![0], value: entries[index++]![1] } }
+        : { done: true },
+      close: async () => undefined
+    };
+  };
   const stub = {
     getState: async (key: string): Promise<Buffer> => Promise.resolve(state.get(key) ?? Buffer.alloc(0)),
     putState: async (key: string, value: Buffer): Promise<void> => { state.set(key, value); },
     createCompositeKey: (objectType: string, attributes: string[]): string => `\x00${objectType}\x00${attributes.join('\x00')}\x00`,
+    splitCompositeKey: (key: string) => {
+      const parts = key.split('\x00').filter(Boolean);
+      return { objectType: parts[0], attributes: parts.slice(1) };
+    },
+    getStateByPartialCompositeKey: async (objectType: string, attributes: string[]) => {
+      const prefix = `\x00${objectType}\x00${attributes.length > 0 ? `${attributes.join('\x00')}\x00` : ''}`;
+      return iteratorFor([...state.entries()].filter(([key]) => key.startsWith(prefix)));
+    },
     setEvent: (_name: string, _payload: Buffer): void => { /* captured for side-effect only */ },
     getTxID: (): string => `mock-tx-${++txCounter}`,
     getTxTimestamp: () => ({ seconds: BigInt(Math.floor(Date.now() / 1000)), nanos: 0 })
@@ -80,7 +98,7 @@ describe('PdsControlContract / PdsDataContract authorization (T1.5)', () => {
     ).rejects.toThrow(/already exists/);
   });
 
-  it('RecordLedgerProof is gated to audit/department MSPs and rejects unknown event types', async () => {
+  it('RecordLedgerProof is gated and rejects malformed proofs', async () => {
     const msp = { mspId: 'FairPriceShopMSP' };
     const ctx = makeContext(msp);
     const data = new PdsDataContract();
@@ -88,12 +106,13 @@ describe('PdsControlContract / PdsDataContract authorization (T1.5)', () => {
       data.RecordLedgerProof(
         ctx,
         JSON.stringify({
-          ledgerTxId: 'TX-X',
+          eventId: 'TX-X', operationId: 'OP-X', schemaVersion: 1,
           entityType: 'lot',
           entityId: 'LOT-1',
           eventType: 'CreateCommodityLot',
-          payload: {},
-          timestamp: '2026-06-01T00:00:00.000Z'
+          payloadHash: 'a'.repeat(64), proofPayload: {},
+          actor: { subject: 'user', applicationRole: 'FPS', submittingOrganization: 'FairPriceShopMSP' },
+          businessTimestamp: '2026-06-01T00:00:00.000Z'
         })
       )
     ).rejects.toThrow(/not authorized/);
@@ -103,30 +122,48 @@ describe('PdsControlContract / PdsDataContract authorization (T1.5)', () => {
       data.RecordLedgerProof(
         ctx,
         JSON.stringify({
-          ledgerTxId: 'TX-Y',
+          eventId: 'TX-Y', operationId: 'OP-Y', schemaVersion: 1,
           entityType: 'lot',
           entityId: 'LOT-1',
           eventType: 'TotallyBogusEventType',
-          payload: {},
-          timestamp: '2026-06-01T00:00:00.000Z'
+          payloadHash: 'bad', proofPayload: {},
+          actor: { subject: 'user', applicationRole: 'AUDITOR', submittingOrganization: 'AuditAuthorityMSP' },
+          businessTimestamp: '2026-06-01T00:00:00.000Z'
         })
       )
-    ).rejects.toThrow(/Unsupported ledger event type/);
+    ).rejects.toThrow(/Invalid LedgerProof/);
 
     msp.mspId = 'FoodAndCivilSuppliesMSP';
     await expect(
       data.RecordLedgerProof(
         ctx,
         JSON.stringify({
-          ledgerTxId: 'TX-Z',
+          eventId: 'TX-Z', operationId: 'OP-Z', schemaVersion: 2,
           entityType: 'lot',
           entityId: 'LOT-1',
           eventType: 'TotallyBogusEventType',
-          payload: {},
-          timestamp: '2026-06-01T00:00:00.000Z'
+          payloadHash: 'a'.repeat(64), proofPayload: {},
+          actor: { subject: 'user', applicationRole: 'DEPARTMENT', submittingOrganization: 'FoodAndCivilSuppliesMSP' },
+          businessTimestamp: '2026-06-01T00:00:00.000Z'
         })
       )
-    ).rejects.toThrow(/Unsupported ledger event type/);
+    ).rejects.toThrow(/Invalid LedgerProof/);
+  });
+
+  it('records identical proofs idempotently and rejects conflicting event IDs', async () => {
+    const msp = { mspId: 'FoodAndCivilSuppliesMSP' };
+    const ctx = makeContext(msp);
+    const data = new PdsDataContract();
+    const proof = {
+      eventId: 'EVT-1', operationId: 'OP-1', schemaVersion: 1,
+      entityType: 'lot', entityId: 'LOT-1', eventType: 'DispatchLot',
+      actor: { subject: 'api', applicationRole: 'DEPARTMENT', submittingOrganization: msp.mspId },
+      payloadHash: createHash('sha256').update('{}').digest('hex'), proofPayload: {},
+      businessTimestamp: '2026-06-01T00:00:00.000Z'
+    };
+    await expect(data.RecordLedgerProof(ctx, JSON.stringify(proof))).resolves.toContain('"duplicate":false');
+    await expect(data.RecordLedgerProof(ctx, JSON.stringify(proof))).resolves.toContain('"duplicate":true');
+    await expect(data.RecordLedgerProof(ctx, JSON.stringify({ ...proof, operationId: 'OP-2' }))).rejects.toThrow(/Conflicting/);
   });
 });
 

@@ -1,10 +1,12 @@
 import type { PdsLedgerState } from '@pds/pds-chaincode';
 import { buildSnapshotWritePlan, hydratePdsState, type PostgresTableRows, type SqlStatement } from './postgres-snapshot.js';
 import type { PdsStateStore } from './state-store.js';
+import type { QueryConfigValues, QueryResult } from 'pg';
 
 export interface PostgresSnapshotAdapter {
   readSnapshotRows(): PostgresTableRows | null | Promise<PostgresTableRows | null>;
   writeStatements(statements: SqlStatement[]): void | Promise<void>;
+  query?(text: string, values?: QueryConfigValues<unknown[]>): Promise<QueryResult>;
 }
 
 export class PostgresPdsStateStore implements PdsStateStore {
