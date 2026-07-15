@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { existsSync, readFileSync } from 'node:fs';
 import { Inject, Injectable } from '@nestjs/common';
 import type { AuditAlert } from '@pds/shared-types';
@@ -82,7 +83,7 @@ export class AdminService {
 
   async resetLedger(commodity?: string): Promise<AdminResetResult> {
     const { ledgerTxId, seriesId, lots } = await this.ledger.resetTransactionalDataPersisted(commodity);
-    const lotSummary = lots.map((lot) => ({
+    const lotSummary = lots.map((lot: any) => ({
       lotId: lot.lotId,
       commodity: lot.commodity,
       quantityKg: lot.quantityKg
@@ -222,11 +223,11 @@ export class AdminService {
   private buildStakeholderSummary(): AdminStakeholderSummary {
     const stakeholders = this.ledger.listStakeholders();
     return {
-      byType: groupBy(stakeholders.map((item) => item.stakeholderType)).map(({ key, count }) => ({
+      byType: groupBy(stakeholders.map((item: any) => item.stakeholderType)).map(({ key, count }) => ({
         stakeholderType: key,
         count
       })),
-      byStatus: groupBy(stakeholders.map((item) => item.status)).map(({ key, count }) => ({
+      byStatus: groupBy(stakeholders.map((item: any) => item.status)).map(({ key, count }) => ({
         status: key,
         count
       })),

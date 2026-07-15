@@ -1,4 +1,5 @@
 import { CanActivate, ExecutionContext, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import { resolveLedgerMode } from '../config/ledger-mode.config.js';
 import { IDENTITY_PROVIDER, type AuthenticatedRequest, type IdentityProvider, type PdsIdentity, type PdsRole } from './identity-provider.js';
 
@@ -26,7 +27,10 @@ export type BusinessAuthOptions = {
 
 @Injectable()
 export class BusinessAuthGuard implements CanActivate {
-  constructor(@Inject(IDENTITY_PROVIDER) private readonly identityProvider: IdentityProvider) {}
+  constructor(
+    @Inject(IDENTITY_PROVIDER) private readonly identityProvider: IdentityProvider,
+    private readonly reflector: Reflector
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const mode = resolveLedgerMode();
@@ -78,7 +82,11 @@ export class BusinessAuthGuard implements CanActivate {
   }
 
   /** Per-controller role requirements (overridable). Default: any authenticated. */
-  protected optionsFor(_context: ExecutionContext): BusinessAuthOptions {
-    return {};
+  protected optionsFor(context: ExecutionContext): BusinessAuthOptions {
+    const roles = this.reflector.getAllAndOverride<PdsRole[]>('roles', [
+      context.getHandler(),
+      context.getClass()
+    ]);
+    return { roles };
   }
 }

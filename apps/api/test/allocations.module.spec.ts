@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { afterEach, describe, expect, it } from 'vitest';
 import { AllocationsController } from '../src/modules/allocations/allocations.controller.js';
 import { createControllerWithFacade, createDemoLedgerFixture, moveLotToIssuePoint, type DemoLedgerFixture } from './helpers/demo-ledger.js';
@@ -23,8 +24,8 @@ describe('AllocationsModule', () => {
     });
 
     expect(allocation.allocationId).toBe('ALLOC-MOD-001');
-    expect(controller.allocations().some((item) => item.allocationId === 'ALLOC-MOD-001')).toBe(true);
-
+    expect(controller.allocations().some((item: any) => item.allocationId === 'ALLOC-MOD-001')).toBe(true);
+    
     const receipt = await controller.fpsReceipt('ALLOC-MOD-001', { receivedQtyKg: 75 });
     expect(receipt.receivedQtyKg).toBe(75);
     expect(controller.allocation('ALLOC-MOD-001').status).toBe('RECEIVED');
@@ -54,7 +55,7 @@ describe('AllocationsModule', () => {
     });
     expect(
       fixture.facade.getAlerts().some(
-        (alert) =>
+        (alert: any) =>
           alert.alertType === 'SHORT_RECEIPT' &&
           alert.entityId === 'ALLOC-MOD-SHORT' &&
           alert.evidence.shortageQtyKg === 50

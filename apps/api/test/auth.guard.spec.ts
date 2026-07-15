@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BusinessAuthGuard } from '../src/modules/auth/auth.guard.js';
@@ -16,7 +17,9 @@ const makeContext = (
 ): { ctx: ExecutionContext; request: FakeRequest } => {
   const request: FakeRequest = { headers, path, url: path };
   const ctx = {
-    switchToHttp: () => ({ getRequest: () => request })
+    switchToHttp: () => ({ getRequest: () => request }),
+    getHandler: () => () => {},
+    getClass: () => class {}
   } as unknown as ExecutionContext;
   return { ctx, request };
 };
@@ -35,6 +38,9 @@ const identity = (role?: PdsIdentity['role']): PdsIdentity => {
 describe('BusinessAuthGuard (T2.5 / T6.2)', () => {
   const origMode = process.env.PDS_LEDGER_MODE;
   let guard: BusinessAuthGuard;
+  const reflector = {
+    getAllAndOverride: vi.fn().mockReturnValue(undefined)
+  } as any;
 
   beforeEach(() => {
     process.env.PDS_LEDGER_MODE = 'fabric';
@@ -49,7 +55,7 @@ describe('BusinessAuthGuard (T2.5 / T6.2)', () => {
     process.env.PDS_LEDGER_MODE = 'demo';
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const provider: IdentityProvider = { verify: vi.fn() };
-    guard = new BusinessAuthGuard(provider);
+    guard = new BusinessAuthGuard(provider, reflector);
     await expect(guard.canActivate(makeContext({}).ctx)).resolves.toBe(true);
     await guard.canActivate(makeContext({}).ctx);
     expect(warnSpy).toHaveBeenCalledTimes(1);
@@ -58,13 +64,13 @@ describe('BusinessAuthGuard (T2.5 / T6.2)', () => {
 
   it('rejects requests with no Authorization header in fabric mode', async () => {
     const provider: IdentityProvider = { verify: vi.fn().mockResolvedValue(identity('fps')) };
-    guard = new BusinessAuthGuard(provider);
+    guard = new BusinessAuthGuard(provider, reflector);
     await expect(guard.canActivate(makeContext({}).ctx)).rejects.toThrow(UnauthorizedException);
   });
 
   it('rejects malformed (non-bearer) Authorization headers', async () => {
     const provider: IdentityProvider = { verify: vi.fn() };
-    guard = new BusinessAuthGuard(provider);
+    guard = new BusinessAuthGuard(provider, reflector);
     await expect(guard.canActivate(makeContext({ authorization: 'Basic abc' }).ctx)).rejects.toThrow(
       UnauthorizedException
     );
@@ -72,7 +78,7 @@ describe('BusinessAuthGuard (T2.5 / T6.2)', () => {
 
   it('rejects empty bearer tokens', async () => {
     const provider: IdentityProvider = { verify: vi.fn() };
-    guard = new BusinessAuthGuard(provider);
+    guard = new BusinessAuthGuard(provider, reflector);
     await expect(guard.canActivate(makeContext({ authorization: 'Bearer ' }).ctx)).rejects.toThrow(
       UnauthorizedException
     );
@@ -80,7 +86,7 @@ describe('BusinessAuthGuard (T2.5 / T6.2)', () => {
 
   it('accepts a valid token and attaches the identity to the request', async () => {
     const provider: IdentityProvider = { verify: vi.fn().mockResolvedValue(identity('fps')) };
-    guard = new BusinessAuthGuard(provider);
+    guard = new BusinessAuthGuard(provider, reflector);
     const { ctx, request } = makeContext({ authorization: 'Bearer good-token' });
     await expect(guard.canActivate(ctx)).resolves.toBe(true);
     expect(request.user?.subject).toBe('user-1');
@@ -88,7 +94,7 @@ describe('BusinessAuthGuard (T2.5 / T6.2)', () => {
 
   it('rejects when the identity provider returns null', async () => {
     const provider: IdentityProvider = { verify: vi.fn().mockResolvedValue(null) };
-    guard = new BusinessAuthGuard(provider);
+    guard = new BusinessAuthGuard(provider, reflector);
     await expect(guard.canActivate(makeContext({ authorization: 'Bearer bad' }).ctx)).rejects.toThrow(
       UnauthorizedException
     );
@@ -96,7 +102,7 @@ describe('BusinessAuthGuard (T2.5 / T6.2)', () => {
 
   it('leaves health / openapi / admin paths ungated', async () => {
     const provider: IdentityProvider = { verify: vi.fn() };
-    guard = new BusinessAuthGuard(provider);
+    guard = new BusinessAuthGuard(provider, reflector);
     for (const path of ['/health', '/openapi.json', '/admin/reset']) {
       await expect(guard.canActivate(makeContext({}, path).ctx)).resolves.toBe(true);
     }

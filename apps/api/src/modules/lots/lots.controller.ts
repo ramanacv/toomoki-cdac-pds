@@ -2,6 +2,7 @@ import { Plane } from '../../infrastructure/plane.decorator.js';
 import { Body, Controller, Get, Inject, Param, Post } from '@nestjs/common';
 import { PdsLedgerFacade } from '../core/pds-ledger.facade.js';
 import { LotCreateDto } from './dto/lot.dto.js';
+import { Roles } from '../auth/roles.decorator.js';
 
 @Plane('data')
 @Controller()
@@ -19,6 +20,7 @@ export class LotsController {
   }
 
   @Post('/lots')
+  @Roles('procurement')
   createLot(@Body() body: LotCreateDto) {
     return this.ledger.createCommodityLotPersisted(body);
   }

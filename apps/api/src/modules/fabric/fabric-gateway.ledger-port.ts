@@ -24,6 +24,13 @@ export class FabricGatewayLedgerPort implements PdsLedgerPort, ChainQueryPort {
     }
   }
 
+  getPool() {
+    if (this.adapter) {
+      return this.adapter.pool;
+    }
+    return null;
+  }
+
   async loadState(): Promise<PdsLedgerState | null> {
     return this.postgresPort.loadState();
   }

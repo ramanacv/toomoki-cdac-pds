@@ -15,6 +15,10 @@ export class PostgresChaincodeLedgerPort implements PdsLedgerPort, ChainQueryPor
     this.chaincodeClient = chaincodeClient;
   }
 
+  getPool() {
+    return this.postgresPort.getPool();
+  }
+
   async loadState(): Promise<PdsLedgerState | null> {
     return this.postgresPort.loadState();
   }

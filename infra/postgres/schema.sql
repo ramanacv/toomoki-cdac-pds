@@ -299,3 +299,8 @@ CREATE INDEX IF NOT EXISTS idx_quantity_adjustments_lot ON quantity_adjustments(
 
 CREATE INDEX IF NOT EXISTS idx_ledger_outbox_status ON ledger_outbox (status);
 CREATE INDEX IF NOT EXISTS idx_ledger_outbox_created_at ON ledger_outbox (created_at);
+
+ALTER TABLE stock_positions ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE monthly_entitlements ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1;
+CREATE INDEX IF NOT EXISTS idx_ledger_outbox_status_created ON ledger_outbox (status, created_at);
+

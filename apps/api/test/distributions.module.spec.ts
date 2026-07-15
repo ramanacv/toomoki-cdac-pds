@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { afterEach, describe, expect, it } from 'vitest';
 import { AlertType, AuthMode, AuthResult } from '@pds/shared-types';
 import { DistributionsController } from '../src/modules/distributions/distributions.controller.js';
@@ -37,7 +38,7 @@ describe('DistributionsModule', () => {
     });
 
     expect(distribution.distributionId).toBe('DIST-MOD-001');
-    expect(controller.distributions().some((item) => item.distributionId === 'DIST-MOD-001')).toBe(true);
+    expect(controller.distributions().some((item: any) => item.distributionId === 'DIST-MOD-001')).toBe(true);
     expect(controller.distribution('DIST-MOD-001').deliveredKg).toBe(10);
   });
 
@@ -76,7 +77,7 @@ describe('DistributionsModule', () => {
       })
     ).rejects.toThrow(/exceeds balance/);
 
-    expect(fixture.facade.getAlerts().some((alert) => alert.alertType === AlertType.DUPLICATE_CLAIM)).toBe(true);
+    expect(fixture.facade.getAlerts().some((alert: any) => alert.alertType === AlertType.DUPLICATE_CLAIM)).toBe(true);
   });
 
   it('records supervisor-exception distribution and exposes an auditor alert', async () => {
@@ -113,7 +114,7 @@ describe('DistributionsModule', () => {
     expect(
       fixture.facade
         .getAlerts()
-        .some((alert) => alert.alertType === AlertType.UNAUTHORIZED_TRANSACTION && alert.entityId === 'DIST-MOD-EXCEPTION')
+        .some((alert: any) => alert.alertType === AlertType.UNAUTHORIZED_TRANSACTION && alert.entityId === 'DIST-MOD-EXCEPTION')
     ).toBe(true);
   });
 });

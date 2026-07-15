@@ -25,6 +25,12 @@ export type SqlStatement = {
 
 const asString = (value: unknown): string => String(value);
 const asNumber = (value: unknown): number => Number(value);
+const toIsoStringDefault = (value: unknown): string => {
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+  return String(value);
+};
 
 export const mapStakeholderRow = (row: Record<string, unknown>): Stakeholder => ({
   stakeholderId: asString(row.stakeholder_id),
@@ -47,7 +53,7 @@ export const mapLotRow = (row: Record<string, unknown>): CommodityLot => ({
   status: asString(row.status) as LotStatus
 });
 
-export const mapTransferRow = (row: Record<string, unknown>, toIsoString = asString): TransferOrder => ({
+export const mapTransferRow = (row: Record<string, unknown>, toIsoString = toIsoStringDefault): TransferOrder => ({
   transferId: asString(row.transfer_id),
   lotId: asString(row.lot_id),
   fromOrg: asString(row.from_org),
@@ -83,7 +89,7 @@ export const mapEntitlementRow = (row: Record<string, unknown>): MonthlyEntitlem
   active: Boolean(row.active)
 });
 
-export const mapAuthTransactionRow = (row: Record<string, unknown>, toIsoString = asString): AuthTransaction => ({
+export const mapAuthTransactionRow = (row: Record<string, unknown>, toIsoString = toIsoStringDefault): AuthTransaction => ({
   authTxnId: asString(row.auth_txn_id),
   beneficiaryRefHash: asString(row.beneficiary_ref_hash),
   rationCardHash: asString(row.ration_card_hash),
@@ -94,7 +100,7 @@ export const mapAuthTransactionRow = (row: Record<string, unknown>, toIsoString 
   timestamp: toIsoString(row.timestamp)
 });
 
-export const mapDistributionRow = (row: Record<string, unknown>, toIsoString = asString): DistributionTransaction => ({
+export const mapDistributionRow = (row: Record<string, unknown>, toIsoString = toIsoStringDefault): DistributionTransaction => ({
   distributionId: asString(row.distribution_id),
   fpsId: asString(row.fps_id),
   rationCardHash: asString(row.ration_card_hash),
@@ -109,7 +115,7 @@ export const mapDistributionRow = (row: Record<string, unknown>, toIsoString = a
   timestamp: toIsoString(row.timestamp)
 });
 
-export const mapAlertRow = (row: Record<string, unknown>, toIsoString = asString): AuditAlert => ({
+export const mapAlertRow = (row: Record<string, unknown>, toIsoString = toIsoStringDefault): AuditAlert => ({
   alertId: asString(row.alert_id),
   alertType: asString(row.alert_type) as AlertType,
   entityId: asString(row.entity_id),
@@ -123,7 +129,7 @@ export const mapAlertRow = (row: Record<string, unknown>, toIsoString = asString
   ...(row.resolution_note == null ? {} : { resolutionNote: asString(row.resolution_note) })
 });
 
-export const mapEventRow = (row: Record<string, unknown>, toIsoString = asString): LedgerEvent => ({
+export const mapEventRow = (row: Record<string, unknown>, toIsoString = toIsoStringDefault): LedgerEvent => ({
   ledgerTxId: asString(row.ledger_tx_id),
   entityType: asString(row.entity_type) as LedgerEvent['entityType'],
   entityId: asString(row.entity_id),

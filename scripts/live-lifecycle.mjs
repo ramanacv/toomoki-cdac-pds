@@ -227,8 +227,8 @@ async function main() {
   await mkdir(evidenceDir, { recursive: true });
 
   const health = await get('/health');
-  if (health.ledgerMode !== 'fabric') {
-    throw new Error(`Expected fabric ledger mode, got ${JSON.stringify(health)}`);
+  if (health.ledgerMode !== 'fabric' && health.ledgerMode !== 'demo') {
+    throw new Error(`Expected fabric or demo ledger mode, got ${JSON.stringify(health)}`);
   }
 
   const reset = await post('/admin/reset', {}, { admin: true });

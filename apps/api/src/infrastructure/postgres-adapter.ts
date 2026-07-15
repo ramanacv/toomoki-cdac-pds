@@ -25,7 +25,7 @@ const toIsoString = (value: unknown): string => {
 const mapRows = <T>(rows: QueryResultRow[], mapper: (row: QueryResultRow) => T): T[] => rows.map(mapper);
 
 export class PgPoolSnapshotAdapter implements PostgresSnapshotAdapter {
-  constructor(private readonly pool: Pool) {}
+  constructor(public readonly pool: Pool) {}
 
   async query(text: string, values?: QueryConfigValues<unknown[]>): Promise<QueryResult> {
     return this.pool.query(text, values);

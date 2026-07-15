@@ -2,6 +2,7 @@ import { Plane } from '../../infrastructure/plane.decorator.js';
 import { Body, Controller, Get, Inject, Param, Post, Query } from '@nestjs/common';
 import { PdsLedgerFacade } from '../core/pds-ledger.facade.js';
 import { EntitlementCreateDto, EntitlementValidateDto } from './dto/entitlement.dto.js';
+import { Roles } from '../auth/roles.decorator.js';
 
 @Plane('control')
 @Controller()
@@ -29,6 +30,7 @@ export class EntitlementsController {
   }
 
   @Post('/entitlements')
+  @Roles('department')
   create(@Body() body: EntitlementCreateDto) {
     return this.ledger.createOrUpdateEntitlementPersisted(body);
   }

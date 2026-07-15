@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { afterEach, describe, expect, it } from 'vitest';
 import { AuditController } from '../src/modules/audit/audit.controller.js';
 import { createControllerWithFacade, createDemoLedgerFixture, type DemoLedgerFixture } from './helpers/demo-ledger.js';
@@ -23,12 +24,12 @@ describe('AuditModule', () => {
     fixture.facade.receiveLot({ transferId: 'TR-AUDIT-001', receivedQtyKg: 400 });
 
     const alerts = controller.alerts();
-    expect(alerts.some((alert) => alert.alertType === 'SHORT_RECEIPT')).toBe(true);
+    expect(alerts.some((alert: any) => alert.alertType === 'SHORT_RECEIPT')).toBe(true);
 
     const reconciled = await controller.reconcile();
     expect(reconciled.length).toBeGreaterThanOrEqual(0);
 
-    const alert = alerts.find((item) => item.alertType === 'SHORT_RECEIPT');
+    const alert = alerts.find((item: any) => item.alertType === 'SHORT_RECEIPT');
     expect(alert).toBeDefined();
 
     const resolved = await controller.resolveAlert(alert!.alertId, {
