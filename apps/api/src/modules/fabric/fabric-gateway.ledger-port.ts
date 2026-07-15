@@ -7,14 +7,28 @@ import { PostgresPdsLedgerPort } from '../../infrastructure/postgres-ledger-port
 import type { FabricRuntimeConfig } from '../config/fabric.config.js';
 import { FabricGatewayClient } from './fabric-gateway.client.js';
 
+/** Default age after which a SUBMITTING claim is treated as orphaned (API crash/restart). */
+export const DEFAULT_OUTBOX_STALE_SUBMITTING_MS = 60_000;
+
+export const resolveOutboxStaleSubmittingMs = (): number => {
+  const raw = process.env.PDS_OUTBOX_STALE_SUBMITTING_MS?.trim();
+  if (!raw) {
+    return DEFAULT_OUTBOX_STALE_SUBMITTING_MS;
+  }
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : DEFAULT_OUTBOX_STALE_SUBMITTING_MS;
+};
+
 export class FabricGatewayLedgerPort implements PdsLedgerPort, ChainQueryPort {
   private readonly postgresPort: PostgresPdsLedgerPort | FilePdsLedgerPort;
   private readonly gatewayClient: FabricGatewayClient;
   private readonly adapter?: PgPoolSnapshotAdapter | undefined;
+  private readonly staleSubmittingMs: number;
 
   constructor(config: FabricRuntimeConfig, adapter?: PgPoolSnapshotAdapter) {
     this.gatewayClient = new FabricGatewayClient(config);
     this.adapter = adapter;
+    this.staleSubmittingMs = resolveOutboxStaleSubmittingMs();
     this.postgresPort =
       adapter == null
         ? new FilePdsLedgerPort(config.statePath, config.journalPath)
@@ -74,10 +88,50 @@ export class FabricGatewayLedgerPort implements PdsLedgerPort, ChainQueryPort {
     return this.gatewayClient.verifyDatabaseHash(digest);
   }
 
+  /** Stop the embedded poller (tests / graceful shutdown). */
+  stopOutboxWorker(): void {
+    if (this.workerInterval) {
+      clearInterval(this.workerInterval);
+      this.workerInterval = null;
+    }
+  }
+
   private startOutboxWorker(): void {
+    // Reclaim orphans from a prior process before the first poll tick.
+    void this.reclaimStaleSubmittingClaims().catch((error: unknown) => {
+      console.error('Fabric outbox worker failed to reclaim stale SUBMITTING rows:', error);
+    });
     this.workerInterval = setInterval(() => {
       void this.processOutbox();
     }, 2000);
+  }
+
+  /**
+   * After a crash/restart, rows can remain SUBMITTING forever because only
+   * PENDING/FAILED are claimed. Age them back to PENDING without consuming a retry.
+   */
+  private async reclaimStaleSubmittingClaims(): Promise<number> {
+    if (!this.adapter || typeof this.adapter.query !== 'function') {
+      return 0;
+    }
+    const result = await this.adapter.query(
+      `UPDATE ledger_outbox
+       SET status = 'PENDING',
+           submitting_at = NULL,
+           next_attempt_at = NOW(),
+           last_error = COALESCE(last_error, 'Reclaimed stale SUBMITTING claim after worker interruption'),
+           updated_at = NOW()
+       WHERE status = 'SUBMITTING'
+         AND submitting_at IS NOT NULL
+         AND submitting_at < NOW() - ($1 * INTERVAL '1 millisecond')
+       RETURNING outbox_id`,
+      [this.staleSubmittingMs]
+    );
+    const count = result.rowCount ?? result.rows.length;
+    if (count > 0) {
+      console.warn(`Fabric outbox worker reclaimed ${count} stale SUBMITTING row(s)`);
+    }
+    return count;
   }
 
   private async processOutbox(): Promise<void> {
@@ -85,6 +139,12 @@ export class FabricGatewayLedgerPort implements PdsLedgerPort, ChainQueryPort {
     this.isProcessing = true;
 
     try {
+      try {
+        await this.reclaimStaleSubmittingClaims();
+      } catch (reclaimError) {
+        console.error('Fabric outbox worker failed to reclaim stale SUBMITTING rows:', reclaimError);
+      }
+
       const pendingResult = await this.adapter!.query!(
         `WITH ready AS (
            SELECT outbox_id FROM ledger_outbox

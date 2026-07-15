@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { AuthMode, AuthResult } from '@pds/shared-types';
 import { demoQuantities } from '@pds/fixtures';
@@ -6,10 +6,18 @@ import { demoQuantities } from '@pds/fixtures';
 const fabricE2eEnabled = process.env.PDS_E2E_FABRIC === 'true';
 const API_BASE = process.env.API_BASE ?? 'http://127.0.0.1:3000';
 const AUTH_TOKEN = process.env.PDS_DEV_AUTH_TOKEN ?? process.env.SMOKE_AUTH_TOKEN ?? '';
+const ADMIN_TOKEN = process.env.PDS_ADMIN_TOKEN ?? 'admin-mvp-token';
 
-const authed = () => {
-  const agent = request(API_BASE);
-  return AUTH_TOKEN ? agent.set('Authorization', `Bearer ${AUTH_TOKEN}`) : agent;
+const roleToken = (role: string): string => (AUTH_TOKEN ? `${AUTH_TOKEN}:${role}` : '');
+
+const authed = (role?: string) => {
+  const token = role ? roleToken(role) : AUTH_TOKEN;
+  const withAuth = <T extends { set: (k: string, v: string) => T }>(req: T): T =>
+    token ? req.set('Authorization', `Bearer ${token}`) : req;
+  return {
+    get: (path: string) => withAuth(request(API_BASE).get(path)),
+    post: (path: string) => withAuth(request(API_BASE).post(path))
+  };
 };
 
 const expectSuccess = (status: number): void => {
@@ -17,6 +25,18 @@ const expectSuccess = (status: number): void => {
 };
 
 describe.skipIf(!fabricE2eEnabled)('Fabric API e2e', () => {
+  beforeAll(async () => {
+    // Restore fixture lots/stock so transfer + allocation paths are deterministic
+    // after prior live-lifecycle runs.
+    await request(API_BASE)
+      .post('/admin/reset')
+      .set('X-Admin-Token', ADMIN_TOKEN)
+      .send({})
+      .expect((response) => {
+        expect([200, 201]).toContain(response.status);
+      });
+  });
+
   it('requires PDS_DEV_AUTH_TOKEN when hitting a live fabric stack', () => {
     expect(AUTH_TOKEN.length).toBeGreaterThan(0);
   });
@@ -32,7 +52,7 @@ describe.skipIf(!fabricE2eEnabled)('Fabric API e2e', () => {
 
     expectSuccess(
       (
-        await authed().post('/stakeholders').send({
+        await authed('department').post('/stakeholders').send({
           stakeholderId: smokeId,
           stakeholderType: 'DISTRICT_SUPPLY_OFFICE',
           name: 'Fabric E2E',
@@ -43,11 +63,17 @@ describe.skipIf(!fabricE2eEnabled)('Fabric API e2e', () => {
       ).status
     );
 
+    const lots = await authed('department').get('/lots').expect(200);
+    const riceLot = (lots.body as Array<{ lotId: string; commodity: string }>).find(
+      (lot) => lot.commodity === 'Rice'
+    );
+    expect(riceLot?.lotId).toBeTruthy();
+
     expectSuccess(
       (
-        await authed().post('/transfers').send({
+        await authed('procurement').post('/transfers').send({
           transferId: `${smokeId}-TR`,
-          lotId: 'LOT-RICE-2026-001',
+          lotId: riceLot!.lotId,
           fromOrg: 'PROC-001',
           toOrg: 'FCI-001',
           dispatchedQtyKg: 10,
@@ -56,29 +82,51 @@ describe.skipIf(!fabricE2eEnabled)('Fabric API e2e', () => {
       ).status
     );
 
-    expectSuccess((await authed().post(`/transfers/${smokeId}-TR/receive`).send({ receivedQtyKg: 10 })).status);
+    expectSuccess((await authed('godown').post(`/transfers/${smokeId}-TR/receive`).send({ receivedQtyKg: 10 })).status);
 
-    const trace = await request(API_BASE).get('/trace/lots/LOT-RICE-2026-001').expect(200);
+    const trace = await authed('department').get(`/trace/lots/${riceLot!.lotId}`).expect(200);
     expect(trace.body.verificationSource).toBe('chaincode');
   });
 
   it('runs allocation, distribution, and records ledger tx id', async () => {
     const prefix = `FAB-DIST-${Date.now()}`;
+    const qty = demoQuantities.fpsAllocationKg;
 
-    await authed()
-      .post('/transfers/TR-POC-RICE-DEPOT-ISSUE/authorize')
-      .send({ authorizedBy: 'DSO-001', roRef: 'RO-DSO-POC-001' })
-      .expect((response) => {
-        expect([200, 201, 404, 409]).toContain(response.status);
-      });
+    const lots = await authed('department').get('/lots').expect(200);
+    const riceLot = (lots.body as Array<{ lotId: string; commodity: string }>).find(
+      (lot) => lot.commodity === 'Rice'
+    );
+    expect(riceLot?.lotId).toBeTruthy();
+
+    // Reset leaves stock at PROC only — move a slice to ISSUE before FPS allocation.
+    const move = async (transferId: string, fromOrg: string, toOrg: string, role: string) => {
+      expectSuccess(
+        (
+          await authed(role).post('/transfers').send({
+            transferId,
+            lotId: riceLot!.lotId,
+            fromOrg,
+            toOrg,
+            dispatchedQtyKg: qty,
+            vehicleNo: `KA${prefix.slice(-6)}`,
+            transporterId: 'TRANS-001'
+          })
+        ).status
+      );
+      expectSuccess((await authed('godown').post(`/transfers/${transferId}/receive`).send({ receivedQtyKg: qty })).status);
+    };
+
+    await move(`${prefix}-TR1`, 'PROC-001', 'FCI-001', 'procurement');
+    await move(`${prefix}-TR2`, 'FCI-001', 'GODOWN-S-001', 'godown');
+    await move(`${prefix}-TR3`, 'GODOWN-S-001', 'ISSUE-001', 'godown');
 
     expectSuccess(
       (
-        await authed().post('/fps-allocations').send({
+        await authed('godown').post('/fps-allocations').send({
           allocationId: `${prefix}-ALLOC`,
           fpsId: 'FPS-101',
           commodity: 'Rice',
-          allocatedQtyKg: demoQuantities.fpsAllocationKg,
+          allocatedQtyKg: qty,
           month: '2026-06',
           sourceGodownId: 'ISSUE-001'
         })
@@ -86,11 +134,25 @@ describe.skipIf(!fabricE2eEnabled)('Fabric API e2e', () => {
     );
 
     expectSuccess(
-      (await authed().post(`/fps-allocations/${prefix}-ALLOC/receipt`).send({ receivedQtyKg: demoQuantities.fpsReceiptKg }))
+      (await authed('fps').post(`/fps-allocations/${prefix}-ALLOC/receipt`).send({ receivedQtyKg: demoQuantities.fpsReceiptKg }))
         .status
     );
 
-    const auth = await authed()
+    expectSuccess(
+      (
+        await authed('department').post('/entitlements').send({
+          rationCardHash: 'demo-ration-card-hash',
+          commodity: 'Rice',
+          month: '2026-06',
+          monthlyEntitlementKg: qty,
+          alreadyLiftedKg: 0,
+          availableBalanceKg: qty,
+          active: true
+        })
+      ).status
+    );
+
+    const auth = await authed('fps')
       .post('/auth/mock-otp')
       .send({
         authTxnId: `${prefix}-AUTH`,
@@ -100,7 +162,7 @@ describe.skipIf(!fabricE2eEnabled)('Fabric API e2e', () => {
       });
     expectSuccess(auth.status);
 
-    const distribution = await authed().post('/distributions').send({
+    const distribution = await authed('fps').post('/distributions').send({
       distributionId: `${prefix}-DIST`,
       fpsId: 'FPS-101',
       rationCardHash: 'demo-ration-card-hash',

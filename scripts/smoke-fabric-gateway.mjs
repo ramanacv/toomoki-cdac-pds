@@ -19,6 +19,9 @@ const main = async () => {
   if (!health.ok) {
     throw new Error('API health check failed');
   }
+  if (health.ledgerMode !== 'fabric') {
+    throw new Error(`Expected fabric ledgerMode, got ${health.ledgerMode}`);
+  }
 
   await request('/stakeholders', {
     method: 'POST',
@@ -33,12 +36,21 @@ const main = async () => {
     })
   });
 
-  const trace = await request('/trace/lots/LOT-RICE-2026-001');
+  // After admin reset / live-lifecycle, fixture lot ids may not exist — discover a Rice lot.
+  const lots = await request('/lots');
+  const riceLot = Array.isArray(lots)
+    ? lots.find((lot) => lot?.commodity === 'Rice') ?? lots[0]
+    : null;
+  if (!riceLot?.lotId) {
+    throw new Error('No lots available to trace in fabric smoke');
+  }
+
+  const trace = await request(`/trace/lots/${riceLot.lotId}`);
   if (trace.verificationSource !== 'chaincode') {
     throw new Error(`Expected verificationSource=chaincode in fabric mode, got ${trace.verificationSource}`);
   }
 
-  console.log('Fabric gateway smoke passed');
+  console.log(`Fabric gateway smoke passed (lot=${riceLot.lotId})`);
 };
 
 main().catch((error) => {

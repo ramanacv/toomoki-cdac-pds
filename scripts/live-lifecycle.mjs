@@ -30,12 +30,15 @@ const pathWithQuery = (path, query = {}) => {
   return `${url.pathname}${url.search}`;
 };
 
-async function request(path, { method = 'GET', body, admin = false } = {}) {
+async function request(path, { method = 'GET', body, admin = false, role } = {}) {
   const headers = new Headers();
   if (admin) {
     headers.set('X-Admin-Token', adminToken);
   } else {
-    headers.set('Authorization', `Bearer ${token}`);
+    // Stub IdP accepts `${token}:${role}` so fabric-mode @Roles can be exercised
+    // across the multi-actor lifecycle with one configured base secret.
+    const bearer = role ? `${token}:${role}` : token;
+    headers.set('Authorization', `Bearer ${bearer}`);
   }
   if (body !== undefined) {
     headers.set('Content-Type', 'application/json');
@@ -55,12 +58,12 @@ async function request(path, { method = 'GET', body, admin = false } = {}) {
   return parsed;
 }
 
-const get = (path) => request(path);
+const get = (path, options) => request(path, options);
 const post = (path, body, options) => request(path, { ...options, method: 'POST', body });
 
-async function postSoft(path, body) {
+async function postSoft(path, body, options) {
   try {
-    return { ok: true, body: await post(path, body) };
+    return { ok: true, body: await post(path, body, options) };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : String(error) };
   }
@@ -94,91 +97,127 @@ async function runCommodity(reset, commodity, qty, index) {
     ro: `RO-${runId}-${commoditySlug}`
   };
 
-  const entitlement = await post('/entitlements', {
-    rationCardHash,
-    commodity,
-    month,
-    monthlyEntitlementKg: qty,
-    alreadyLiftedKg: 0,
-    availableBalanceKg: qty,
-    active: true
-  });
+  const entitlement = await post(
+    '/entitlements',
+    {
+      rationCardHash,
+      commodity,
+      month,
+      monthlyEntitlementKg: qty,
+      alreadyLiftedKg: 0,
+      availableBalanceKg: qty,
+      active: true
+    },
+    { role: 'department' }
+  );
 
-  const dispatch1 = await post('/transfers', {
-    transferId: ids.procToFci,
-    lotId: lot.lotId,
-    fromOrg: 'PROC-001',
-    toOrg: 'FCI-001',
-    dispatchedQtyKg: qty,
-    vehicleNo: vehicle,
-    stage: 'I',
-    transporterId: 'TRANS-001'
-  });
-  const receive1 = await post(`/transfers/${ids.procToFci}/receive`, { receivedQtyKg: qty });
+  const dispatch1 = await post(
+    '/transfers',
+    {
+      transferId: ids.procToFci,
+      lotId: lot.lotId,
+      fromOrg: 'PROC-001',
+      toOrg: 'FCI-001',
+      dispatchedQtyKg: qty,
+      vehicleNo: vehicle,
+      stage: 'I',
+      transporterId: 'TRANS-001'
+    },
+    { role: 'procurement' }
+  );
+  const receive1 = await post(`/transfers/${ids.procToFci}/receive`, { receivedQtyKg: qty }, { role: 'godown' });
 
-  const dispatch2 = await post('/transfers', {
-    transferId: ids.fciToDepot,
-    lotId: lot.lotId,
-    fromOrg: 'FCI-001',
-    toOrg: 'GODOWN-S-001',
-    dispatchedQtyKg: qty,
-    vehicleNo: `${vehicle}B`,
-    stage: 'I',
-    transporterId: 'TRANS-001'
-  });
-  const receive2 = await post(`/transfers/${ids.fciToDepot}/receive`, { receivedQtyKg: qty });
+  const dispatch2 = await post(
+    '/transfers',
+    {
+      transferId: ids.fciToDepot,
+      lotId: lot.lotId,
+      fromOrg: 'FCI-001',
+      toOrg: 'GODOWN-S-001',
+      dispatchedQtyKg: qty,
+      vehicleNo: `${vehicle}B`,
+      stage: 'I',
+      transporterId: 'TRANS-001'
+    },
+    { role: 'godown' }
+  );
+  const receive2 = await post(`/transfers/${ids.fciToDepot}/receive`, { receivedQtyKg: qty }, { role: 'godown' });
 
-  const approval = await postSoft(`/transfers/${ids.depotToIssue}/authorize`, {
-    authorizedBy: 'DSO-001',
-    roRef: ids.ro,
-    remarks: 'Live lifecycle reset run'
-  });
+  const approval = await postSoft(
+    `/transfers/${ids.depotToIssue}/authorize`,
+    {
+      authorizedBy: 'DSO-001',
+      roRef: ids.ro,
+      remarks: 'Live lifecycle reset run'
+    },
+    { role: 'department' }
+  );
 
-  const dispatch3 = await post('/transfers', {
-    transferId: ids.depotToIssue,
-    lotId: lot.lotId,
-    fromOrg: 'GODOWN-S-001',
-    toOrg: 'ISSUE-001',
-    dispatchedQtyKg: qty,
-    vehicleNo: `${vehicle}C`,
-    stage: 'II',
-    roRef: ids.ro,
-    authorizedBy: 'DSO-001',
-    transporterId: 'TRANS-001'
-  });
-  const receive3 = await post(`/transfers/${ids.depotToIssue}/receive`, { receivedQtyKg: qty });
+  const dispatch3 = await post(
+    '/transfers',
+    {
+      transferId: ids.depotToIssue,
+      lotId: lot.lotId,
+      fromOrg: 'GODOWN-S-001',
+      toOrg: 'ISSUE-001',
+      dispatchedQtyKg: qty,
+      vehicleNo: `${vehicle}C`,
+      stage: 'II',
+      roRef: ids.ro,
+      authorizedBy: 'DSO-001',
+      transporterId: 'TRANS-001'
+    },
+    { role: 'godown' }
+  );
+  const receive3 = await post(`/transfers/${ids.depotToIssue}/receive`, { receivedQtyKg: qty }, { role: 'godown' });
 
-  const allocation = await post('/fps-allocations', {
-    allocationId: ids.allocation,
-    fpsId: 'FPS-101',
-    commodity,
-    allocatedQtyKg: qty,
-    month,
-    sourceGodownId: 'ISSUE-001'
-  });
-  const fpsReceipt = await post(`/fps-allocations/${ids.allocation}/receipt`, { receivedQtyKg: qty });
+  const allocation = await post(
+    '/fps-allocations',
+    {
+      allocationId: ids.allocation,
+      fpsId: 'FPS-101',
+      commodity,
+      allocatedQtyKg: qty,
+      month,
+      sourceGodownId: 'ISSUE-001'
+    },
+    { role: 'godown' }
+  );
+  const fpsReceipt = await post(
+    `/fps-allocations/${ids.allocation}/receipt`,
+    { receivedQtyKg: qty },
+    { role: 'fps' }
+  );
 
-  const auth = await post('/auth/mock-otp', {
-    authTxnId: ids.auth,
-    beneficiaryRefHash,
-    rationCardHash,
-    authMode: 'MOCK_OTP',
-    authResult: 'SUCCESS'
-  });
+  const auth = await post(
+    '/auth/mock-otp',
+    {
+      authTxnId: ids.auth,
+      beneficiaryRefHash,
+      rationCardHash,
+      authMode: 'MOCK_OTP',
+      authResult: 'SUCCESS'
+    },
+    { role: 'fps' }
+  );
 
-  const distribution = await post('/distributions', {
-    distributionId: ids.distribution,
-    fpsId: 'FPS-101',
-    rationCardHash,
-    beneficiaryRefHash,
-    commodity,
-    deliveredKg: qty,
-    authMode: auth.authMode,
-    authResult: auth.authResult,
-    authTxnRefHash: auth.authTxnRefHash,
-    dealerId: 'FPS-DEALER-101',
-    timestamp: `${month}-15T10:00:00.000Z`
-  });
+  const distribution = await post(
+    '/distributions',
+    {
+      distributionId: ids.distribution,
+      fpsId: 'FPS-101',
+      rationCardHash,
+      beneficiaryRefHash,
+      commodity,
+      deliveredKg: qty,
+      authMode: auth.authMode,
+      authResult: auth.authResult,
+      authTxnRefHash: auth.authTxnRefHash,
+      dealerId: 'FPS-DEALER-101',
+      timestamp: `${month}-15T10:00:00.000Z`
+    },
+    { role: 'fps' }
+  );
 
   const entitlementAfter = await get(pathWithQuery(`/entitlements/${rationCardHash}`, { commodity, month }));
   const lotTrace = await get(`/trace/lots/${lot.lotId}`);
