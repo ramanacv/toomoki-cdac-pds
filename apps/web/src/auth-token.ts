@@ -6,6 +6,13 @@ export const WEB_ROLES = [
 ] as const;
 export type WebRole = (typeof WEB_ROLES)[number];
 
+export const OPERATIONAL_WEB_ROLES: readonly WebRole[] = [
+  'management', 'department', 'procurement', 'fci', 'godown', 'fps', 'auditor'
+];
+
+export const hasOperationalRole = (roles: readonly WebRole[]): boolean =>
+  roles.some((role) => OPERATIONAL_WEB_ROLES.includes(role));
+
 export type WebIdentity = {
   subject: string;
   displayName: string;
@@ -59,6 +66,14 @@ export const initializeAuth = async (): Promise<void> => {
 
 export const signIn = async (returnUrl = '/'): Promise<void> => {
   await getManager().signinRedirect({ state: { returnUrl } });
+};
+
+export const signInAs = async (username: string, returnUrl = '/'): Promise<void> => {
+  await getManager().signinRedirect({
+    state: { returnUrl },
+    prompt: 'login',
+    login_hint: username
+  });
 };
 
 export const signOut = async (): Promise<void> => {

@@ -125,4 +125,23 @@ describe('BusinessAuthGuard (T2.5 / T6.2)', () => {
     }
     await expect(guard.canActivate(makeContext({ authorization: 'Bearer good-token' }, path, method).ctx)).rejects.toMatchObject({ status: 429 });
   });
+
+  it('honors explicit positive read and mutation rate-limit overrides', async () => {
+    process.env.PDS_RATE_LIMIT_READ_PER_MINUTE = '2';
+    process.env.PDS_RATE_LIMIT_MUTATION_PER_MINUTE = '1';
+    try {
+      const provider: IdentityProvider = { verify: vi.fn().mockResolvedValue(identity('platform-admin')) };
+      guard = new BusinessAuthGuard(provider, reflector);
+      const read = () => guard.canActivate(makeContext({ authorization: 'Bearer good-token' }, '/dashboard/summary', 'GET').ctx);
+      const mutation = () => guard.canActivate(makeContext({ authorization: 'Bearer good-token' }, '/lots', 'POST').ctx);
+      await expect(read()).resolves.toBe(true);
+      await expect(read()).resolves.toBe(true);
+      await expect(read()).rejects.toMatchObject({ status: 429 });
+      await expect(mutation()).resolves.toBe(true);
+      await expect(mutation()).rejects.toMatchObject({ status: 429 });
+    } finally {
+      delete process.env.PDS_RATE_LIMIT_READ_PER_MINUTE;
+      delete process.env.PDS_RATE_LIMIT_MUTATION_PER_MINUTE;
+    }
+  });
 });

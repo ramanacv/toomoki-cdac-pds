@@ -17,7 +17,7 @@ This tracker implements the gaps identified in [the initial evaluation](../produ
 | Proof status | Implemented | Per-event and aggregate durable outbox endpoints, safe failure categories, privileged raw errors, admin summary and UI status badges. |
 | Proof privacy | Implemented | Recursive normalized alias rejection exists at API and chaincode boundaries with tests. |
 | Metrics | Implemented | Normalized route/status labels, business outcomes, outbox state, commit latency, retry/dead-letter and Fabric submission metrics; access requires `metrics-reader` or `platform-admin`. |
-| Controlled benchmark | Partial | Safety-gated script and target evaluation exist. No maintained result is claimed until the explicitly authorized live Fabric benchmark is run. |
+| Controlled benchmark | Partial | An authorized live Fabric run is recorded in `benchmark-results.md`: operational success and latency targets passed, but proof-completion gates missed because the run began with a non-empty outbox, and lifecycle concurrency 2 exposed the documented snapshot-persistence limitation. A clean-baseline rerun remains required. |
 | Security/compliance pack | Partial | Threat model, data inventory, control matrix, current official-source DPDP/Aadhaar assessment, SBOM/licence generation and scan register exist. External VAPT/ZAP and container scanning remain environment/pilot gates. |
 | Commercial/pilot package | Implemented | Paid district-pilot model, cost framework, KPIs, conversion criteria, concept note, discovery guide, data sheet and draft charter are documented without government-endorsement claims. |
 

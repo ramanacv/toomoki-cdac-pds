@@ -32,10 +32,17 @@ export const normalizeSecurityRoute = (path: string): string => {
   ).join('/');
 };
 
+const positiveIntegerFromEnv = (name: string, fallback: number): number => {
+  const value = Number(process.env[name]);
+  return Number.isSafeInteger(value) && value > 0 ? value : fallback;
+};
+
 @Injectable()
 export class BusinessAuthGuard implements CanActivate {
   private readonly logger = new Logger('PdsSecurity');
   private readonly requestWindows = new Map<string, number[]>();
+  private readonly readRequestsPerMinute = positiveIntegerFromEnv('PDS_RATE_LIMIT_READ_PER_MINUTE', 120);
+  private readonly mutationRequestsPerMinute = positiveIntegerFromEnv('PDS_RATE_LIMIT_MUTATION_PER_MINUTE', 30);
   constructor(
     @Inject(IDENTITY_PROVIDER) private readonly identityProvider: IdentityProvider,
     @Inject(Reflector) private readonly reflector: Reflector
@@ -129,7 +136,7 @@ export class BusinessAuthGuard implements CanActivate {
   private enforceRateLimit(request: AuthenticatedRequest, identity: PdsIdentity, path: string) {
     const isReset = path.startsWith('/admin/reset');
     const isRead = request.method === 'GET' || request.method === 'HEAD';
-    const limit = isReset ? 3 : isRead ? 120 : 30;
+    const limit = isReset ? 3 : isRead ? this.readRequestsPerMinute : this.mutationRequestsPerMinute;
     const windowMs = isReset ? 15 * 60_000 : 60_000;
     const bucket = isReset ? 'reset' : isRead ? 'read' : 'mutation';
     const key = `${identity.subject}:${request.ip ?? 'unknown'}:${bucket}`;

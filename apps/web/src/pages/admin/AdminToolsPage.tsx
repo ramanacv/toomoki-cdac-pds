@@ -22,7 +22,7 @@ import {
   DialogTrigger
 } from '@/components/ui/dialog.js';
 import { useAdminContext } from '@/hooks/use-admin-context.js';
-import { getCurrentIdentity } from '@/auth-token.js';
+import { getCurrentIdentity, hasOperationalRole } from '@/auth-token.js';
 
 const getCommodityDefaults = (commodity: string) =>
   COMMODITIES.find((item) => item.name === commodity) ?? COMMODITIES[0]!;
@@ -35,6 +35,7 @@ const formatLotCreatedAt = (lot: CommodityLot): string => {
 export function AdminToolsPage() {
   const { apiOnline, stakeholders, refresh } = useAdminContext();
   const roles = getCurrentIdentity()?.roles ?? [];
+  const canReadOperationalData = hasOperationalRole(roles);
   const canCreateStock = roles.includes('procurement');
   const canReset = roles.includes('demo-reset');
 
@@ -56,11 +57,11 @@ export function AdminToolsPage() {
   const refreshLots = useCallback(async () => {
     setLotsLoading(true);
     try {
-      setIssuedLots(await loadLots(apiOnline));
+      setIssuedLots(canReadOperationalData ? await loadLots(apiOnline) : []);
     } finally {
       setLotsLoading(false);
     }
-  }, [apiOnline]);
+  }, [apiOnline, canReadOperationalData]);
 
   useEffect(() => {
     void refreshLots();
@@ -232,7 +233,9 @@ export function AdminToolsPage() {
 
       <Panel eyebrow="Test data" title="Issued stock lots" pill={`${issuedLots.length} lots`} wide>
         <p className="mb-4 text-sm text-muted-foreground">
-          {apiOnline
+          {!canReadOperationalData
+            ? 'Operational lot data requires an operational role in addition to platform-admin.'
+            : apiOnline
             ? 'Commodity lots currently on the live ledger, most recently created first.'
             : 'Fixture lots from demo data (API offline). Start the API to see live ledger lots after reset.'}
         </p>

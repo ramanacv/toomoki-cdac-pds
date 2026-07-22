@@ -129,6 +129,9 @@ vi.mock('@/auth-token.js', () => ({
   })),
   signIn: vi.fn(),
   signOut: vi.fn(),
+  hasOperationalRole: vi.fn((roles: string[]) =>
+    roles.some((role) => ['management', 'department', 'procurement', 'fci', 'godown', 'fps', 'auditor'].includes(role))
+  ),
   authHeaders: vi.fn(() => ({ Authorization: 'Bearer test-only' }))
 }));
 
@@ -138,9 +141,15 @@ import { AdminNetworkPage } from '@/pages/admin/AdminNetworkPage.js';
 import { AdminLedgerPage } from '@/pages/admin/AdminLedgerPage.js';
 import { AdminAlertsPage } from '@/pages/admin/AdminAlertsPage.js';
 import { AdminToolsPage } from '@/pages/admin/AdminToolsPage.js';
+import { getCurrentIdentity } from '@/auth-token.js';
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(getCurrentIdentity).mockReturnValue({
+    subject: 'admin-test',
+    displayName: 'Admin Test',
+    roles: ['platform-admin', 'procurement', 'demo-reset']
+  });
 });
 
 function renderAdmin(initialPath: string) {
@@ -161,6 +170,36 @@ function renderAdmin(initialPath: string) {
 }
 
 describe('Admin console', () => {
+  it('does not request operational stakeholders for an admin-only identity', async () => {
+    const { loadStakeholders } = await import('@/api.js');
+    vi.mocked(getCurrentIdentity).mockReturnValue({
+      subject: 'admin-only',
+      displayName: 'Admin Only',
+      roles: ['platform-admin']
+    });
+
+    renderAdmin('/admin/overview');
+
+    expect(await screen.findByText('5')).toBeInTheDocument();
+    expect(loadStakeholders).not.toHaveBeenCalled();
+    expect(screen.queryByText(/not permitted/i)).not.toBeInTheDocument();
+  });
+
+  it('does not request operational lots for an admin-only identity', async () => {
+    const { loadLots } = await import('@/api.js');
+    vi.mocked(getCurrentIdentity).mockReturnValue({
+      subject: 'admin-only',
+      displayName: 'Admin Only',
+      roles: ['platform-admin']
+    });
+
+    renderAdmin('/admin/tools');
+
+    expect(await screen.findByText(/operational lot data requires an operational role/i)).toBeInTheDocument();
+    expect(loadLots).not.toHaveBeenCalled();
+    expect(screen.queryByText(/not permitted/i)).not.toBeInTheDocument();
+  });
+
   it('renders overview metrics', async () => {
     renderAdmin('/admin/overview');
     expect(await screen.findByText('5')).toBeInTheDocument();

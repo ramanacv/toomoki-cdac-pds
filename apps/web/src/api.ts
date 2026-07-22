@@ -13,7 +13,7 @@ import type {
 } from '@pds/shared-types';
 import { AuthMode, AuthResult } from '@pds/shared-types';
 import { demoQuantities, getWorkspaceSnapshot, type DemoScenario } from '@pds/fixtures';
-import { authHeaders } from './auth-token.js';
+import { authHeaders, getCurrentIdentity, type WebRole } from './auth-token.js';
 import { getDataSourceMode, usesMockData } from './data-source.js';
 import { getScenarioAlerts } from './demo-model.js';
 import type { WorkflowActionRequest } from './workflow-actions.js';
@@ -45,6 +45,22 @@ export type WorkspaceData = {
   ledgerEvents: LedgerEvent[];
   stockPositions: StockPosition[];
 };
+
+export type RestrictedWorkspaceCollection = 'authTransactions' | 'entitlements' | 'distributions' | 'alerts';
+
+// Keep this map aligned with the API controllers' GET policies. Expected RBAC
+// denials are represented as unavailable collections, not service outages.
+const restrictedCollectionRoles: Record<RestrictedWorkspaceCollection, readonly WebRole[]> = {
+  authTransactions: ['fps', 'department', 'auditor'],
+  entitlements: ['fps', 'department', 'auditor'],
+  distributions: ['fps', 'department', 'auditor', 'management'],
+  alerts: ['auditor']
+};
+
+export const canReadWorkspaceCollection = (
+  collection: RestrictedWorkspaceCollection,
+  roles: readonly WebRole[]
+): boolean => restrictedCollectionRoles[collection].some((role) => roles.includes(role));
 
 const mockWorkspace = (scenario: DemoScenario): WorkspaceData => ({
   ...getWorkspaceSnapshot(scenario),
@@ -178,6 +194,7 @@ export async function loadWorkspaceData(scenario: DemoScenario): Promise<Workspa
     return mockWorkspace(scenario);
   }
 
+  const roles = getCurrentIdentity()?.roles ?? [];
   const [summary, stakeholders, lots, transfers, allocations, authTransactions, entitlements, distributions, alerts, ledgerEvents, stockPositions] =
     await Promise.all([
       loadDashboardSummary(apiOnline),
@@ -185,10 +202,10 @@ export async function loadWorkspaceData(scenario: DemoScenario): Promise<Workspa
       loadLots(apiOnline),
       loadTransfers(apiOnline),
       loadAllocations(apiOnline),
-      loadAuthTransactions(apiOnline),
-      loadEntitlements(apiOnline),
-      loadDistributions(apiOnline),
-      loadAlerts(scenario, apiOnline),
+      canReadWorkspaceCollection('authTransactions', roles) ? loadAuthTransactions(apiOnline) : Promise.resolve([]),
+      canReadWorkspaceCollection('entitlements', roles) ? loadEntitlements(apiOnline) : Promise.resolve([]),
+      canReadWorkspaceCollection('distributions', roles) ? loadDistributions(apiOnline) : Promise.resolve([]),
+      canReadWorkspaceCollection('alerts', roles) ? loadAlerts(scenario, apiOnline) : Promise.resolve([]),
       loadLedgerEvents(apiOnline),
       loadStockPositions(apiOnline)
     ]);

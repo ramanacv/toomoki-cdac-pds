@@ -5,11 +5,12 @@ import { loadAdminOverview, type AdminOverview } from '@/admin-api.js';
 import { fetchApiHealth, loadStakeholders, type LedgerMode } from '@/api.js';
 import { AdminShell } from '@/components/layout/AdminShell';
 import type { AdminOutletContext } from '@/hooks/use-admin-context.js';
-import { getCurrentIdentity, signIn, signOut } from '@/auth-token.js';
+import { getCurrentIdentity, hasOperationalRole, signIn, signOut } from '@/auth-token.js';
 import { Button } from '@/components/ui/button.js';
 
 export function AdminLayout() {
   const identity = getCurrentIdentity();
+  const canReadOperationalData = hasOperationalRole(identity?.roles ?? []);
   const [overview, setOverview] = useState<AdminOverview | null>(null);
   const [stakeholders, setStakeholders] = useState<Stakeholder[]>([]);
   const [apiOnline, setApiOnline] = useState(false);
@@ -27,22 +28,27 @@ export function AdminLayout() {
 
     if (!online) {
       setOverview(null);
+      setStakeholders([]);
       setError('API is offline. Start the backend to load the admin dashboard.');
       setLoading(false);
       return;
     }
 
     try {
-      const [payload, stakeholderList] = await Promise.all([loadAdminOverview(), loadStakeholders(online)]);
+      const [payload, stakeholderList] = await Promise.all([
+        loadAdminOverview(),
+        canReadOperationalData ? loadStakeholders(online) : Promise.resolve([])
+      ]);
       setOverview(payload);
       setStakeholders(stakeholderList);
     } catch (caught) {
       setOverview(null);
+      setStakeholders([]);
       setError(caught instanceof Error ? caught.message : 'Failed to load admin overview');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [canReadOperationalData]);
 
   useEffect(() => {
     if (identity?.roles.includes('platform-admin')) void refresh();
