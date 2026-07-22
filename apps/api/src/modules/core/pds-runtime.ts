@@ -81,6 +81,10 @@ export class PdsRuntime extends PdsLedgerEngine {
     return null;
   }
 
+  getOperationalPool(): Pool | null {
+    return this.getDbPool();
+  }
+
   async bootstrapFromPersistenceAsync(): Promise<void> {
     const pool = this.getDbPool();
     if (pool) {
@@ -273,6 +277,50 @@ export class PdsRuntime extends PdsLedgerEngine {
     return super.listAuthTransactions();
   }
 
+  listStockPositions(): any {
+    const pool = this.getDbPool();
+    if (pool) {
+      return pool.query(
+        'SELECT stakeholder_id, commodity, quantity_kg FROM stock_positions ORDER BY stakeholder_id, commodity'
+      ).then(res => res.rows.map(row => ({
+        entityId: String(row.stakeholder_id),
+        commodity: String(row.commodity),
+        quantityKg: Number(row.quantity_kg)
+      })));
+    }
+    return this.exportState().stock.map(([key, quantityKg]) => {
+      const separatorIndex = key.lastIndexOf(':');
+      return { entityId: key.slice(0, separatorIndex), commodity: key.slice(separatorIndex + 1), quantityKg };
+    });
+  }
+
+  override getDashboardSummary(): any {
+    const pool = this.getDbPool();
+    if (!pool) return super.getDashboardSummary();
+    return Promise.all([
+      pool.query('SELECT COALESCE(SUM(quantity_kg), 0)::bigint AS value FROM stock_positions'),
+      pool.query("SELECT COUNT(*)::int AS value FROM commodity_lots WHERE status IN ('CREATED', 'DISPATCHED')"),
+      pool.query('SELECT COUNT(*)::int AS value FROM distribution_transactions'),
+      pool.query("SELECT COUNT(*)::int AS value FROM transfer_orders WHERE status = 'DISPATCHED'"),
+      pool.query("SELECT COUNT(*)::int AS value FROM fps_allocations WHERE status = 'ALLOCATED'"),
+      pool.query("SELECT COUNT(*)::int AS value FROM audit_alerts WHERE status <> 'RESOLVED'"),
+      pool.query("SELECT DISTINCT entity_id FROM audit_alerts WHERE risk_level = 'HIGH' ORDER BY entity_id")
+    ]).then(([stock, lots, distributions, transfers, allocations, alerts, highRisk]) => {
+      const pendingTransferReceipts = Number(transfers.rows[0]?.value ?? 0);
+      const pendingFpsAllocations = Number(allocations.rows[0]?.value ?? 0);
+      return {
+        trackedStockKg: Number(stock.rows[0]?.value ?? 0),
+        activeLots: Number(lots.rows[0]?.value ?? 0),
+        completedDistributions: Number(distributions.rows[0]?.value ?? 0),
+        pendingTransferReceipts,
+        pendingFpsAllocations,
+        pendingReceipts: pendingTransferReceipts + pendingFpsAllocations,
+        openAlerts: Number(alerts.rows[0]?.value ?? 0),
+        highRiskFps: highRisk.rows.map(row => String(row.entity_id))
+      };
+    });
+  }
+
   override getAuthTransaction(authTxnId: string): any {
     const pool = this.getDbPool();
     if (pool) {
@@ -307,13 +355,25 @@ export class PdsRuntime extends PdsLedgerEngine {
       const newEvents = updatedState.events;
       await this.saveStateChanges(client, updatedState, newEvents);
       await client.query('COMMIT');
-      return result;
+      return this.attachLedgerEventId(result, newEvents.at(-1)?.ledgerTxId);
     } catch (error) {
       await client.query('ROLLBACK');
       throw error;
     } finally {
       client.release();
     }
+  }
+
+  private attachLedgerEventId<T>(result: T, ledgerTxId?: string): T {
+    if (!ledgerTxId || result === null || typeof result !== 'object' || Array.isArray(result)) return result;
+    const object = result as Record<string, unknown>;
+    if (object.ledgerTxId) return result;
+    return { ...object, ledgerTxId } as T;
+  }
+
+  private attachLatestInMemoryEventId<T>(result: T): T {
+    if (result !== null && typeof result === 'object' && (result as Record<string, unknown>).ledgerTxId) return result;
+    return this.attachLedgerEventId(result, this.exportState().events.at(-1)?.ledgerTxId);
   }
 
   private async saveStateChanges(client: PoolClient, state: any, newEvents: LedgerEvent[]): Promise<void> {
@@ -360,8 +420,8 @@ export class PdsRuntime extends PdsLedgerEngine {
 
     for (const transfer of state.transfers) {
       await client.query(
-        `INSERT INTO transfer_orders (transfer_id, lot_id, from_org, to_org, dispatched_qty_kg, received_qty_kg, shortage_qty_kg, vehicle_no, status, dispatch_timestamp, receive_timestamp)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        `INSERT INTO transfer_orders (transfer_id, lot_id, from_org, to_org, dispatched_qty_kg, received_qty_kg, shortage_qty_kg, vehicle_no, status, dispatch_timestamp, receive_timestamp, stage, ro_ref, authorized_by, authorized_at, approval_status, transporter_id, transformed_from_lot_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
          ON CONFLICT (transfer_id) DO UPDATE SET
            lot_id = EXCLUDED.lot_id,
            from_org = EXCLUDED.from_org,
@@ -372,11 +432,21 @@ export class PdsRuntime extends PdsLedgerEngine {
            vehicle_no = EXCLUDED.vehicle_no,
            status = EXCLUDED.status,
            dispatch_timestamp = EXCLUDED.dispatch_timestamp,
-           receive_timestamp = EXCLUDED.receive_timestamp`,
+           receive_timestamp = EXCLUDED.receive_timestamp,
+           stage = EXCLUDED.stage,
+           ro_ref = EXCLUDED.ro_ref,
+           authorized_by = EXCLUDED.authorized_by,
+           authorized_at = EXCLUDED.authorized_at,
+           approval_status = EXCLUDED.approval_status,
+           transporter_id = EXCLUDED.transporter_id,
+           transformed_from_lot_id = EXCLUDED.transformed_from_lot_id`,
         [
           transfer.transferId, transfer.lotId, transfer.fromOrg, transfer.toOrg,
           transfer.dispatchedQtyKg, transfer.receivedQtyKg ?? null, transfer.shortageQtyKg ?? null,
-          transfer.vehicleNo, transfer.status, transfer.dispatchTimestamp, transfer.receiveTimestamp ?? null
+          transfer.vehicleNo, transfer.status, transfer.dispatchTimestamp, transfer.receiveTimestamp ?? null,
+          transfer.stage ?? null, transfer.roRef ?? null, transfer.authorizedBy ?? null,
+          transfer.authorizedAt ?? null, transfer.approvalStatus ?? null,
+          transfer.transporterId ?? null, transfer.transformedFromLotId ?? null
         ]
       );
     }
@@ -451,15 +521,19 @@ export class PdsRuntime extends PdsLedgerEngine {
       const separatorIndex = stockKey.lastIndexOf(':');
       const stakeholderId = stockKey.slice(0, separatorIndex);
       const commodity = stockKey.slice(separatorIndex + 1);
-      await client.query(
-        `INSERT INTO stock_positions (stakeholder_id, commodity, quantity_kg, lot_id, month, version)
-         VALUES ($1, $2, $3, NULL, NULL, 1)
-         ON CONFLICT (stakeholder_id, commodity, lot_id, month) DO UPDATE SET
-           quantity_kg = EXCLUDED.quantity_kg,
-           version = stock_positions.version + 1,
-           updated_at = NOW()`,
+      const updated = await client.query(
+        `UPDATE stock_positions
+         SET quantity_kg = $3, version = version + 1, updated_at = NOW()
+         WHERE stakeholder_id = $1 AND commodity = $2 AND lot_id IS NULL AND month IS NULL`,
         [stakeholderId, commodity, quantityKg]
       );
+      if (updated.rowCount === 0) {
+        await client.query(
+          `INSERT INTO stock_positions (stakeholder_id, commodity, quantity_kg, lot_id, month, version)
+           VALUES ($1, $2, $3, NULL, NULL, 1)`,
+          [stakeholderId, commodity, quantityKg]
+        );
+      }
     }
 
     for (const alert of state.alerts) {
@@ -574,20 +648,25 @@ export class PdsRuntime extends PdsLedgerEngine {
         const lotResQuery = await client.query('SELECT commodity FROM commodity_lots WHERE lot_id = $1', [input.lotId]);
         const commodity = lotResQuery.rows[0]?.commodity || '';
 
-        const [lotRes, stakeholderRes, stockRes, transferRes] = await Promise.all([
+        const [lotRes, stakeholderRes, stockRes, transferRes, authorizationEventRes] = await Promise.all([
           client.query('SELECT * FROM commodity_lots WHERE lot_id = $1 FOR UPDATE', [input.lotId]),
           client.query('SELECT * FROM stakeholders WHERE stakeholder_id IN ($1, $2) FOR UPDATE', [input.fromOrg, input.toOrg]),
           client.query(
             'SELECT * FROM stock_positions WHERE stakeholder_id = $1 AND commodity = $2 AND lot_id IS NULL AND month IS NULL FOR UPDATE',
             [input.fromOrg, commodity]
           ),
-          client.query('SELECT * FROM transfer_orders WHERE transfer_id = $1 FOR UPDATE', [input.transferId])
+          client.query('SELECT * FROM transfer_orders WHERE transfer_id = $1 FOR UPDATE', [input.transferId]),
+          client.query(
+            "SELECT * FROM ledger_events WHERE entity_id = $1 AND event_type = 'AuthorizeMovement' ORDER BY timestamp FOR UPDATE",
+            [input.transferId]
+          )
         ]);
         return {
           lots: lotRes.rows.map(mapLotRow),
           stakeholders: stakeholderRes.rows.map(mapStakeholderRow),
           stock: stockRes.rows.map(r => [`${r.stakeholder_id}:${r.commodity}`, Number(r.quantity_kg)] as const),
-          transfers: transferRes.rows.map(r => mapTransferRow(r))
+          transfers: transferRes.rows.map(r => mapTransferRow(r)),
+          events: authorizationEventRes.rows.map(r => mapEventRow(r))
         };
       },
       (engine) => engine.dispatchLot(input)
@@ -605,9 +684,13 @@ export class PdsRuntime extends PdsLedgerEngine {
     return this.executeMutationTx(
       pool,
       async (client) => {
-        const transferRes = await client.query('SELECT * FROM transfer_orders WHERE transfer_id = $1 FOR UPDATE', [input.transferId]);
+        const [transferRes, approverRes] = await Promise.all([
+          client.query('SELECT * FROM transfer_orders WHERE transfer_id = $1 FOR UPDATE', [input.transferId]),
+          client.query('SELECT * FROM stakeholders WHERE stakeholder_id = $1 FOR UPDATE', [input.authorizedBy])
+        ]);
         return {
-          transfers: transferRes.rows.map(r => mapTransferRow(r))
+          transfers: transferRes.rows.map(r => mapTransferRow(r)),
+          stakeholders: approverRes.rows.map(mapStakeholderRow)
         };
       },
       (engine) => engine.authorizeMovement(input)
@@ -906,85 +989,85 @@ export class PdsRuntime extends PdsLedgerEngine {
   async registerStakeholderPersisted(...args: Parameters<PdsLedgerEngine['registerStakeholder']>) {
     const result = await this.registerStakeholder(...args);
     await this.flushPersist();
-    return result;
+    return this.attachLatestInMemoryEventId(result);
   }
 
   async createCommodityLotPersisted(...args: Parameters<PdsLedgerEngine['createCommodityLot']>) {
     const result = await this.createCommodityLot(...args);
     await this.flushPersist();
-    return result;
+    return this.attachLatestInMemoryEventId(result);
   }
 
   async dispatchLotPersisted(...args: Parameters<PdsLedgerEngine['dispatchLot']>) {
     const result = await this.dispatchLot(...args);
     await this.flushPersist();
-    return result;
+    return this.attachLatestInMemoryEventId(result);
   }
 
   async authorizeMovementPersisted(...args: Parameters<PdsLedgerEngine['authorizeMovement']>) {
     const result = await this.authorizeMovement(...args);
     await this.flushPersist();
-    return result;
+    return this.attachLatestInMemoryEventId(result);
   }
 
   async receiveLotPersisted(...args: Parameters<PdsLedgerEngine['receiveLot']>) {
     const result = await this.receiveLot(...args);
     await this.flushPersist();
-    return result;
+    return this.attachLatestInMemoryEventId(result);
   }
 
   async allocateToFpsPersisted(...args: Parameters<PdsLedgerEngine['allocateToFps']>) {
     const result = await this.allocateToFps(...args);
     await this.flushPersist();
-    return result;
+    return this.attachLatestInMemoryEventId(result);
   }
 
   async recordFpsReceiptPersisted(...args: Parameters<PdsLedgerEngine['recordFpsReceipt']>) {
     const result = await this.recordFpsReceipt(...args);
     await this.flushPersist();
-    return result;
+    return this.attachLatestInMemoryEventId(result);
   }
 
   async simulateAuthenticationPersisted(...args: Parameters<PdsLedgerEngine['simulateAuthentication']>) {
     const result = await this.simulateAuthentication(...args);
     await this.flushPersist();
-    return result;
+    return this.attachLatestInMemoryEventId(result);
   }
 
   async createOrUpdateEntitlementPersisted(...args: Parameters<PdsLedgerEngine['createOrUpdateEntitlement']>) {
     const result = await this.createOrUpdateEntitlement(...args);
     await this.flushPersist();
-    return result;
+    return this.attachLatestInMemoryEventId(result);
   }
 
   async recordDistributionPersisted(...args: Parameters<PdsLedgerEngine['recordDistribution']>) {
     const result = await this.recordDistribution(...args);
     await this.flushPersist();
-    return result;
+    return this.attachLatestInMemoryEventId(result);
   }
 
   async reconcileAlertsPersisted(...args: Parameters<PdsLedgerEngine['reconcileAlerts']>) {
     const result = await this.reconcileAlerts(...args);
     await this.flushPersist();
-    return result;
+    return this.attachLatestInMemoryEventId(result);
   }
 
   async resolveAuditAlertPersisted(...args: Parameters<PdsLedgerEngine['resolveAuditAlert']>) {
     const result = await this.resolveAuditAlert(...args);
     await this.flushPersist();
-    return result;
+    return this.attachLatestInMemoryEventId(result);
   }
 
   async raiseAuditFlagPersisted(...args: Parameters<PdsLedgerEngine['raiseAuditFlag']>) {
     const result = await this.raiseAuditFlag(...args);
     await this.flushPersist();
-    return result;
+    return this.attachLatestInMemoryEventId(result);
   }
 
   async resetTransactionalDataPersisted(...args: Parameters<PdsLedgerEngine['resetTransactionalData']>) {
     const result = await this.resetTransactionalData(...args);
     await this.flushPersist();
-    return result;
+    return this.attachLatestInMemoryEventId(result);
   }
 
   override getLotHistory(lotId: string) {

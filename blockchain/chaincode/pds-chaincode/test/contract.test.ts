@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { Context } from 'fabric-contract-api';
 import { PdsControlContract, PdsDataContract } from '../src/contract.js';
+import { PdsLedgerEngine } from '../src/index.js';
 import { assertAuthorized, type ClientIdentity } from '../src/authorization.js';
-import { EntitlementRuleStatus } from '@pds/shared-types';
+import { AlertType, EntitlementRuleStatus } from '@pds/shared-types';
 import { createHash } from 'node:crypto';
 
 /**
@@ -33,6 +34,18 @@ const makeContext = (mspHolder: { mspId: string }): Context => {
     getStateByPartialCompositeKey: async (objectType: string, attributes: string[]) => {
       const prefix = `\x00${objectType}\x00${attributes.length > 0 ? `${attributes.join('\x00')}\x00` : ''}`;
       return iteratorFor([...state.entries()].filter(([key]) => key.startsWith(prefix)));
+    },
+    getQueryResult: async (queryJson: string) => {
+      const selector = (JSON.parse(queryJson) as { selector: Record<string, unknown> }).selector;
+      const valueAt = (value: unknown, path: string): unknown => path.split('.').reduce<unknown>(
+        (current, segment) => current && typeof current === 'object' ? (current as Record<string, unknown>)[segment] : undefined,
+        value
+      );
+      const matches = [...state.entries()].filter(([, value]) => {
+        const parsed = JSON.parse(value.toString('utf8')) as unknown;
+        return Object.entries(selector).every(([path, expected]) => valueAt(parsed, path) === expected);
+      });
+      return iteratorFor(matches);
     },
     setEvent: (_name: string, _payload: Buffer): void => { /* captured for side-effect only */ },
     getTxID: (): string => `mock-tx-${++txCounter}`,
@@ -165,6 +178,49 @@ describe('PdsControlContract / PdsDataContract authorization (T1.5)', () => {
     await expect(data.RecordLedgerProof(ctx, JSON.stringify(proof))).resolves.toContain('"duplicate":true');
     await expect(data.RecordLedgerProof(ctx, JSON.stringify({ ...proof, operationId: 'OP-2' }))).rejects.toThrow(/Conflicting/);
   });
+
+  it('projects committed ledger proofs into lot and distribution trace history', async () => {
+    const msp = { mspId: 'FoodAndCivilSuppliesMSP' };
+    const ctx = makeContext(msp);
+    const data = new PdsDataContract();
+    const record = async (entityType: 'lot' | 'distribution', entityId: string, eventId: string) => {
+      const proofPayload = { quantityKg: 25 };
+      await data.RecordLedgerProof(ctx, JSON.stringify({
+        eventId, operationId: eventId, schemaVersion: 1, entityType, entityId,
+        eventType: entityType === 'lot' ? 'CreateCommodityLot' : 'RecordDistribution',
+        actor: { subject: 'api', applicationRole: 'SYSTEM', submittingOrganization: msp.mspId },
+        payloadHash: createHash('sha256').update(JSON.stringify(proofPayload)).digest('hex'),
+        proofPayload, businessTimestamp: '2026-07-22T00:00:00.000Z'
+      }));
+    };
+
+    await record('lot', 'LOT-TRACE-1', 'EVT-LOT-1');
+    await record('distribution', 'DIST-TRACE-1', 'EVT-DIST-1');
+
+    await expect(data.GetLotHistory(ctx, JSON.stringify({ lotId: 'LOT-TRACE-1' })))
+      .resolves.toContain('EVT-LOT-1');
+    await expect(data.GetDistributionHistory(ctx, JSON.stringify({ distributionId: 'DIST-TRACE-1' })))
+      .resolves.toContain('EVT-DIST-1');
+  });
+
+  it.each(['aadhaarNumber', 'customer_aadhaar', 'phoneNumber', 'mobileNo', 'otpValue', 'biometricPayload', 'ration_card_value'])(
+    'rejects normalized proof privacy alias %s',
+    async (key) => {
+      const msp = { mspId: 'FoodAndCivilSuppliesMSP' };
+      const ctx = makeContext(msp);
+      const data = new PdsDataContract();
+      const proofPayload = { nested: { [key]: 'prohibited' } };
+      const proof = {
+        eventId: `EVT-${key}`, operationId: `OP-${key}`, schemaVersion: 1,
+        entityType: 'auth', entityId: 'AUTH-1', eventType: 'AuthTransaction',
+        actor: { subject: 'api', applicationRole: 'DEPARTMENT', submittingOrganization: msp.mspId },
+        payloadHash: createHash('sha256').update(JSON.stringify(proofPayload)).digest('hex'),
+        proofPayload,
+        businessTimestamp: '2026-06-01T00:00:00.000Z'
+      };
+      await expect(data.RecordLedgerProof(ctx, JSON.stringify(proof))).rejects.toThrow(/prohibited personal data/);
+    }
+  );
 });
 
 describe('assertAuthorized (unit)', () => {
@@ -220,6 +276,35 @@ describe('assertAuthorized (unit)', () => {
 });
 
 describe('PdsControlContract / PdsDataContract Fabric-native primitives (Tier 1)', () => {
+  it('produces byte-identical endorsed state for two peers with the same transaction context', () => {
+    const executeAsPeer = () => {
+      let sequence = 0;
+      const engine = new PdsLedgerEngine(false, {
+        timestamp: () => '2026-07-22T05:00:00.000Z',
+        identifier: () => `fabric-tx-fixed-${sequence++}`
+      });
+      engine.restoreState({
+        stakeholders: [], lots: [], transfers: [], allocations: [], entitlements: [],
+        authTransactions: [], distributions: [], alerts: [], events: [], stock: [],
+        rationCards: [], grievances: [], entitlementRules: [], seriesId: 'POC'
+      });
+      engine.registerStakeholder(
+        stakeholder('PROC-DET', 'PROCUREMENT_CENTER') as Parameters<PdsLedgerEngine['registerStakeholder']>[0]
+      );
+      engine.createCommodityLot({
+        lotId: 'LOT-DET-001', commodity: 'Rice', season: 'Kharif 2026', quantityKg: 100,
+        qualityGrade: 'A', source: 'PROC-DET', currentOwner: 'PROC-DET', currentLocation: 'Yard'
+      });
+      engine.raiseAuditFlag({
+        alertType: AlertType.UNAUTHORIZED_TRANSACTION,
+        entityId: 'LOT-DET-001', message: 'Determinism test', evidence: { check: true }
+      });
+      return JSON.stringify(engine.exportState());
+    };
+
+    expect(executeAsPeer()).toBe(executeAsPeer());
+  });
+
   it('IssueRationCard returns a real-looking Fabric txId as ledgerTxId', async () => {
     const msp = { mspId: 'FoodAndCivilSuppliesMSP' };
     const ctx = makeContext(msp);

@@ -64,7 +64,14 @@ export const mapTransferRow = (row: Record<string, unknown>, toIsoString = toIso
   vehicleNo: asString(row.vehicle_no),
   status: asString(row.status) as TransferStatus,
   dispatchTimestamp: toIsoString(row.dispatch_timestamp),
-  ...(row.receive_timestamp == null ? {} : { receiveTimestamp: toIsoString(row.receive_timestamp) })
+  ...(row.receive_timestamp == null ? {} : { receiveTimestamp: toIsoString(row.receive_timestamp) }),
+  ...(row.stage == null ? {} : { stage: asString(row.stage) as 'I' | 'II' }),
+  ...(row.ro_ref == null ? {} : { roRef: asString(row.ro_ref) }),
+  ...(row.authorized_by == null ? {} : { authorizedBy: asString(row.authorized_by) }),
+  ...(row.authorized_at == null ? {} : { authorizedAt: toIsoString(row.authorized_at) }),
+  ...(row.approval_status == null ? {} : { approvalStatus: asString(row.approval_status) as 'PENDING' | 'APPROVED' | 'REJECTED' | 'BLOCKED' }),
+  ...(row.transporter_id == null ? {} : { transporterId: asString(row.transporter_id) }),
+  ...(row.transformed_from_lot_id == null ? {} : { transformedFromLotId: asString(row.transformed_from_lot_id) })
 });
 
 export const mapAllocationRow = (row: Record<string, unknown>): FPSAllocation => ({
@@ -182,7 +189,7 @@ export const buildSnapshotWritePlan = (state: PdsLedgerState): SqlStatement[] =>
 
   for (const transfer of state.transfers) {
     statements.push({
-      text: 'INSERT INTO transfer_orders (transfer_id, lot_id, from_org, to_org, dispatched_qty_kg, received_qty_kg, shortage_qty_kg, vehicle_no, status, dispatch_timestamp, receive_timestamp) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) ON CONFLICT (transfer_id) DO UPDATE SET lot_id = EXCLUDED.lot_id, from_org = EXCLUDED.from_org, to_org = EXCLUDED.to_org, dispatched_qty_kg = EXCLUDED.dispatched_qty_kg, received_qty_kg = EXCLUDED.received_qty_kg, shortage_qty_kg = EXCLUDED.shortage_qty_kg, vehicle_no = EXCLUDED.vehicle_no, status = EXCLUDED.status, dispatch_timestamp = EXCLUDED.dispatch_timestamp, receive_timestamp = EXCLUDED.receive_timestamp',
+      text: 'INSERT INTO transfer_orders (transfer_id, lot_id, from_org, to_org, dispatched_qty_kg, received_qty_kg, shortage_qty_kg, vehicle_no, status, dispatch_timestamp, receive_timestamp, stage, ro_ref, authorized_by, authorized_at, approval_status, transporter_id, transformed_from_lot_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18) ON CONFLICT (transfer_id) DO UPDATE SET lot_id = EXCLUDED.lot_id, from_org = EXCLUDED.from_org, to_org = EXCLUDED.to_org, dispatched_qty_kg = EXCLUDED.dispatched_qty_kg, received_qty_kg = EXCLUDED.received_qty_kg, shortage_qty_kg = EXCLUDED.shortage_qty_kg, vehicle_no = EXCLUDED.vehicle_no, status = EXCLUDED.status, dispatch_timestamp = EXCLUDED.dispatch_timestamp, receive_timestamp = EXCLUDED.receive_timestamp, stage = EXCLUDED.stage, ro_ref = EXCLUDED.ro_ref, authorized_by = EXCLUDED.authorized_by, authorized_at = EXCLUDED.authorized_at, approval_status = EXCLUDED.approval_status, transporter_id = EXCLUDED.transporter_id, transformed_from_lot_id = EXCLUDED.transformed_from_lot_id',
       values: [
         transfer.transferId,
         transfer.lotId,
@@ -194,7 +201,14 @@ export const buildSnapshotWritePlan = (state: PdsLedgerState): SqlStatement[] =>
         transfer.vehicleNo,
         transfer.status,
         transfer.dispatchTimestamp,
-        transfer.receiveTimestamp ?? null
+        transfer.receiveTimestamp ?? null,
+        transfer.stage ?? null,
+        transfer.roRef ?? null,
+        transfer.authorizedBy ?? null,
+        transfer.authorizedAt ?? null,
+        transfer.approvalStatus ?? null,
+        transfer.transporterId ?? null,
+        transfer.transformedFromLotId ?? null
       ]
     });
   }

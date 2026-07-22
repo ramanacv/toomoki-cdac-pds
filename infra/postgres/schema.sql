@@ -68,7 +68,7 @@ CREATE TABLE IF NOT EXISTS stock_positions (
   lot_id TEXT,
   month TEXT,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  UNIQUE (stakeholder_id, commodity, lot_id, month)
+  UNIQUE NULLS NOT DISTINCT (stakeholder_id, commodity, lot_id, month)
 );
 
 CREATE INDEX IF NOT EXISTS idx_stock_positions_stakeholder_commodity ON stock_positions (stakeholder_id, commodity);
@@ -86,8 +86,23 @@ CREATE TABLE IF NOT EXISTS transfer_orders (
   vehicle_no TEXT NOT NULL,
   status TEXT NOT NULL,
   dispatch_timestamp TIMESTAMPTZ NOT NULL,
-  receive_timestamp TIMESTAMPTZ
+  receive_timestamp TIMESTAMPTZ,
+  stage TEXT CHECK (stage IN ('I', 'II')),
+  ro_ref TEXT,
+  authorized_by TEXT REFERENCES stakeholders(stakeholder_id) ON DELETE RESTRICT,
+  authorized_at TIMESTAMPTZ,
+  approval_status TEXT CHECK (approval_status IN ('PENDING', 'APPROVED', 'REJECTED', 'BLOCKED')),
+  transporter_id TEXT REFERENCES stakeholders(stakeholder_id) ON DELETE RESTRICT,
+  transformed_from_lot_id TEXT REFERENCES commodity_lots(lot_id) ON DELETE RESTRICT
 );
+
+ALTER TABLE transfer_orders ADD COLUMN IF NOT EXISTS stage TEXT CHECK (stage IN ('I', 'II'));
+ALTER TABLE transfer_orders ADD COLUMN IF NOT EXISTS ro_ref TEXT;
+ALTER TABLE transfer_orders ADD COLUMN IF NOT EXISTS authorized_by TEXT REFERENCES stakeholders(stakeholder_id) ON DELETE RESTRICT;
+ALTER TABLE transfer_orders ADD COLUMN IF NOT EXISTS authorized_at TIMESTAMPTZ;
+ALTER TABLE transfer_orders ADD COLUMN IF NOT EXISTS approval_status TEXT CHECK (approval_status IN ('PENDING', 'APPROVED', 'REJECTED', 'BLOCKED'));
+ALTER TABLE transfer_orders ADD COLUMN IF NOT EXISTS transporter_id TEXT REFERENCES stakeholders(stakeholder_id) ON DELETE RESTRICT;
+ALTER TABLE transfer_orders ADD COLUMN IF NOT EXISTS transformed_from_lot_id TEXT REFERENCES commodity_lots(lot_id) ON DELETE RESTRICT;
 
 CREATE INDEX IF NOT EXISTS idx_transfer_orders_status ON transfer_orders (status);
 CREATE INDEX IF NOT EXISTS idx_transfer_orders_lot_id ON transfer_orders (lot_id);
@@ -303,4 +318,3 @@ CREATE INDEX IF NOT EXISTS idx_ledger_outbox_created_at ON ledger_outbox (create
 ALTER TABLE stock_positions ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1;
 ALTER TABLE monthly_entitlements ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1;
 CREATE INDEX IF NOT EXISTS idx_ledger_outbox_status_created ON ledger_outbox (status, created_at);
-

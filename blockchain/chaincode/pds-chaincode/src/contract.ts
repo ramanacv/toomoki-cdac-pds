@@ -35,11 +35,12 @@ import type {
   FPSAllocation,
   Grievance,
   LedgerEvent,
+  LedgerProof,
   MonthlyEntitlement,
-  RationCard,
   Stakeholder,
   TransferOrder
 } from '@pds/shared-types';
+import type { PdsLedgerEngine } from './index.js';
 import { assertAuthorized } from './authorization.js';
 import {
   buildEngine,
@@ -55,6 +56,17 @@ import {
 
 type StockKey = `${string}:${string}`;
 
+type StoredLedgerProof = { docType: 'proof'; proof: LedgerProof; fabricTxId: string };
+
+const proofAsLedgerEvent = ({ proof }: StoredLedgerProof): LedgerEvent => ({
+  ledgerTxId: proof.eventId,
+  entityType: proof.entityType as LedgerEvent['entityType'],
+  entityId: proof.entityId,
+  eventType: proof.eventType,
+  payload: proof.proofPayload,
+  timestamp: proof.businessTimestamp
+});
+
 const canonicalJson = (value: unknown): string => {
   if (value === null || typeof value !== 'object') return JSON.stringify(value);
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
@@ -66,7 +78,11 @@ const assertNoSensitiveProofFields = (value: unknown): void => {
   if (value === null || typeof value !== 'object') return;
   if (Array.isArray(value)) return value.forEach(assertNoSensitiveProofFields);
   for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
-    if (/^(aadhaar|mobile|phone|otp|biometric|rationcard(number|value)?)$/i.test(key)) {
+    const normalizedKey = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const prohibitedIdentityAlias = ['aadhaar', 'mobile', 'phone', 'otp', 'biometric']
+      .some((term) => normalizedKey.includes(term));
+    const prohibitedRationCard = normalizedKey.includes('rationcard') && !/(hash|refhash|digest)$/.test(normalizedKey);
+    if (prohibitedIdentityAlias || prohibitedRationCard) {
       throw new Error(`LedgerProof contains prohibited personal data field: ${key}`);
     }
     assertNoSensitiveProofFields(child);
@@ -95,7 +111,7 @@ export class PdsControlContract extends Contract {
       emitAndLog(ctx, 'control', 'RegisterStakeholder', txId, out);
       return JSON.stringify(out);
     }
-    const engine = buildEngine(partialState);
+    const engine = buildEngine(partialState, ctx);
     const result = engine.registerStakeholder(payload);
     const state = engine.exportState();
     await Promise.all([
@@ -115,7 +131,7 @@ export class PdsControlContract extends Contract {
     const partialState = await loadSelective(ctx, {
       rationCards: [payload.rationCardHash]
     });
-    const engine = buildEngine(partialState);
+    const engine = buildEngine(partialState, ctx);
     const result = engine.issueRationCard(payload);
     const state = engine.exportState();
     const cardKey = ctx.stub.createCompositeKey('rationcard', [result.rationCardHash]);
@@ -136,7 +152,7 @@ export class PdsControlContract extends Contract {
     const partialState = await loadSelective(ctx, {
       rationCards: [payload.rationCardHash]
     });
-    const engine = buildEngine(partialState);
+    const engine = buildEngine(partialState, ctx);
     const result = engine.activateRationCard(payload);
     const state = engine.exportState();
     const cardKey = ctx.stub.createCompositeKey('rationcard', [result.rationCardHash]);
@@ -159,7 +175,7 @@ export class PdsControlContract extends Contract {
       rationCards: [payload.rationCardHash],
       alerts: payload.alertId ? [payload.alertId] : []
     });
-    const engine = buildEngine(partialState);
+    const engine = buildEngine(partialState, ctx);
     const result = engine.suspendRationCard(payload);
     const state = engine.exportState();
     const cardKey = ctx.stub.createCompositeKey('rationcard', [result.rationCardHash]);
@@ -183,7 +199,7 @@ export class PdsControlContract extends Contract {
       rationCards: [payload.rationCardHash],
       stakeholders: [payload.newFpsId]
     });
-    const engine = buildEngine(partialState);
+    const engine = buildEngine(partialState, ctx);
     const result = engine.transferRationCard(payload);
     const state = engine.exportState();
     const cardKey = ctx.stub.createCompositeKey('rationcard', [result.rationCardHash]);
@@ -205,7 +221,7 @@ export class PdsControlContract extends Contract {
     const partialState = await loadSelective(ctx, {
       entitlementRules: [payload.ruleId]
     });
-    const engine = buildEngine(partialState);
+    const engine = buildEngine(partialState, ctx);
     const result = engine.proposeEntitlementRule(payload);
     const state = engine.exportState();
     await Promise.all([
@@ -225,7 +241,7 @@ export class PdsControlContract extends Contract {
     const partialState = await loadSelective(ctx, {
       entitlementRules: [payload.ruleId]
     });
-    const engine = buildEngine(partialState);
+    const engine = buildEngine(partialState, ctx);
     const result = engine.approveEntitlementRule(payload);
     const state = engine.exportState();
     await Promise.all([
@@ -240,7 +256,7 @@ export class PdsControlContract extends Contract {
   async RolloverUnclaimedQuota(ctx: Context, payloadJson: string): Promise<string> {
     assertAuthorized('RolloverUnclaimedQuota', identityFromContext(ctx));
     const txId = ctx.stub.getTxID();
-    const payload = JSON.parse(payloadJson) as any;
+    const payload = JSON.parse(payloadJson) as Parameters<PdsLedgerEngine['rolloverUnclaimedQuota']>[0];
     const entitlements = await queryState<MonthlyEntitlement>(ctx, {
       selector: {
         docType: 'entitlement',
@@ -248,7 +264,7 @@ export class PdsControlContract extends Contract {
         commodity: payload.commodity
       }
     });
-    const engine = buildEngine({ entitlements, events: [] });
+    const engine = buildEngine({ entitlements, events: [] }, ctx);
     const result = engine.rolloverUnclaimedQuota(payload);
     const state = engine.exportState();
     await Promise.all([
@@ -311,7 +327,7 @@ export class PdsDataContract extends Contract {
       lots: [payload.lotId],
       stock: [{ org: payload.currentOwner, commodity: payload.commodity }]
     });
-    const engine = buildEngine(partialState);
+    const engine = buildEngine(partialState, ctx);
     const result = engine.createCommodityLot(payload);
     const state = engine.exportState();
     await Promise.all([
@@ -346,7 +362,7 @@ export class PdsDataContract extends Contract {
       }
     });
     partialState.events = events;
-    const engine = buildEngine(partialState);
+    const engine = buildEngine(partialState, ctx);
     const result = engine.dispatchLot(payload);
     const state = engine.exportState();
     await Promise.all([
@@ -379,7 +395,7 @@ export class PdsDataContract extends Contract {
       transfers: [payload.transferId],
       stock: [{ org: transfer.toOrg, commodity: lot.commodity }]
     });
-    const engine = buildEngine(partialState);
+    const engine = buildEngine(partialState, ctx);
     const result = engine.receiveLot(payload);
     const state = engine.exportState();
     await Promise.all([
@@ -403,7 +419,7 @@ export class PdsDataContract extends Contract {
       allocations: [payload.allocationId],
       stock: [{ org: payload.sourceGodownId, commodity: payload.commodity }]
     });
-    const engine = buildEngine(partialState);
+    const engine = buildEngine(partialState, ctx);
     const result = engine.allocateToFps(payload);
     const state = engine.exportState();
     await Promise.all([
@@ -429,7 +445,7 @@ export class PdsDataContract extends Contract {
       allocations: [payload.allocationId],
       stock: [{ org: allocation.fpsId, commodity: allocation.commodity }]
     });
-    const engine = buildEngine(partialState);
+    const engine = buildEngine(partialState, ctx);
     const result = engine.recordFpsReceipt(payload);
     const state = engine.exportState();
     await Promise.all([
@@ -448,11 +464,11 @@ export class PdsDataContract extends Contract {
   async RegisterBeneficiaryHash(ctx: Context, payloadJson: string): Promise<string> {
     assertAuthorized('RegisterBeneficiaryHash', identityFromContext(ctx));
     const txId = ctx.stub.getTxID();
-    const payload = JSON.parse(payloadJson) as any;
+    const payload = JSON.parse(payloadJson) as Parameters<PdsLedgerEngine['simulateAuthentication']>[0];
     const partialState = await loadSelective(ctx, {
       authTransactions: [payload.authTxnId]
     });
-    const engine = buildEngine({ authTransactions: partialState.authTransactions as never, events: [] });
+    const engine = buildEngine({ authTransactions: partialState.authTransactions as never, events: [] }, ctx);
     const result = engine.simulateAuthentication(payload);
     const state = engine.exportState();
     await Promise.all([
@@ -467,7 +483,7 @@ export class PdsDataContract extends Contract {
   async CreateMonthlyEntitlement(ctx: Context, payloadJson: string): Promise<string> {
     assertAuthorized('CreateMonthlyEntitlement', identityFromContext(ctx));
     const txId = ctx.stub.getTxID();
-    const payload = JSON.parse(payloadJson) as any;
+    const payload = JSON.parse(payloadJson) as Parameters<PdsLedgerEngine['createOrUpdateEntitlement']>[0];
     const [partialState, entitlementRules] = await Promise.all([
       loadSelective(ctx, {
         entitlements: [{ rationCardHash: payload.rationCardHash, commodity: payload.commodity, month: payload.month }]
@@ -475,7 +491,7 @@ export class PdsDataContract extends Contract {
       queryState<EntitlementRule>(ctx, { selector: { docType: 'entitlementrule' } })
     ]);
     partialState.entitlementRules = entitlementRules;
-    const engine = buildEngine(partialState);
+    const engine = buildEngine(partialState, ctx);
     const result = engine.createOrUpdateEntitlement(payload);
     const state = engine.exportState();
     await Promise.all([
@@ -499,7 +515,7 @@ export class PdsDataContract extends Contract {
       stock: [{ org: payload.fpsId, commodity: payload.commodity }],
       rationCards: [payload.rationCardHash]
     });
-    const engine = buildEngine(partialState);
+    const engine = buildEngine(partialState, ctx);
     const result = engine.recordDistribution(payload);
     const state = engine.exportState();
     await Promise.all([
@@ -519,11 +535,11 @@ export class PdsDataContract extends Contract {
   async RaiseAuditFlag(ctx: Context, payloadJson: string): Promise<string> {
     assertAuthorized('RaiseAuditFlag', identityFromContext(ctx));
     const txId = ctx.stub.getTxID();
-    const payload = JSON.parse(payloadJson) as any;
+    const payload = JSON.parse(payloadJson) as Parameters<PdsLedgerEngine['raiseAuditFlag']>[0] & { alertId?: string };
     const partialState = await loadSelective(ctx, {
-      alerts: [payload.alertId]
+      alerts: payload.alertId ? [payload.alertId] : []
     });
-    const engine = buildEngine(partialState);
+    const engine = buildEngine(partialState, ctx);
     const result = engine.raiseAuditFlag(payload);
     const state = engine.exportState();
     await Promise.all([
@@ -538,11 +554,11 @@ export class PdsDataContract extends Contract {
   async ResolveAuditFlag(ctx: Context, payloadJson: string): Promise<string> {
     assertAuthorized('ResolveAuditFlag', identityFromContext(ctx));
     const txId = ctx.stub.getTxID();
-    const payload = JSON.parse(payloadJson) as any;
+    const payload = JSON.parse(payloadJson) as Parameters<PdsLedgerEngine['resolveAuditAlert']>[0];
     const partialState = await loadSelective(ctx, {
       alerts: [payload.alertId]
     });
-    const engine = buildEngine(partialState);
+    const engine = buildEngine(partialState, ctx);
     const result = engine.resolveAuditAlert(payload);
     const state = engine.exportState();
     await Promise.all([
@@ -592,7 +608,7 @@ export class PdsDataContract extends Contract {
     const partialState = await loadSelective(ctx, {
       grievances: [payload.grievanceId]
     });
-    const engine = buildEngine(partialState);
+    const engine = buildEngine(partialState, ctx);
     const result = engine.fileGrievance(payload);
     const state = engine.exportState();
     const grievanceKey = ctx.stub.createCompositeKey('grievance', [result.grievanceId]);
@@ -614,7 +630,7 @@ export class PdsDataContract extends Contract {
     const partialState = await loadSelective(ctx, {
       grievances: [payload.grievanceId]
     });
-    const engine = buildEngine(partialState);
+    const engine = buildEngine(partialState, ctx);
     const result = engine.acknowledgeGrievance(payload);
     const state = engine.exportState();
     const grievanceKey = ctx.stub.createCompositeKey('grievance', [result.grievanceId]);
@@ -636,7 +652,7 @@ export class PdsDataContract extends Contract {
     const partialState = await loadSelective(ctx, {
       grievances: [payload.grievanceId]
     });
-    const engine = buildEngine(partialState);
+    const engine = buildEngine(partialState, ctx);
     const result = engine.resolveGrievance(payload);
     const state = engine.exportState();
     const grievanceKey = ctx.stub.createCompositeKey('grievance', [result.grievanceId]);
@@ -659,7 +675,7 @@ export class PdsDataContract extends Contract {
       loadCollection<AuditAlert>(ctx, 'alerts'),
       loadCollection<LedgerEvent>(ctx, 'events')
     ]);
-    const engine = buildEngine({ grievances, alerts, events });
+    const engine = buildEngine({ grievances, alerts, events }, ctx);
     const result = engine.escalateOverdueGrievances({ currentTimestamp: isoTimestamp });
     const state = engine.exportState();
     await Promise.all([
@@ -676,26 +692,26 @@ export class PdsDataContract extends Contract {
 
   async GetLotHistory(ctx: Context, payloadJson: string): Promise<string> {
     const { lotId } = JSON.parse(payloadJson) as { lotId: string };
-    const events = await queryState<LedgerEvent>(ctx, {
+    const proofs = await queryState<StoredLedgerProof>(ctx, {
       selector: {
-        docType: 'event',
-        entityType: 'lot',
-        entityId: lotId
+        docType: 'proof',
+        'proof.entityType': 'lot',
+        'proof.entityId': lotId
       }
     });
-    return JSON.stringify(events);
+    return JSON.stringify(proofs.map(proofAsLedgerEvent));
   }
 
   async GetDistributionHistory(ctx: Context, payloadJson: string): Promise<string> {
     const { distributionId } = JSON.parse(payloadJson) as { distributionId: string };
-    const events = await queryState<LedgerEvent>(ctx, {
+    const proofs = await queryState<StoredLedgerProof>(ctx, {
       selector: {
-        docType: 'event',
-        entityType: 'distribution',
-        entityId: distributionId
+        docType: 'proof',
+        'proof.entityType': 'distribution',
+        'proof.entityId': distributionId
       }
     });
-    return JSON.stringify(events);
+    return JSON.stringify(proofs.map(proofAsLedgerEvent));
   }
 
   async GetCurrentStock(ctx: Context): Promise<string> {
@@ -706,13 +722,13 @@ export class PdsDataContract extends Contract {
   async VerifyDatabaseHash(ctx: Context, payloadJson: string): Promise<string> {
     const { digest } = JSON.parse(payloadJson) as { digest: string };
     const events = await loadCollection<LedgerEvent>(ctx, 'events');
-    return JSON.stringify(buildEngine({ events }).verifyDatabaseHash({ digest }));
+    return JSON.stringify(buildEngine({ events }, ctx).verifyDatabaseHash({ digest }));
   }
 
   async CheckDuplicateClaim(ctx: Context, payloadJson: string): Promise<string> {
     const payload = JSON.parse(payloadJson) as { rationCardHash: string; commodity: string; month: string; requestedQtyKg: number };
     const entitlements = await loadCollection<MonthlyEntitlement>(ctx, 'entitlements');
-    return JSON.stringify(buildEngine({ entitlements }).checkDuplicateClaim(payload));
+    return JSON.stringify(buildEngine({ entitlements }, ctx).checkDuplicateClaim(payload));
   }
 
   async GetDistributionsByFPS(ctx: Context, payloadJson: string): Promise<string> {
