@@ -2,7 +2,6 @@ import { useState } from 'react';
 import type { DemoRole } from '@/demo-model.js';
 import { roleProfiles, screenDefinitions, getRoleScreens } from '@/demo-model.js';
 import { RuntimeCard } from '@/components/RuntimeCard';
-import { DevAuthTokenDialog } from '@/components/DevAuthTokenDialog';
 import { Panel } from '@/components/Panel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,6 +20,8 @@ type LoginPageProps = {
   onRoleChange: (role: DemoRole) => void;
   onSignIn: () => void;
   adminHref: string;
+  offlineMode: boolean;
+  onOidcSignIn: () => void;
 };
 
 export function LoginPage({
@@ -31,7 +32,9 @@ export function LoginPage({
   onOperatorNameChange,
   onRoleChange,
   onSignIn,
-  adminHref
+  adminHref,
+  offlineMode,
+  onOidcSignIn
 }: LoginPageProps) {
   const [localName, setLocalName] = useState(operatorName);
   const fabricOnline = apiOnline && ledgerMode === 'fabric';
@@ -43,31 +46,30 @@ export function LoginPage({
           <p className="eyebrow">ViksitPDS</p>
           <h1 className="text-3xl font-semibold tracking-tight">Sign in</h1>
           <p className="mt-2 leading-relaxed text-muted-foreground">
-            Choose a demo role to open the screens relevant to your job.
+            {offlineMode ? 'Choose an offline fixture persona.' : 'Continue through the ViksitPDS identity service.'}
           </p>
         </div>
         <RuntimeCard
           apiOnline={apiOnline}
           title="Runtime"
           onlineLabel={fabricOnline ? 'Fabric Backend reachable' : 'Backend reachable'}
-          offlineLabel="Offline demo mode"
+          offlineLabel={offlineMode ? 'Offline fixture mode' : 'API or IAM unavailable'}
           onlineDetail={
             fabricOnline
               ? 'Live Fabric ledger data will populate the workspace after sign in.'
               : 'Live API data will populate the workspace after sign in.'
           }
-          offlineDetail="Seeded data will be used after sign in."
+          offlineDetail={offlineMode ? 'Seeded fixture data will be used.' : 'Online mode never falls back silently to fixture data.'}
         />
       </section>
 
-      {fabricOnline ? <DevAuthTokenDialog ledgerMode="fabric" apiOnline /> : null}
-
       <Panel
         eyebrow="Operator"
-        title="Choose a role to continue"
-        pill={roleProfiles[role].title}
+        title={offlineMode ? 'Choose a role to continue' : 'OIDC Authorization Code + PKCE'}
+        pill={offlineMode ? roleProfiles[role].title : 'Keycloak'}
         className="p-6"
       >
+        {offlineMode ? <>
         <div className="mb-4 grid gap-3 md:grid-cols-2">
           <div className="grid gap-2">
             <Label htmlFor="operator-name">Operator name</Label>
@@ -123,6 +125,12 @@ export function LoginPage({
             <a href={adminHref}>Open admin console</a>
           </Button>
         </div>
+        </> : <div className="grid gap-4">
+          <p className="text-sm text-muted-foreground">
+            Your application role and allowed navigation are derived from the signed access token. Tokens are kept only in browser session storage.
+          </p>
+          <Button type="button" disabled={!apiOnline} onClick={onOidcSignIn}>Sign in with Keycloak</Button>
+        </div>}
       </Panel>
     </main>
   );

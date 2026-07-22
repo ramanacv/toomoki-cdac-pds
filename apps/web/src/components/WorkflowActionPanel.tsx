@@ -12,7 +12,7 @@ import {
   type TransferOrder
 } from '@pds/shared-types';
 import { executeWorkflowAction, type LedgerMode } from '@/api.js';
-import { hasSavedDevAuthToken } from '@/auth-token.js';
+import { hasAccessToken } from '@/auth-token.js';
 import type { DemoRole } from '@/demo-model.js';
 import {
   applyMockWorkflowAction,
@@ -35,6 +35,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DefinitionList } from '@/components/Entity';
 import { formatDateTime, roleTitle } from '@/lib/constants';
+import { ProofStatusBadges } from '@/components/ProofStatusBadges.js';
 
 const extractLedgerTxId = (result: unknown): string | undefined => {
   if (typeof result === 'object' && result && 'ledgerTxId' in result) {
@@ -157,7 +158,6 @@ const nonBlockedCount = (actions: WorkflowActionSpec[]): number =>
 
 export function WorkflowActionPanel({
   apiOnline,
-  ledgerMode,
   role,
   lots,
   transfers,
@@ -175,6 +175,7 @@ export function WorkflowActionPanel({
   const [quantityInputs, setQuantityInputs] = useState<Record<string, string>>({});
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [proofEventId, setProofEventId] = useState<string | null>(null);
   const [completedActionId, setCompletedActionId] = useState<string | null>(null);
   const [commodityFilter, setCommodityFilter] = useState<CommodityName | 'ALL'>('ALL');
 
@@ -225,6 +226,7 @@ export function WorkflowActionPanel({
     setMessage(null);
     setError(null);
     setCompletedActionId(null);
+    setProofEventId(null);
     setQuantityInputs({});
   }, [role, commodityFilter]);
 
@@ -250,10 +252,8 @@ export function WorkflowActionPanel({
       request = editable.apply(qtyKg);
     }
 
-    if (apiOnline && ledgerMode === 'fabric' && !hasSavedDevAuthToken()) {
-      setError(
-        'Fabric mode requires a saved API bearer token. Enter dev-mvp-token in the banner at the top and click Save token.'
-      );
+    if (apiOnline && !hasAccessToken()) {
+      setError('Your identity session is missing or expired. Sign in again.');
       return;
     }
 
@@ -271,6 +271,7 @@ export function WorkflowActionPanel({
           setError('Duplicate claim was not blocked. Check entitlement rules.');
         } else {
           const ledgerTxId = extractLedgerTxId(result);
+          setProofEventId(ledgerTxId ?? null);
           setMessage(successMessage(action, ledgerTxId, true));
         }
         setCompletedActionId(action.id);
@@ -477,6 +478,7 @@ export function WorkflowActionPanel({
           <AlertDescription>{message}</AlertDescription>
         </Alert>
       )}
+      {message && proofEventId ? <ProofStatusBadges eventId={proofEventId} /> : null}
       {error && (
         <Alert variant="destructive" className="mt-4">
           <AlertTitle>Issue</AlertTitle>

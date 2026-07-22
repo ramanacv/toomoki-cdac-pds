@@ -53,10 +53,13 @@ services:
       PDS_FABRIC_CHANNEL: ${PDS_FABRIC_CHANNEL:-pdschannel}
       PDS_FABRIC_CHAINCODE: ${PDS_FABRIC_CHAINCODE:-pds-chaincode}
       PDS_FABRIC_ENDORSING_ORGS: ${PDS_FABRIC_ENDORSING_ORGS:-}
-      PDS_DEV_AUTH_TOKEN: ${PDS_DEV_AUTH_TOKEN:-}
-      PDS_DEV_AUTH_ROLE: ${PDS_DEV_AUTH_ROLE:-department}
-      PDS_DEV_AUTH_SUBJECT: ${PDS_DEV_AUTH_SUBJECT:-fabric-smoke}
-      PDS_ADMIN_TOKEN: ${PDS_ADMIN_TOKEN:-}
+      PDS_AUTH_MODE: oidc
+      PDS_OIDC_ISSUER: ${PDS_OIDC_ISSUER:-http://localhost:8080/realms/viksitpds}
+      PDS_OIDC_AUDIENCE: pds-api
+      PDS_OIDC_JWKS_URI: ${PDS_OIDC_JWKS_URI:-http://keycloak:8080/realms/viksitpds/protocol/openid-connect/certs}
+      PDS_OIDC_CLOCK_SKEW_SECONDS: ${PDS_OIDC_CLOCK_SKEW_SECONDS:-30}
+      PDS_CORS_ORIGINS: ${PDS_CORS_ORIGINS:-http://localhost:4173}
+      PDS_ALLOW_RESET: ${PDS_ALLOW_RESET:-false}
     ports:
       - '3000:3000'
     depends_on:
@@ -72,6 +75,10 @@ services:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
+      args:
+        VITE_DATA_SOURCE: api
+        VITE_OIDC_AUTHORITY: ${VITE_OIDC_AUTHORITY:-http://localhost:8080/realms/viksitpds}
+        VITE_OIDC_CLIENT_ID: pds-web
     environment:
       VITE_API_PROXY_TARGET: http://api:3000
     ports:
@@ -79,6 +86,29 @@ services:
     depends_on:
       api:
         condition: service_healthy
+
+  keycloak:
+    profiles: [iam]
+    image: quay.io/keycloak/keycloak:26.7.0
+    command: ['start-dev', '--import-realm']
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME:-}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD:-}
+      KC_HEALTH_ENABLED: 'true'
+      KC_METRICS_ENABLED: 'true'
+      KC_HOSTNAME_STRICT: 'false'
+    ports:
+      - '8080:8080'
+      - '9000:9000'
+    healthcheck:
+      test: ['CMD-SHELL', "exec 3<>/dev/tcp/127.0.0.1/9000; printf 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3; grep -q '200 OK' <&3"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    volumes:
+      - keycloak_data:/opt/keycloak/data
+      - ./infra/keycloak/viksitpds-realm.json:/opt/keycloak/data/import/viksitpds-realm.json:ro
 
   orderer.pds.example.com:
     profiles: [fabric]
@@ -124,6 +154,7 @@ services:
 
 volumes:
   postgres_data:
+  keycloak_data:
 
 networks:
   default:

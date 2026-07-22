@@ -2,10 +2,11 @@ import { Plane } from '../../infrastructure/plane.decorator.js';
 import { Body, Controller, Get, Inject, Param, Post } from '@nestjs/common';
 import { PdsLedgerFacade } from '../core/pds-ledger.facade.js';
 import { DispatchDto, TransferAuthorizeDto, TransferReceiveDto } from './dto/transfer.dto.js';
-import { Roles } from '../auth/roles.decorator.js';
+import { OPERATIONAL_ROLES, Roles } from '../auth/roles.decorator.js';
 
 @Plane('data')
 @Controller()
+@Roles(...OPERATIONAL_ROLES)
 export class TransfersController {
   constructor(@Inject(PdsLedgerFacade) private readonly ledger: PdsLedgerFacade) {}
 
@@ -25,13 +26,13 @@ export class TransfersController {
   }
 
   @Post('/transfers')
-  @Roles('procurement', 'godown')
+  @Roles('procurement', 'fci', 'godown')
   dispatch(@Body() body: DispatchDto) {
     return this.ledger.dispatchLotPersisted(body);
   }
 
   @Post('/transfers/:transferId/receive')
-  @Roles('godown', 'fps')
+  @Roles('fci', 'godown')
   receive(@Param('transferId') transferId: string, @Body() body: TransferReceiveDto) {
     return this.ledger.receiveLotPersisted({ transferId, receivedQtyKg: body.receivedQtyKg });
   }

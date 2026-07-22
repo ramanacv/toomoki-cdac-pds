@@ -1,7 +1,11 @@
 import { createHash } from 'node:crypto';
 import type { LedgerEvent, LedgerProof } from '@pds/shared-types';
 
-const prohibitedKeys = /^(aadhaar|mobile|phone|otp|biometric|rationcard(number|value)?)$/i;
+const isProhibitedKey = (key: string): boolean => {
+  const normalized = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (['aadhaar', 'mobile', 'phone', 'otp', 'biometric'].some((term) => normalized.includes(term))) return true;
+  return normalized.includes('rationcard') && !/(hash|refhash|digest)$/.test(normalized);
+};
 
 export const canonicalJson = (value: unknown): string => {
   if (value === null || typeof value !== 'object') return JSON.stringify(value);
@@ -20,7 +24,7 @@ const assertProofSafe = (value: unknown, path = 'proofPayload'): void => {
     return;
   }
   for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
-    if (prohibitedKeys.test(key)) throw new Error(`${path}.${key} contains prohibited personal data`);
+    if (isProhibitedKey(key)) throw new Error(`${path}.${key} contains prohibited personal data`);
     assertProofSafe(item, `${path}.${key}`);
   }
 };

@@ -26,6 +26,7 @@ describe('LotsModule', () => {
     });
 
     expect(created.lotId).toBe('LOT-TEST-001');
+    expect((created as typeof created & { ledgerTxId: string }).ledgerTxId).toMatch(/^TX-/);
     expect(controller.lots().length).toBe(initialCount + 1);
     expect(controller.lot('LOT-TEST-001').commodity).toBe('Wheat');
     expect(controller.lotHistory('LOT-TEST-001').length).toBeGreaterThan(0);

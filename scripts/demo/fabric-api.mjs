@@ -33,16 +33,14 @@ export const createFabricClient = ({ apiBase, token }) => {
 
 export const runHappyPathFabric = async ({ apiBase, token }) => {
   if (!token) {
-    throw new Error('Fabric demo requires PDS_DEV_AUTH_TOKEN or --token=');
+    throw new Error('Fabric demo requires an OIDC service access token');
   }
 
   const { request } = createFabricClient({ apiBase, token });
   const prefix = `FAB-HAPPY-${Date.now()}`;
 
   const health = await request('/health');
-  if (health.ledgerMode !== 'fabric') {
-    throw new Error(`Expected ledgerMode=fabric, got ${health.ledgerMode ?? 'unknown'}`);
-  }
+  if (!health.ok) throw new Error('API health check failed');
 
   const allocation = await request('/fps-allocations', {
     method: 'POST',
@@ -105,16 +103,14 @@ export const runHappyPathFabric = async ({ apiBase, token }) => {
 
 export const runExceptionPathFabric = async ({ apiBase, token }) => {
   if (!token) {
-    throw new Error('Fabric demo requires PDS_DEV_AUTH_TOKEN or --token=');
+    throw new Error('Fabric demo requires an OIDC service access token');
   }
 
   const { request } = createFabricClient({ apiBase, token });
   const prefix = `FAB-EXC-${Date.now()}`;
 
   const health = await request('/health');
-  if (health.ledgerMode !== 'fabric') {
-    throw new Error(`Expected ledgerMode=fabric, got ${health.ledgerMode ?? 'unknown'}`);
-  }
+  if (!health.ok) throw new Error('API health check failed');
 
   await request('/transfers', {
     method: 'POST',

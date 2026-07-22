@@ -11,6 +11,7 @@ type TopBarProps = {
   operatorName: string;
   role: DemoRole;
   onRoleChange: (role: DemoRole) => void;
+  allowRoleSelection: boolean;
   onLogout: () => void;
   onToggleSidebar: () => void;
 };
@@ -22,6 +23,7 @@ export function TopBar({
   operatorName,
   role,
   onRoleChange,
+  allowRoleSelection,
   onLogout,
   onToggleSidebar
 }: TopBarProps) {
@@ -42,6 +44,7 @@ export function TopBar({
           operatorName={operatorName}
           role={role}
           onRoleChange={onRoleChange}
+          allowRoleSelection={allowRoleSelection}
           onLogout={onLogout}
         />
       </div>

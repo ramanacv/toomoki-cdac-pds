@@ -7,6 +7,10 @@ vi.mock('@/api.js', () => ({
   executeWorkflowAction: vi.fn().mockResolvedValue({ ledgerTxId: 'TX-NEW' })
 }));
 
+vi.mock('@/auth-token.js', () => ({
+  hasAccessToken: vi.fn(() => true)
+}));
+
 import { executeWorkflowAction } from '@/api.js';
 import { demoEntitlements, demoLots } from '@/demo-model.js';
 import { demoQuantities } from '@pds/fixtures';

@@ -1,9 +1,10 @@
 import { Controller, Get, Header, Inject, HttpException, HttpStatus } from '@nestjs/common';
 import { renderLandingPage, renderSwaggerPage } from './api-pages.js';
 import { PdsLedgerFacade } from '../core/pds-ledger.facade.js';
-import { resolveLedgerMode } from '../config/ledger-mode.config.js';
+import { Public } from '../auth/public.decorator.js';
 
 @Controller()
+@Public()
 export class HealthController {
   constructor(@Inject(PdsLedgerFacade) private readonly ledger: PdsLedgerFacade) {}
 
@@ -40,18 +41,12 @@ export class HealthController {
         HttpStatus.SERVICE_UNAVAILABLE
       );
     }
-    return {
-      ok: true,
-      timestamp: new Date().toISOString(),
-      stakeholders: stakeholderCount,
-      lots: snapshot.lots.length,
-      distributions: snapshot.distributions.length
-    };
+    return { ok: true };
   }
 
   /** Legacy endpoint — kept for backward compat with existing probes. */
   @Get('/health')
   health() {
-    return { ok: true, ledgerMode: resolveLedgerMode() };
+    return { ok: true };
   }
 }

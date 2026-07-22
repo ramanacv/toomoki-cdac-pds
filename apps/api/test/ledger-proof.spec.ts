@@ -17,4 +17,21 @@ describe('LedgerProof', () => {
   it('rejects sensitive fields at any depth', () => {
     expect(() => ledgerProofFromEvent({ ledgerTxId: 'evt-1', entityType: 'auth', entityId: 'auth-1', eventType: 'AuthTransaction', payload: { evidence: { otp: '1234' } }, timestamp: '2026-01-01T00:00:00.000Z' }, actor)).toThrow(/prohibited personal data/);
   });
+
+  it.each(['aadhaarNumber', 'customer_aadhaar', 'phoneNumber', 'mobileNo', 'otpValue', 'biometricPayload', 'ration_card_value']) (
+    'rejects normalized sensitive alias %s',
+    (key) => {
+      expect(() => ledgerProofFromEvent({
+        ledgerTxId: 'evt-alias', entityType: 'auth', entityId: 'auth-1', eventType: 'AuthTransaction',
+        payload: { nested: { [key]: 'prohibited' } }, timestamp: '2026-01-01T00:00:00.000Z'
+      }, actor)).toThrow(/prohibited personal data/);
+    }
+  );
+
+  it('allows approved opaque ration-card hashes', () => {
+    expect(() => ledgerProofFromEvent({
+      ledgerTxId: 'evt-hash', entityType: 'distribution', entityId: 'distribution-1', eventType: 'Distribution',
+      payload: { rationCardHash: 'opaque-hash' }, timestamp: '2026-01-01T00:00:00.000Z'
+    }, actor)).not.toThrow();
+  });
 });

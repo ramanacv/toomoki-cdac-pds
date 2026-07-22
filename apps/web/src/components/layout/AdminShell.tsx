@@ -4,15 +4,15 @@ import { adminRouteToScreen, adminScreenDefinitions } from '@/lib/admin-model.js
 import type { LedgerMode } from '@/api.js';
 import { AdminSidebar } from '@/components/layout/AdminSidebar';
 import { AdminTopBar } from '@/components/layout/AdminTopBar';
-import { DevAuthTokenDialog } from '@/components/DevAuthTokenDialog';
 
 type AdminShellProps = {
   apiOnline: boolean;
   ledgerMode: LedgerMode | null;
   children: ReactNode;
+  onLogout: () => void;
 };
 
-export function AdminShell({ apiOnline, ledgerMode, children }: AdminShellProps) {
+export function AdminShell({ apiOnline, ledgerMode, onLogout, children }: AdminShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { pathname } = useLocation();
 
@@ -50,9 +50,9 @@ export function AdminShell({ apiOnline, ledgerMode, children }: AdminShellProps)
           screenLabel={screenLabel}
           apiOnline={apiOnline}
           ledgerMode={ledgerMode}
+          onLogout={onLogout}
           onToggleSidebar={() => setSidebarOpen((open) => !open)}
         />
-        <DevAuthTokenDialog ledgerMode={ledgerMode} apiOnline={apiOnline} />
         <main id="admin-main" className="mx-auto w-full max-w-[1100px] flex-1 px-4 py-6 md:px-8">
           {children}
         </main>

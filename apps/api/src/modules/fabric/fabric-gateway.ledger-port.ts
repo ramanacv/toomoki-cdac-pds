@@ -6,6 +6,7 @@ import type { PgPoolSnapshotAdapter } from '../../infrastructure/postgres-adapte
 import { PostgresPdsLedgerPort } from '../../infrastructure/postgres-ledger-port.js';
 import type { FabricRuntimeConfig } from '../config/fabric.config.js';
 import { FabricGatewayClient } from './fabric-gateway.client.js';
+import { recordFabricSubmissionMetric, recordProofRetryMetric } from '../metrics/metrics-hooks.js';
 
 /** Default age after which a SUBMITTING claim is treated as orphaned (API crash/restart). */
 export const DEFAULT_OUTBOX_STALE_SUBMITTING_MS = 60_000;
@@ -153,20 +154,25 @@ export class FabricGatewayLedgerPort implements PdsLedgerPort, ChainQueryPort {
          )
          UPDATE ledger_outbox o SET status = 'SUBMITTING', submitting_at = NOW(), updated_at = NOW()
          FROM ready WHERE o.outbox_id = ready.outbox_id
-         RETURNING o.outbox_id, o.event_payload`
+         RETURNING o.outbox_id, o.event_payload, o.retry_count`
       );
 
       for (const row of pendingResult.rows) {
         const outboxId = row.outbox_id;
         const event = row.event_payload as LedgerEvent;
+        const submissionStarted = process.hrtime.bigint();
 
         try {
           const submission = await this.gatewayClient.submitLedgerEventAsync(event);
+          recordFabricSubmissionMetric(Number(process.hrtime.bigint() - submissionStarted) / 1_000_000_000, 'success');
           await this.adapter!.query!(
             "UPDATE ledger_outbox SET status = 'COMMITTED', fabric_tx_id = $1, committed_at = NOW(), updated_at = NOW() WHERE outbox_id = $2",
             [submission.txId, outboxId]
           );
         } catch (error: unknown) {
+          recordFabricSubmissionMetric(Number(process.hrtime.bigint() - submissionStarted) / 1_000_000_000, 'failure');
+          const deadLettered = Number((row as { retry_count?: unknown }).retry_count ?? 0) + 1 >= 5;
+          recordProofRetryMetric(deadLettered);
           console.error(`Fabric outbox worker failed to process event ${event.ledgerTxId}:`, error);
           await this.adapter!.query!(
             `UPDATE ledger_outbox SET

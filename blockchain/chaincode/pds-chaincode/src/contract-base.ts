@@ -179,8 +179,14 @@ export const emptyState = (): PdsLedgerState => ({
   seriesId: 'POC'
 });
 
-export const buildEngine = (partial: Partial<PdsLedgerState>): PdsLedgerEngine => {
-  const engine = new PdsLedgerEngine(false);
+export const buildEngine = (partial: Partial<PdsLedgerState>, ctx?: Context): PdsLedgerEngine => {
+  let sequence = 0;
+  const transactionId = ctx?.stub.getTxID();
+  const transactionTimestamp = ctx ? getTxTimestamp(ctx) : undefined;
+  const engine = new PdsLedgerEngine(false, ctx ? {
+    timestamp: () => transactionTimestamp!,
+    identifier: () => `${transactionId}-${sequence++}`
+  } : {});
   engine.restoreState({ ...emptyState(), ...partial });
   return engine;
 };

@@ -12,6 +12,7 @@ import type {
   TransferOrder
 } from '@pds/shared-types';
 import { fetchApiHealth, loadWorkspaceData, type LedgerMode, type StockPosition } from '@/api.js';
+import { getDataSourceMode } from '@/data-source.js';
 import type { DemoScenario } from '@/demo-model.js';
 import {
   demoAllocations,
@@ -41,6 +42,7 @@ export type WorkspaceState = {
   apiOnline: boolean;
   ledgerMode: LedgerMode | null;
   loading: boolean;
+  error: string | null;
   refresh: () => Promise<void>;
   applyMockResult: (result: {
     context: {
@@ -56,7 +58,7 @@ export type WorkspaceState = {
   }) => void;
 };
 
-export function useWorkspace(scenario: DemoScenario): WorkspaceState {
+export function useWorkspace(scenario: DemoScenario, enabled = true): WorkspaceState {
   const [summary, setSummary] = useState<DashboardSummary>(demoSummaryFallback);
   const [stakeholders, setStakeholders] = useState<Stakeholder[]>(demoStakeholders);
   const [lots, setLots] = useState<CommodityLot[]>(demoLots);
@@ -71,27 +73,40 @@ export function useWorkspace(scenario: DemoScenario): WorkspaceState {
   const [apiOnline, setApiOnline] = useState(false);
   const [ledgerMode, setLedgerMode] = useState<LedgerMode | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
-    const health = await fetchApiHealth();
-    setApiOnline(health.ok);
-    setLedgerMode(health.ok ? (health.ledgerMode ?? null) : null);
+    setError(null);
+    const offlineFixtures = getDataSourceMode() === 'mock';
+    const health = offlineFixtures ? { ok: false } : await fetchApiHealth();
+    setApiOnline(!offlineFixtures && health.ok);
+    setLedgerMode(null);
 
-    const workspace = await loadWorkspaceData(scenario);
-    setSummary(workspace.summary);
-    setStakeholders(workspace.stakeholders);
-    setLots(workspace.lots);
-    setTransfers(workspace.transfers);
-    setAllocations(workspace.allocations);
-    setAuthTransactions(workspace.authTransactions);
-    setEntitlements(workspace.entitlements);
-    setDistributions(workspace.distributions);
-    setAlerts(workspace.alerts);
-    setLedgerEvents(workspace.ledgerEvents ?? []);
-    setStockPositions(workspace.stockPositions ?? []);
-    setLoading(false);
-  }, [scenario]);
+    if (!enabled) {
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const workspace = await loadWorkspaceData(scenario);
+      setSummary(workspace.summary);
+      setStakeholders(workspace.stakeholders);
+      setLots(workspace.lots);
+      setTransfers(workspace.transfers);
+      setAllocations(workspace.allocations);
+      setAuthTransactions(workspace.authTransactions);
+      setEntitlements(workspace.entitlements);
+      setDistributions(workspace.distributions);
+      setAlerts(workspace.alerts);
+      setLedgerEvents(workspace.ledgerEvents ?? []);
+      setStockPositions(workspace.stockPositions ?? []);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'The API request failed.');
+    } finally {
+      setLoading(false);
+    }
+  }, [enabled, scenario]);
 
   useEffect(() => {
     void refresh();
@@ -123,6 +138,7 @@ export function useWorkspace(scenario: DemoScenario): WorkspaceState {
     apiOnline,
     ledgerMode,
     loading,
+    error,
     refresh,
     applyMockResult
   };

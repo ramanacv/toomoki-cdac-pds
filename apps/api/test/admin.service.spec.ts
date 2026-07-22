@@ -52,8 +52,8 @@ describe('AdminService', () => {
     service = moduleRef.get(AdminService);
   });
 
-  it('returns a unified admin overview payload', () => {
-    const overview = service.getOverview();
+  it('returns a unified admin overview payload', async () => {
+    const overview = await service.getOverview();
 
     expect(overview.readOnly).toBe(true);
     expect(overview.dashboard.activeLots).toBeGreaterThan(0);
@@ -67,10 +67,10 @@ describe('AdminService', () => {
     expect(overview.entitlementSummary.utilizationPct).toBeGreaterThanOrEqual(0);
   });
 
-  it('returns network, activity, and stakeholder summaries', () => {
-    const network = service.getNetwork();
-    const activity = service.getActivity();
-    const stakeholders = service.getStakeholderSummary();
+  it('returns network, activity, and stakeholder summaries', async () => {
+    const network = await service.getNetwork();
+    const activity = await service.getActivity();
+    const stakeholders = await service.getStakeholderSummary();
 
     expect(network.persistenceBackend).toBeDefined();
     expect(activity.recentEvents.length).toBeGreaterThan(0);
@@ -80,7 +80,7 @@ describe('AdminService', () => {
   });
 
   it('resets transactional data while leaving stakeholders intact', async () => {
-    const before = service.getOverview();
+    const before = await service.getOverview();
     expect(before.metrics.lots).toBeGreaterThan(0);
     expect(before.stock.length).toBeGreaterThan(0);
 
@@ -90,7 +90,7 @@ describe('AdminService', () => {
     expect(result.lots).toHaveLength(6);
     expect(result.lots.every((lot) => lot.lotId.includes(result.seriesId))).toBe(true);
 
-    const after = service.getOverview();
+    const after = await service.getOverview();
     // The demo's starting lots are recreated by the reset so the frontend's
     // scripted rice workflow can be replayed while the commodity catalog remains visible.
     expect(after.metrics.lots).toBe(6);
@@ -103,7 +103,7 @@ describe('AdminService', () => {
   });
 
   it('scopes a reset to one commodity, leaving the others in place', async () => {
-    const before = service.getOverview();
+    const before = await service.getOverview();
     const wheatStockBefore = before.stock.find((position) => position.commodity === 'Wheat');
     expect(wheatStockBefore?.quantityKg).toBeGreaterThan(0);
 
@@ -114,7 +114,7 @@ describe('AdminService', () => {
     expect(result.lots[0]?.commodity).toBe('Rice');
     expect(result.message).toContain('Rice');
 
-    const after = service.getOverview();
+    const after = await service.getOverview();
     expect(after.metrics.lots).toBe(before.metrics.lots);
     expect(after.stock.map((position) => position.commodity)).toEqual(
       expect.arrayContaining(['Rice', 'Wheat', 'Dal', 'Sugar', 'Cooking Oil', 'Kerosene'])

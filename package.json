@@ -1,5 +1,6 @@
 {
   "name": "pds-chain",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "workspaces": [
@@ -22,7 +23,10 @@
     "seed": "node scripts/seed.mjs",
     "reset": "node scripts/reset.mjs",
     "test": "npm run test --workspaces --if-present",
-    "test:demo-http": "npm run test --workspace=@pds/api -- --run test/e2e/demo-api.e2e.spec.ts",
+    "test:demo-http": "npm run test:http --workspace=@pds/api",
+    "iam:bootstrap": "scripts/iam/bootstrap-keycloak.sh",
+    "benchmark:competition": "node scripts/benchmark-competition.mjs",
+    "security:evidence": "scripts/generate-security-evidence.sh",
     "typecheck": "npm run typecheck --workspaces --if-present"
   },
   "devDependencies": {
@@ -34,5 +38,8 @@
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.36.0",
     "vitest": "^3.2.4"
+  },
+  "overrides": {
+    "esbuild": "0.28.1"
   }
 }

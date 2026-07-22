@@ -3,7 +3,7 @@
 - PostgreSQL is the operational source of truth. Fabric proof completion is eventually consistent and does not roll back a valid operation.
 - The deployed Fabric network has two organizations and simulates governance; it is not the final consortium.
 - Application roles are enforced by the API. Some logical roles submit proofs through the department Fabric identity in this cycle.
-- Static development tokens and generated crypto are permitted only in local/demo environments.
+- Online demo and Fabric modes use Keycloak OIDC. A static identity adapter is permitted only inside automated tests; generated Fabric crypto remains local-demo material.
 - Quantities are positive integer kilograms. Unit conversion and calibrated weighbridge integration are deferred.
 - Existing local transactional data is reset and deterministically reseeded; it is not migrated.
 - The demo assumes one district and modest transaction volume.

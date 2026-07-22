@@ -5,15 +5,24 @@ import { demoQuantities } from '@pds/fixtures';
 
 const fabricE2eEnabled = process.env.PDS_E2E_FABRIC === 'true';
 const API_BASE = process.env.API_BASE ?? 'http://127.0.0.1:3000';
-const AUTH_TOKEN = process.env.PDS_DEV_AUTH_TOKEN ?? process.env.SMOKE_AUTH_TOKEN ?? '';
-const ADMIN_TOKEN = process.env.PDS_ADMIN_TOKEN ?? 'admin-mvp-token';
+let authToken = process.env.PDS_E2E_ACCESS_TOKEN ?? '';
 
-const roleToken = (role: string): string => (AUTH_TOKEN ? `${AUTH_TOKEN}:${role}` : '');
+const acquireToken = async (): Promise<string> => {
+  if (authToken) return authToken;
+  const secret = process.env.PDS_BENCHMARK_CLIENT_SECRET;
+  if (!secret) throw new Error('Set PDS_BENCHMARK_CLIENT_SECRET for live Fabric e2e');
+  const response = await fetch(process.env.PDS_OIDC_TOKEN_URL ?? 'http://127.0.0.1:8080/realms/viksitpds/protocol/openid-connect/token', {
+    method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ grant_type: 'client_credentials', client_id: 'pds-benchmark', client_secret: secret })
+  });
+  const body = await response.json() as { access_token?: string };
+  if (!response.ok || !body.access_token) throw new Error(`OIDC token request failed: ${response.status}`);
+  return body.access_token;
+};
 
-const authed = (role?: string) => {
-  const token = role ? roleToken(role) : AUTH_TOKEN;
+const authed = (_role?: string) => {
   const withAuth = <T extends { set: (k: string, v: string) => T }>(req: T): T =>
-    token ? req.set('Authorization', `Bearer ${token}`) : req;
+    authToken ? req.set('Authorization', `Bearer ${authToken}`) : req;
   return {
     get: (path: string) => withAuth(request(API_BASE).get(path)),
     post: (path: string) => withAuth(request(API_BASE).post(path))
@@ -26,25 +35,27 @@ const expectSuccess = (status: number): void => {
 
 describe.skipIf(!fabricE2eEnabled)('Fabric API e2e', () => {
   beforeAll(async () => {
+    authToken = await acquireToken();
     // Restore fixture lots/stock so transfer + allocation paths are deterministic
     // after prior live-lifecycle runs.
     await request(API_BASE)
       .post('/admin/reset')
-      .set('X-Admin-Token', ADMIN_TOKEN)
+      .set('Authorization', `Bearer ${authToken}`)
       .send({})
       .expect((response) => {
         expect([200, 201]).toContain(response.status);
       });
   });
 
-  it('requires PDS_DEV_AUTH_TOKEN when hitting a live fabric stack', () => {
-    expect(AUTH_TOKEN.length).toBeGreaterThan(0);
+  it('requires a short-lived Keycloak service token when hitting a live fabric stack', () => {
+    expect(authToken.length).toBeGreaterThan(0);
   });
 
-  it('serves health with fabric ledger mode', async () => {
+  it('serves minimal health and authenticated Fabric network state', async () => {
     const health = await request(API_BASE).get('/health').expect(200);
-    expect(health.body.ok).toBe(true);
-    expect(health.body.ledgerMode).toBe('fabric');
+    expect(health.body).toEqual({ ok: true });
+    const network = await authed('platform-admin').get('/admin/network').expect(200);
+    expect(network.body.ledgerMode).toBe('fabric');
   });
 
   it('runs register → transfer → trace with chaincode verification', async () => {

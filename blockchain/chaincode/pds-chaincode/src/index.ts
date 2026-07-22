@@ -181,8 +181,12 @@ export class PdsLedgerEngine {
   private grievances = new Map<string, Grievance>();
   private entitlementRules = new Map<string, EntitlementRule>();
   private seriesId: string = INITIAL_DEMO_SERIES_ID;
+  private readonly timestamp: () => string;
+  private readonly identifier: () => string;
 
-  constructor(seed = true) {
+  constructor(seed = true, runtime: { timestamp?: () => string; identifier?: () => string } = {}) {
+    this.timestamp = runtime.timestamp ?? makeTimestamp;
+    this.identifier = runtime.identifier ?? randomUUID;
     if (seed) {
       this.seedDemoData();
     }
@@ -407,7 +411,7 @@ export class PdsLedgerEngine {
     seriesId: string;
     lots: CommodityLot[];
   } {
-    const seriesId = generateResetSeriesId(new Date(), randomUUID().slice(0, 4));
+    const seriesId = generateResetSeriesId(new Date(this.timestamp()), this.identifier().slice(0, 12));
     this.seriesId = seriesId;
     const seedLots = this.buildSeriesSeedLots(seriesId, commodity);
     const affectedEntityIds = this.applyTransactionalReset(commodity);
@@ -419,7 +423,7 @@ export class PdsLedgerEngine {
     }
 
     const { ledgerTxId } = this.recordEvent('workflow', 'ledger', 'ResetTransactionalData', {
-      resetAt: makeTimestamp(),
+      resetAt: this.timestamp(),
       seriesId,
       lots: seedLots,
       ...(commodity ? { commodity } : {})
@@ -469,7 +473,7 @@ export class PdsLedgerEngine {
     const lot: CommodityLot = {
       ...input,
       status: LotStatus.CREATED,
-      createdAt: input.createdAt ?? makeTimestamp()
+      createdAt: input.createdAt ?? this.timestamp()
     };
     this.lots.set(lot.lotId, lot);
     // Open the stock position for the originating owner so getCurrentStock is correct
@@ -546,7 +550,7 @@ export class PdsLedgerEngine {
       dispatchedQtyKg: input.dispatchedQtyKg,
       vehicleNo: input.vehicleNo,
       status: TransferStatus.DISPATCHED,
-      dispatchTimestamp: input.dispatchTimestamp ?? makeTimestamp(),
+      dispatchTimestamp: input.dispatchTimestamp ?? this.timestamp(),
       ...(input.stage ? { stage: input.stage } : {}),
       ...(input.roRef ? { roRef: input.roRef } : {}),
       ...(input.authorizedBy || priorAuthorization?.payload?.authorizedBy
@@ -579,7 +583,7 @@ export class PdsLedgerEngine {
     remarks?: string;
   }): { transferId: string; authorizedBy: string; authorizedAt: string; roRef?: string; remarks?: string; ledgerTxId: string } {
     this.assertActiveStakeholder(input.authorizedBy);
-    const authorizedAt = input.authorizedAt ?? makeTimestamp();
+    const authorizedAt = input.authorizedAt ?? this.timestamp();
     const approval = {
       transferId: input.transferId,
       authorizedBy: input.authorizedBy,
@@ -625,7 +629,7 @@ export class PdsLedgerEngine {
       ...transfer,
       receivedQtyKg: input.receivedQtyKg,
       status,
-      receiveTimestamp: input.receiveTimestamp ?? makeTimestamp()
+      receiveTimestamp: input.receiveTimestamp ?? this.timestamp()
     };
     if (shortageQtyKg > 0) {
       updated.shortageQtyKg = shortageQtyKg;
@@ -764,12 +768,12 @@ export class PdsLedgerEngine {
           ...input,
           authTxnRefHash,
           approvedBy: input.approvedBy,
-          timestamp: makeTimestamp()
+          timestamp: this.timestamp()
         }
       : {
           ...input,
           authTxnRefHash,
-          timestamp: makeTimestamp()
+          timestamp: this.timestamp()
         };
     this.authTransactions.set(input.authTxnId, authTransaction);
     this.recordEvent('auth', input.authTxnId, 'AuthTransaction', authTransaction);
@@ -842,7 +846,7 @@ export class PdsLedgerEngine {
     }
     // Derive the entitlement month from the distribution timestamp instead of a
     // hardcoded value so the engine is date-correct across months.
-    const effectiveTimestamp = input.timestamp ?? makeTimestamp();
+    const effectiveTimestamp = input.timestamp ?? this.timestamp();
     const month = monthFromTimestamp(effectiveTimestamp);
     const entitlement = this.mustGetEntitlement(input.rationCardHash, input.commodity, month);
     if (entitlement.availableBalanceKg < input.deliveredKg) {
@@ -909,7 +913,7 @@ export class PdsLedgerEngine {
       rationCardHash: input.rationCardHash,
       cardType: input.cardType,
       assignedFpsId: input.assignedFpsId,
-      issuedAt: input.issuedAt ?? makeTimestamp(),
+      issuedAt: input.issuedAt ?? this.timestamp(),
       status: RationCardStatus.ISSUED,
       transferHistory: []
     };
@@ -940,7 +944,7 @@ export class PdsLedgerEngine {
     const updated: RationCard = {
       ...card,
       status: RationCardStatus.SUSPENDED,
-      suspendedAt: input.suspendedAt ?? makeTimestamp(),
+      suspendedAt: input.suspendedAt ?? this.timestamp(),
       suspendReason: input.suspendReason
     };
     this.rationCards.set(updated.rationCardHash, updated);
@@ -965,7 +969,7 @@ export class PdsLedgerEngine {
       throw new Error(`Ration card ${input.rationCardHash} must be ACTIVE to transfer (current: ${card.status})`);
     }
     this.assertActiveStakeholder(input.toFpsId);
-    const transferEntry = { fromFps: card.assignedFpsId, toFps: input.toFpsId, at: input.transferredAt ?? makeTimestamp(), authorizedBy: input.authorizedBy };
+    const transferEntry = { fromFps: card.assignedFpsId, toFps: input.toFpsId, at: input.transferredAt ?? this.timestamp(), authorizedBy: input.authorizedBy };
     const updated: RationCard = {
       ...card,
       assignedFpsId: input.toFpsId,
@@ -1001,7 +1005,7 @@ export class PdsLedgerEngine {
       throw new Error('Grievance description must not exceed 500 characters');
     }
     validateHashFormat(input.rationCardHash, 'rationCardHash');
-    const filedAt = input.filedAt ?? makeTimestamp();
+    const filedAt = input.filedAt ?? this.timestamp();
     const slaDeadlineAt = new Date(new Date(filedAt).getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
     const grievance: Grievance = {
       grievanceId: input.grievanceId,
@@ -1023,7 +1027,7 @@ export class PdsLedgerEngine {
     if (grievance.status !== GrievanceStatus.OPEN) {
       throw new Error(`Grievance ${input.grievanceId} is not OPEN (current: ${grievance.status})`);
     }
-    const updated: Grievance = { ...grievance, status: GrievanceStatus.ACKNOWLEDGED, acknowledgedAt: input.acknowledgedAt ?? makeTimestamp() };
+    const updated: Grievance = { ...grievance, status: GrievanceStatus.ACKNOWLEDGED, acknowledgedAt: input.acknowledgedAt ?? this.timestamp() };
     this.grievances.set(updated.grievanceId, updated);
     this.recordEvent('grievance', updated.grievanceId, 'AcknowledgeGrievance', updated as unknown as Record<string, unknown>);
     return updated;
@@ -1037,7 +1041,7 @@ export class PdsLedgerEngine {
     const updated: Grievance = {
       ...grievance,
       status: GrievanceStatus.RESOLVED,
-      resolvedAt: input.resolvedAt ?? makeTimestamp(),
+      resolvedAt: input.resolvedAt ?? this.timestamp(),
       resolvedBy: input.resolvedBy,
       resolutionNote: input.resolutionNote
     };
@@ -1047,7 +1051,7 @@ export class PdsLedgerEngine {
   }
 
   escalateOverdueGrievances(input: { currentTimestamp?: string }): { escalated: Grievance[]; alerts: AuditAlert[] } {
-    const now = input.currentTimestamp ?? makeTimestamp();
+    const now = input.currentTimestamp ?? this.timestamp();
     const escalated: Grievance[] = [];
     const newAlerts: AuditAlert[] = [];
     for (const grievance of this.grievances.values()) {
@@ -1350,7 +1354,7 @@ export class PdsLedgerEngine {
     const resolved: AuditAlert = {
       ...alert,
       status: 'RESOLVED',
-      resolvedAt: makeTimestamp(),
+      resolvedAt: this.timestamp(),
       resolvedBy: input.resolvedBy,
       resolutionNote: input.resolutionNote
     };
@@ -1385,14 +1389,14 @@ export class PdsLedgerEngine {
     evidence: Record<string, string | number | boolean>;
   }): AuditAlert {
     const alert: AuditAlert = {
-      alertId: `ALERT-${randomUUID()}`,
+      alertId: `ALERT-${this.identifier()}`,
       alertType: input.alertType,
       entityId: input.entityId,
       riskLevel: input.alertType === AlertType.DB_LEDGER_MISMATCH || input.alertType === AlertType.UNAUTHORIZED_TRANSACTION ? 'HIGH' : 'MEDIUM',
       message: input.message,
       status: 'OPEN',
       evidence: input.evidence,
-      createdAt: makeTimestamp()
+      createdAt: this.timestamp()
     };
     this.alerts.set(alert.alertId, alert);
     this.recordEvent('audit', alert.alertId, 'RaiseAuditFlag', alert);
@@ -1405,14 +1409,14 @@ export class PdsLedgerEngine {
     eventType: string,
     payload: Record<string, unknown>
   ): { ledgerTxId: string; event: LedgerEvent } {
-    const ledgerTxId = `TX-${randomUUID()}`;
+    const ledgerTxId = `TX-${this.identifier()}`;
     const event: LedgerEvent = {
       ledgerTxId,
       entityType,
       entityId,
       eventType,
       payload,
-      timestamp: makeTimestamp()
+      timestamp: this.timestamp()
     };
     this.events.push(event);
     return { ledgerTxId, event };
@@ -1483,7 +1487,7 @@ export class PdsLedgerEngine {
   }
 
   private currentMonth(): string {
-    return monthFromTimestamp(makeTimestamp());
+    return monthFromTimestamp(this.timestamp());
   }
 
   private projectEventToState(event: LedgerEvent): void {

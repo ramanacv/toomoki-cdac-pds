@@ -32,7 +32,7 @@ The implementation must follow the existing product and technical docs and prese
 Ledger modes:
 
 - **Demo** (`PDS_LEDGER_MODE=demo`, default): in-process chaincode + PostgreSQL — unchanged POC behavior.
-- **Fabric** (`PDS_LEDGER_MODE=fabric`): `@hyperledger/fabric-gateway` to `pds-chaincode` on `pdschannel` via Fabric 3.1.x 2-org stack.
+- **Fabric** (`PDS_LEDGER_MODE=fabric`): `@hyperledger/fabric-gateway` to `pds-chaincode` on `pdschannel` via Fabric 2.5.15 two-organization stack.
 
 See [fabric-gateway-plus-refactor.md](fabric-gateway-plus-refactor.md) and [DEPLOYMENT.md](../../DEPLOYMENT.md) for bootstrap and compose profiles.
 
@@ -94,7 +94,7 @@ See [Mock data and fixtures](mock-data.md) for editing, regeneration, and live/m
 
 ## Technology Decisions To Lock Now
 
-- Blockchain: Hyperledger Fabric 3.1.x (2-org live demo via `--profile fabric`); demo mode uses in-process chaincode runtime. Full 5-org consortium documented in `network-manifest.json` for later expansion.
+- Blockchain: Hyperledger Fabric 2.5.15 (two-organization live demo via `--profile fabric`); demo mode uses in-process chaincode runtime. Additional consortium organizations remain planned.
 - Chaincode language: TypeScript.
 - Backend: NestJS 11 on Node.js 22; feature modules under `apps/api/src/modules/`.
 - Database access: raw `pg` client (Prisma noted as alternative; not adopted).

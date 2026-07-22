@@ -26,6 +26,19 @@ export type DemoRole =
   | 'AUDITOR'
   | 'PROCUREMENT'
   | 'GODOWN';
+
+export const oidcRoleToDemoRole = (roles: readonly string[]): DemoRole | null => {
+  const mappings: Array<[string, DemoRole]> = [
+    ['management', 'MANAGEMENT'],
+    ['department', 'CONTROL_OFFICE'],
+    ['procurement', 'PROCUREMENT'],
+    ['fci', 'FCI_DEPOT'],
+    ['godown', 'GODOWN'],
+    ['fps', 'FPS'],
+    ['auditor', 'AUDITOR']
+  ];
+  return mappings.find(([role]) => roles.includes(role))?.[1] ?? null;
+};
 export type DemoScreen =
   | 'dashboard'
   | 'workbench'

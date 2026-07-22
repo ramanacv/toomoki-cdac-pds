@@ -14,7 +14,7 @@ describe('StockModule', () => {
     fixture = await createDemoLedgerFixture();
     controller = await createControllerWithFacade(StockController, fixture.facade);
 
-    const positions = controller.listStock();
+    const positions = await controller.listStock();
     expect(positions.length).toBeGreaterThan(0);
     expect(positions[0]?.entityId).toBeDefined();
     expect(positions[0]?.commodity).toBeDefined();
@@ -25,9 +25,9 @@ describe('StockModule', () => {
     fixture = await createDemoLedgerFixture();
     controller = await createControllerWithFacade(StockController, fixture.facade);
 
-    const all = controller.listStock();
+    const all = await controller.listStock();
     const sample = all[0]!;
-    const filtered = controller.listStock(sample.entityId, sample.commodity);
+    const filtered = await controller.listStock(sample.entityId, sample.commodity);
 
     expect(filtered).toHaveLength(1);
     expect(filtered[0]).toEqual(sample);

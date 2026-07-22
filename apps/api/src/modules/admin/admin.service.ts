@@ -23,6 +23,20 @@ import type {
 
 const RECENT_EVENT_LIMIT = 25;
 
+type AdminOperationalSnapshot = {
+  dashboard: Awaited<ReturnType<PdsLedgerFacade['getDashboardSummary']>>;
+  stakeholders: any[];
+  lots: any[];
+  transfers: any[];
+  allocations: any[];
+  entitlements: any[];
+  authTransactions: any[];
+  distributions: any[];
+  alerts: AuditAlert[];
+  events: any[];
+  stock: AdminStockPosition[];
+};
+
 const groupBy = (items: string[]): Array<{ key: string; count: number }> => {
   const counts = new Map<string, number>();
   for (const item of items) {
@@ -40,25 +54,21 @@ export class AdminService {
     @Inject('FABRIC_RUNTIME_CONFIG') private readonly fabricConfig: FabricRuntimeConfig
   ) {}
 
-  getOverview(): AdminOverview {
-    const dashboard = this.ledger.getDashboardSummary();
-    const metrics = this.buildMetrics();
-    const network = this.buildNetworkInfo();
-    const stakeholders = this.buildStakeholderSummary();
-    const activity = this.buildActivityFeed();
-    const alerts = this.ledger.getAlerts();
+  async getOverview(): Promise<AdminOverview> {
+    const snapshot = await this.loadOperationalSnapshot();
+    const network = this.buildNetworkInfo(snapshot);
 
     return {
       generatedAt: new Date().toISOString(),
       readOnly: true,
-      dashboard,
-      metrics,
+      dashboard: snapshot.dashboard,
+      metrics: this.buildMetrics(snapshot),
       network,
-      stakeholders,
-      activity,
-      auditAlerts: this.buildAuditAlertSummary(alerts),
-      stock: this.buildStockPositions(),
-      entitlementSummary: this.buildEntitlementSummary(),
+      stakeholders: this.buildStakeholderSummary(snapshot),
+      activity: this.buildActivityFeed(snapshot),
+      auditAlerts: this.buildAuditAlertSummary(snapshot.alerts),
+      stock: this.buildStockPositions(snapshot),
+      entitlementSummary: this.buildEntitlementSummary(snapshot),
       health: this.buildHealthChecks(network),
       links: {
         health: '/health',
@@ -69,16 +79,16 @@ export class AdminService {
     };
   }
 
-  getNetwork(): AdminNetworkInfo {
-    return this.buildNetworkInfo();
+  async getNetwork(): Promise<AdminNetworkInfo> {
+    return this.buildNetworkInfo(await this.loadOperationalSnapshot());
   }
 
-  getActivity(): AdminActivityFeed {
-    return this.buildActivityFeed();
+  async getActivity(): Promise<AdminActivityFeed> {
+    return this.buildActivityFeed(await this.loadOperationalSnapshot());
   }
 
-  getStakeholderSummary(): AdminStakeholderSummary {
-    return this.buildStakeholderSummary();
+  async getStakeholderSummary(): Promise<AdminStakeholderSummary> {
+    return this.buildStakeholderSummary(await this.loadOperationalSnapshot());
   }
 
   async resetLedger(commodity?: string): Promise<AdminResetResult> {
@@ -98,10 +108,8 @@ export class AdminService {
     };
   }
 
-  private buildMetrics(): AdminMetrics {
-    const state = this.ledger.exportState();
+  private buildMetrics(state: AdminOperationalSnapshot): AdminMetrics {
     const alerts = state.alerts;
-
     return {
       stakeholders: state.stakeholders.length,
       lots: state.lots.length,
@@ -116,7 +124,7 @@ export class AdminService {
     };
   }
 
-  private buildNetworkInfo(): AdminNetworkInfo {
+  private buildNetworkInfo(state: AdminOperationalSnapshot): AdminNetworkInfo {
     const persistence = loadPersistenceRuntimeConfig();
     const config = this.fabricConfig;
     const base: AdminNetworkInfo = {
@@ -126,7 +134,6 @@ export class AdminService {
     };
 
     if (config.ledgerMode === 'demo') {
-      const state = this.ledger.exportState();
       return {
         ...base,
         demo: {
@@ -220,8 +227,8 @@ export class AdminService {
     }
   }
 
-  private buildStakeholderSummary(): AdminStakeholderSummary {
-    const stakeholders = this.ledger.listStakeholders();
+  private buildStakeholderSummary(state: AdminOperationalSnapshot): AdminStakeholderSummary {
+    const stakeholders = state.stakeholders;
     return {
       byType: groupBy(stakeholders.map((item: any) => item.stakeholderType)).map(({ key, count }) => ({
         stakeholderType: key,
@@ -239,23 +246,14 @@ export class AdminService {
     };
   }
 
-  private buildStockPositions(): AdminStockPosition[] {
-    const state = this.ledger.exportState();
+  private buildStockPositions(state: AdminOperationalSnapshot): AdminStockPosition[] {
     return state.stock
-      .map(([key, quantityKg]) => {
-        const separatorIndex = key.lastIndexOf(':');
-        return {
-          entityId: key.slice(0, separatorIndex),
-          commodity: key.slice(separatorIndex + 1),
-          quantityKg
-        };
-      })
       .filter((position) => position.quantityKg > 0)
       .sort((left, right) => right.quantityKg - left.quantityKg);
   }
 
-  private buildEntitlementSummary(): AdminEntitlementSummary {
-    const entitlements = this.ledger.exportState().entitlements;
+  private buildEntitlementSummary(state: AdminOperationalSnapshot): AdminEntitlementSummary {
+    const entitlements = state.entitlements;
     const totalMonthlyEntitlementKg = entitlements.reduce((total, item) => total + item.monthlyEntitlementKg, 0);
     const totalLiftedKg = entitlements.reduce((total, item) => total + item.alreadyLiftedKg, 0);
     const totalAvailableKg = entitlements.reduce((total, item) => total + item.availableBalanceKg, 0);
@@ -271,8 +269,8 @@ export class AdminService {
     };
   }
 
-  private buildActivityFeed(): AdminActivityFeed {
-    const events = [...this.ledger.exportState().events].sort((left, right) =>
+  private buildActivityFeed(state: AdminOperationalSnapshot): AdminActivityFeed {
+    const events = [...state.events].sort((left, right) =>
       right.timestamp.localeCompare(left.timestamp)
     );
 
@@ -280,6 +278,24 @@ export class AdminService {
       recentEvents: events.slice(0, RECENT_EVENT_LIMIT),
       eventCount: events.length
     };
+  }
+
+  private async loadOperationalSnapshot(): Promise<AdminOperationalSnapshot> {
+    const [dashboard, stakeholders, lots, transfers, allocations, entitlements, authTransactions, distributions, alerts, events, stock] =
+      await Promise.all([
+        this.ledger.getDashboardSummary(),
+        this.ledger.listStakeholders(),
+        this.ledger.listLots(),
+        this.ledger.listTransfers(),
+        this.ledger.listAllocations(),
+        this.ledger.listEntitlements(),
+        this.ledger.listAuthTransactions(),
+        this.ledger.listDistributions(),
+        this.ledger.getAlerts(),
+        this.ledger.listLedgerEvents(),
+        this.ledger.listStockPositions()
+      ]);
+    return { dashboard, stakeholders, lots, transfers, allocations, entitlements, authTransactions, distributions, alerts, events, stock };
   }
 
   private buildAuditAlertSummary(alerts: AuditAlert[]): AdminOverview['auditAlerts'] {

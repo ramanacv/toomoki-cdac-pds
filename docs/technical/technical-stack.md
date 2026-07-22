@@ -4,7 +4,7 @@
 
 The MVP stack is standardized on:
 
-- Hyperledger Fabric **2.5.13** for live demo (`PDS_LEDGER_MODE=fabric`); in-process chaincode for default demo mode.
+- Hyperledger Fabric **2.5.15** for live demo (`PDS_LEDGER_MODE=fabric`); in-process chaincode for default demo mode.
 - Node.js 22 and NestJS 11 for backend APIs.
 - PostgreSQL for operational state.
 - React 19 and Vite 7 for frontend dashboard.
@@ -16,7 +16,7 @@ This stack matches the expert proposal and supports a practical 2-week MVP while
 
 Selected:
 
-- Hyperledger Fabric 2.5.13 (2-org live demo stack; peer/orderer images in `docker-compose.fabric.yml`).
+- Hyperledger Fabric 2.5.15 (2-org live demo stack; peer/orderer images in `docker-compose.fabric.yml`).
 - In-process chaincode runtime for default demo mode (`PDS_LEDGER_MODE=demo`).
 - Fabric CA for identities.
 - `@hyperledger/fabric-gateway` for Node.js (fabric mode).
@@ -47,14 +47,15 @@ Selected:
 - `@hyperledger/fabric-gateway` for fabric ledger mode.
 - `pg` PostgreSQL client.
 - Hand-rolled OpenAPI at `/openapi.json` and `/docs`.
-- JWT-based role login for MVP (guards deferred).
+- Keycloak OIDC Authorization Code + PKCE for the web and client credentials for service clients.
+- Secure-by-default bearer-token authentication and least-privilege role guards.
 
 Rationale:
 
 - NestJS provides modular APIs and clean separation between controllers, services, adapters, and domain logic.
 - Node.js works well with Fabric Gateway SDK.
 - Swagger/OpenAPI supports rapid demo and integration review.
-- JWT is sufficient for MVP role login; Keycloak can be introduced later.
+- Standard OIDC allows later federation to an approved government IAM without changing the API token contract.
 
 ## Database Layer
 
@@ -113,7 +114,7 @@ Rationale:
 MVP:
 
 - Docker Compose with demo (default) and `--profile fabric` stacks.
-- Fabric 2.5.13 network containers (fabric profile).
+- Fabric 2.5.15 network containers (fabric profile).
 - Backend API container (NestJS 11).
 - PostgreSQL container.
 - CouchDB containers (fabric profile).

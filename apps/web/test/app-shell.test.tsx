@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { afterEach, describe, expect, it, vi, beforeEach } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
@@ -112,11 +112,16 @@ import { AppRoutes } from '@/App.js';
 import { fetchApiHealth, loadWorkspaceData, probeApi } from '@/api.js';
 
 beforeEach(() => {
+  vi.stubEnv('VITE_DATA_SOURCE', 'mock');
   vi.clearAllMocks();
   (probeApi as unknown as { mockResolvedValue: (v: boolean) => void }).mockResolvedValue(false);
   (fetchApiHealth as unknown as { mockResolvedValue: (v: { ok: boolean; ledgerMode?: string }) => void }).mockResolvedValue({
     ok: false
   });
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
 });
 
 async function renderApp(initialEntry: string) {
@@ -233,19 +238,17 @@ describe('app shell', () => {
     expect(await screen.findByText('SHORT_RECEIPT')).toBeInTheDocument();
   });
 
-  it('disables scenario buttons in the drawer when the API is online', async () => {
+  it('keeps explicitly selected offline fixtures isolated when an API happens to be reachable', async () => {
     (probeApi as unknown as { mockResolvedValue: (v: boolean) => void }).mockResolvedValue(true);
     (fetchApiHealth as unknown as { mockResolvedValue: (v: { ok: boolean; ledgerMode?: string }) => void }).mockResolvedValue({
       ok: true,
       ledgerMode: 'demo'
     });
     const user = await renderApp('/?role=MANAGEMENT');
-    expect(await screen.findByText('Live API (Demo)')).toBeInTheDocument();
+    expect(await screen.findByText('Demo data')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Demo controls' }));
-    expect(await screen.findByText('Live API available')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Happy path/i })).toBeDisabled();
-    expect(screen.getByText('Live API data shown')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Happy path/i })).toBeEnabled();
   });
 
   it('keeps the skip-link target and supports logout', async () => {

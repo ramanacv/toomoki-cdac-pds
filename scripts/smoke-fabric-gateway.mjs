@@ -1,5 +1,7 @@
+import { getServiceAccessToken } from './iam/service-token.mjs';
+
 const API_BASE = process.env.API_BASE ?? 'http://localhost:3000';
-const AUTH_TOKEN = process.env.PDS_DEV_AUTH_TOKEN ?? process.env.SMOKE_AUTH_TOKEN;
+const AUTH_TOKEN = await getServiceAccessToken();
 const SMOKE_ID = `GW-SMOKE-${Date.now()}`;
 
 const request = async (path, init) => {
@@ -19,9 +21,8 @@ const main = async () => {
   if (!health.ok) {
     throw new Error('API health check failed');
   }
-  if (health.ledgerMode !== 'fabric') {
-    throw new Error(`Expected fabric ledgerMode, got ${health.ledgerMode}`);
-  }
+  const network = await request('/admin/network');
+  if (network.ledgerMode !== 'fabric') throw new Error(`Expected fabric ledgerMode, got ${network.ledgerMode}`);
 
   await request('/stakeholders', {
     method: 'POST',

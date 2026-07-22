@@ -3,46 +3,46 @@ import { StubIdentityProvider } from '../src/modules/auth/stub-identity-provider
 
 describe('StubIdentityProvider', () => {
   const original = {
-    token: process.env.PDS_DEV_AUTH_TOKEN,
-    role: process.env.PDS_DEV_AUTH_ROLE,
-    subject: process.env.PDS_DEV_AUTH_SUBJECT
+    token: process.env.PDS_TEST_AUTH_TOKEN,
+    role: process.env.PDS_TEST_AUTH_ROLE,
+    subject: process.env.PDS_TEST_AUTH_SUBJECT
   };
 
   afterEach(() => {
-    if (original.token === undefined) delete process.env.PDS_DEV_AUTH_TOKEN;
-    else process.env.PDS_DEV_AUTH_TOKEN = original.token;
-    if (original.role === undefined) delete process.env.PDS_DEV_AUTH_ROLE;
-    else process.env.PDS_DEV_AUTH_ROLE = original.role;
-    if (original.subject === undefined) delete process.env.PDS_DEV_AUTH_SUBJECT;
-    else process.env.PDS_DEV_AUTH_SUBJECT = original.subject;
+    if (original.token === undefined) delete process.env.PDS_TEST_AUTH_TOKEN;
+    else process.env.PDS_TEST_AUTH_TOKEN = original.token;
+    if (original.role === undefined) delete process.env.PDS_TEST_AUTH_ROLE;
+    else process.env.PDS_TEST_AUTH_ROLE = original.role;
+    if (original.subject === undefined) delete process.env.PDS_TEST_AUTH_SUBJECT;
+    else process.env.PDS_TEST_AUTH_SUBJECT = original.subject;
   });
 
-  it('maps the base token to PDS_DEV_AUTH_ROLE', async () => {
-    process.env.PDS_DEV_AUTH_TOKEN = 'dev-mvp-token';
-    process.env.PDS_DEV_AUTH_ROLE = 'department';
-    process.env.PDS_DEV_AUTH_SUBJECT = 'fabric-smoke';
+  it('maps the base token to PDS_TEST_AUTH_ROLE', async () => {
+    process.env.PDS_TEST_AUTH_TOKEN = 'test-token';
+    process.env.PDS_TEST_AUTH_ROLE = 'department';
+    process.env.PDS_TEST_AUTH_SUBJECT = 'test-actor';
     const provider = new StubIdentityProvider();
-    const identity = await provider.verify('dev-mvp-token');
+    const identity = await provider.verify('test-token');
     expect(identity).toEqual(
       expect.objectContaining({
-        subject: 'fabric-smoke',
-        role: 'department'
+        subject: 'test-actor',
+        roles: ['department']
       })
     );
   });
 
   it('accepts role-suffixed tokens for multi-actor fabric scripts', async () => {
-    process.env.PDS_DEV_AUTH_TOKEN = 'dev-mvp-token';
-    process.env.PDS_DEV_AUTH_ROLE = 'department';
+    process.env.PDS_TEST_AUTH_TOKEN = 'test-token';
+    process.env.PDS_TEST_AUTH_ROLE = 'department';
     const provider = new StubIdentityProvider();
-    const identity = await provider.verify('dev-mvp-token:procurement');
-    expect(identity?.role).toBe('procurement');
+    const identity = await provider.verify('test-token:procurement');
+    expect(identity?.roles).toEqual(['procurement']);
   });
 
   it('rejects unknown roles and non-matching tokens', async () => {
-    process.env.PDS_DEV_AUTH_TOKEN = 'dev-mvp-token';
+    process.env.PDS_TEST_AUTH_TOKEN = 'test-token';
     const provider = new StubIdentityProvider();
-    await expect(provider.verify('dev-mvp-token:not-a-role')).resolves.toBeNull();
+    await expect(provider.verify('test-token:not-a-role')).resolves.toBeNull();
     await expect(provider.verify('wrong-token')).resolves.toBeNull();
     await expect(provider.verify('wrong-token:procurement')).resolves.toBeNull();
   });

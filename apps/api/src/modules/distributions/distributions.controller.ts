@@ -6,6 +6,7 @@ import { Roles } from '../auth/roles.decorator.js';
 
 @Plane('data')
 @Controller()
+@Roles('fps', 'department', 'auditor', 'management')
 export class DistributionsController {
   constructor(@Inject(PdsLedgerFacade) private readonly ledger: PdsLedgerFacade) {}
 

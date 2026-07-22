@@ -485,7 +485,35 @@ export type LedgerEvent = {
   timestamp: string;
 };
 
-export type ProofStatus = 'PENDING' | 'SUBMITTING' | 'COMMITTED' | 'FAILED';
+export type ProofStatus = 'PENDING' | 'SUBMITTING' | 'COMMITTED' | 'FAILED' | 'DEAD_LETTER';
+
+export type ProofFailureCategory =
+  | 'FABRIC_UNAVAILABLE'
+  | 'ENDORSEMENT_FAILED'
+  | 'COMMIT_FAILED'
+  | 'TIMEOUT'
+  | 'VALIDATION_FAILED'
+  | 'UNKNOWN';
+
+export type LedgerProofStatusResponse = {
+  eventId: string;
+  operationId: string;
+  status: ProofStatus;
+  fabricTxId?: string;
+  retryCount: number;
+  createdAt: string;
+  submittingAt?: string;
+  committedAt?: string;
+  failureCategory?: ProofFailureCategory;
+  rawWorkerError?: string;
+};
+
+export type LedgerProofSummaryResponse = {
+  counts: Record<ProofStatus, number>;
+  oldestOutstandingAgeSeconds: number | null;
+  commitSuccessPercentage: number;
+  recentCommitted: Array<{ eventId: string; fabricTxId: string; committedAt: string }>;
+};
 
 /** Canonical, non-sensitive evidence submitted to Fabric after the business transaction commits. */
 export type LedgerProof = {

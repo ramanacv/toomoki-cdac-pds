@@ -6,6 +6,7 @@ import { Roles } from '../auth/roles.decorator.js';
 
 @Plane('control')
 @Controller()
+@Roles('fps', 'department', 'auditor')
 export class EntitlementsController {
   constructor(@Inject(PdsLedgerFacade) private readonly ledger: PdsLedgerFacade) {}
 
@@ -36,6 +37,7 @@ export class EntitlementsController {
   }
 
   @Post('/entitlements/validate')
+  @Roles('department', 'fps')
   validate(@Body() body: EntitlementValidateDto) {
     return this.ledger.validateEntitlement(body);
   }

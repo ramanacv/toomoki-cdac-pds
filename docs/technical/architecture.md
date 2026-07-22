@@ -148,7 +148,8 @@ The web app supports explicit data modes through `VITE_DATA_SOURCE`:
 
 - `api` — live REST API only.
 - `mock` — fixture workspace from `mock/` via `@pds/fixtures`.
-- `auto` — API when online, fixtures when offline (default).
+
+There is no automatic fallback. Jury builds use `api`; `mock` is an explicitly selected and labelled offline backup.
 
 UI role/screen configuration stays in application source; domain mock records stay in `mock/`. See [Mock data and fixtures](../implementation/mock-data.md).
 
@@ -157,7 +158,7 @@ UI role/screen configuration stays in application source; domain mock records st
 MVP network (implemented):
 
 - **Demo mode:** in-process chaincode runtime; no Fabric containers required.
-- **Fabric mode:** Hyperledger Fabric **3.1.x** 2-org demo (Food Department + Godown).
+- **Fabric mode:** Hyperledger Fabric **2.5.15** 2-org demo (Food Department + Godown).
 - Channel: `pdschannel`; chaincode: `pds-chaincode`.
 - Single-node Raft orderer with channel participation (no system channel).
 - Fabric CA for identities; CouchDB world state on peers.
@@ -232,7 +233,7 @@ Production mode:
 MVP:
 
 - Docker Compose with **demo** (default) and **fabric** profiles.
-- Fabric 3.1.x network containers (fabric profile): orderer, 2 peers, CouchDB, CAs.
+- Fabric 2.5.15 network containers (fabric profile): orderer, 2 peers, CouchDB, CAs.
 - Backend API container (NestJS 11) joins `pds-fabric` network in fabric profile.
 - PostgreSQL container.
 - Frontend container.

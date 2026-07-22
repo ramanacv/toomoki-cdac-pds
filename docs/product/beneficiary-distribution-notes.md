@@ -129,7 +129,7 @@ npm run demo:exception  # duplicate claim / exceptions
 npm run smoke           # both
 ```
 
-With Fabric ledger: `scripts/demo/fabric-api.mjs` (needs `PDS_DEV_AUTH_TOKEN`).
+With Fabric ledger: `scripts/demo/fabric-api.mjs` (uses the Keycloak service client, or a short-lived `PDS_E2E_ACCESS_TOKEN` in test automation).
 
 ### Option C — API curl (for technical audience)
 
