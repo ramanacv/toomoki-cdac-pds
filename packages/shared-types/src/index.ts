@@ -325,7 +325,9 @@ export enum RationCardType {
   AAY = 'AAY',
   PHH = 'PHH',
   NPH = 'NPH',
+  // eslint-disable-next-line @typescript-eslint/no-duplicate-enum-values
   APL = 'NPH',
+  // eslint-disable-next-line @typescript-eslint/no-duplicate-enum-values
   BPL = 'PHH'
 }
 
@@ -381,6 +383,13 @@ export type CommodityLot = {
   transformedFromLotId?: string;
   /** ISO timestamp when the lot was created on the ledger. */
   createdAt?: string;
+  /** Root and parent are equal to lotId/undefined for an original lot. */
+  rootLotId?: string;
+  parentLotId?: string;
+  originalQuantityKg?: number;
+  remainingQuantityKg?: number;
+  unit?: 'KG';
+  version?: number;
 };
 
 export type TransferOrder = {
@@ -474,6 +483,119 @@ export type LedgerEvent = {
   eventType: string;
   payload: Record<string, unknown>;
   timestamp: string;
+};
+
+export type ProofStatus = 'PENDING' | 'SUBMITTING' | 'COMMITTED' | 'FAILED' | 'DEAD_LETTER';
+
+export type ProofFailureCategory =
+  | 'FABRIC_UNAVAILABLE'
+  | 'ENDORSEMENT_FAILED'
+  | 'COMMIT_FAILED'
+  | 'TIMEOUT'
+  | 'VALIDATION_FAILED'
+  | 'UNKNOWN';
+
+export type LedgerProofStatusResponse = {
+  eventId: string;
+  operationId: string;
+  status: ProofStatus;
+  fabricTxId?: string;
+  retryCount: number;
+  createdAt: string;
+  submittingAt?: string;
+  committedAt?: string;
+  failureCategory?: ProofFailureCategory;
+  rawWorkerError?: string;
+};
+
+export type LedgerProofSummaryResponse = {
+  counts: Record<ProofStatus, number>;
+  oldestOutstandingAgeSeconds: number | null;
+  commitSuccessPercentage: number;
+  recentCommitted: Array<{ eventId: string; fabricTxId: string; committedAt: string }>;
+};
+
+/** Canonical, non-sensitive evidence submitted to Fabric after the business transaction commits. */
+export type LedgerProof = {
+  eventId: string;
+  operationId: string;
+  eventType: string;
+  schemaVersion: 1;
+  entityType: LedgerEvent['entityType'];
+  entityId: string;
+  actor: {
+    subject: string;
+    applicationRole: string;
+    submittingOrganization: string;
+  };
+  payloadHash: string;
+  proofPayload: Record<string, unknown>;
+  businessTimestamp: string;
+};
+
+export type OperationProof<T> = {
+  data: T;
+  operationId: string;
+  idempotencyKey: string;
+  proof: {
+    eventId: string;
+    status: ProofStatus;
+    fabricTxId?: string;
+  };
+};
+
+export type WorkflowState =
+  | 'PENDING_AUTHORIZATION'
+  | 'AUTHORIZED'
+  | 'DISPATCHED'
+  | 'RECEIVED'
+  | 'RECEIVED_WITH_SHORTAGE'
+  | 'COMPLETED'
+  | 'REJECTED'
+  | 'CANCELLED';
+
+export type WorkflowTemplate = { templateId: string; version: number; states: WorkflowState[] };
+export type WorkflowInstance = {
+  workflowId: string;
+  templateId: string;
+  templateVersion: number;
+  currentState: WorkflowState;
+  relatedEntityIds: Record<string, string>;
+  failureReason?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+export type WorkflowTransition = {
+  transitionId: string;
+  workflowId: string;
+  fromState: WorkflowState;
+  toState: WorkflowState;
+  idempotencyKey: string;
+  actorSubject: string;
+  actorRole: string;
+  occurredAt: string;
+  failureReason?: string;
+};
+
+export type LotMovement = {
+  movementId: string;
+  sourceLotId: string;
+  childLotId: string;
+  quantityKg: number;
+  fromStakeholderId: string;
+  toStakeholderId: string;
+  status: 'IN_TRANSIT' | 'RECEIVED' | 'RECEIVED_WITH_SHORTAGE' | 'REJECTED' | 'CANCELLED';
+  createdAt: string;
+  receivedAt?: string;
+};
+export type QuantityAdjustment = {
+  adjustmentId: string;
+  movementId?: string;
+  lotId: string;
+  quantityKg: number;
+  reason: 'SHORTAGE' | 'DAMAGE' | 'QUALITY_REJECTION' | 'TRANSIT_LOSS' | 'PROCESS_LOSS';
+  investigationId?: string;
+  createdAt: string;
 };
 
 export type RationCard = {

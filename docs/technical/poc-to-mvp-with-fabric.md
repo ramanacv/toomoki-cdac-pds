@@ -23,6 +23,8 @@ todos:
 isProject: false
 ---
 
+> Historical implementation record. Authentication details below were superseded by the secure-by-default Keycloak/OIDC migration in July 2026. Current deployment instructions are in `DEPLOYMENT.md`; no deployed mode accepts static tokens or stores access tokens in local storage.
+
 # POC → MVP + Fabric Mode Readiness Plan
 
 ## Current state
@@ -62,7 +64,7 @@ flowchart TB
 ## Guiding principles (no regressions)
 
 1. **Demo mode is the regression baseline** — `PDS_LEDGER_MODE=demo` (default) must pass all existing tests unchanged after every phase.
-2. **Fabric changes are additive** — new env files, scripts, and opt-in e2e (`PDS_E2E_FABRIC=true`); never weaken demo-mode open auth.
+2. **Fabric changes are additive** — new env files, scripts, and opt-in e2e (`PDS_E2E_FABRIC=true`); online demo and Fabric modes both fail closed through OIDC.
 3. **Single source of truth for routes** — all workflow and allocation changes flow through `[packages/shared-types/src/index.ts](packages/shared-types/src/index.ts)` `COMMODITY_ROUTE_TEMPLATES`.
 4. **Test before merge** — each phase ends with: `npm test`, `npm run smoke` (demo), and (when Fabric stack is up) `npm run smoke:fabric`.
 
@@ -74,46 +76,40 @@ flowchart TB
 
 ### 0.1 Environment and bootstrap
 
-- Add `[.env.fabric.example](.env.fabric.example)` at repo root with documented values:
+- Configure Fabric and OIDC through an untracked `.env` based on `.env.example`:
   ```env
   PDS_LEDGER_MODE=fabric
-  PDS_DEV_AUTH_TOKEN=dev-mvp-token
-  PDS_ADMIN_TOKEN=admin-mvp-token
+  PDS_AUTH_MODE=oidc
+  PDS_OIDC_ISSUER=http://localhost:8080/realms/viksitpds
+  PDS_OIDC_AUDIENCE=pds-api
   VITE_DATA_SOURCE=api
-  VITE_DEV_AUTH_TOKEN=dev-mvp-token
   ```
-- Update `[.env.example](.env.example)` to document `PDS_LEDGER_MODE`, fabric auth vars, and `VITE_DEV_AUTH_TOKEN`.
+- Keep `.env.example` aligned with ledger and OIDC configuration; never commit client or user secrets.
 - Add root script `smoke:fabric` → `node scripts/smoke-fabric-gateway.mjs` (document in `[DEPLOYMENT.md](DEPLOYMENT.md)`).
-- Fix `[blockchain/fabric-network/scripts/smoke-fabric.sh](blockchain/fabric-network/scripts/smoke-fabric.sh)` to send `Authorization: Bearer $PDS_DEV_AUTH_TOKEN` on POSTs.
+- Make Fabric smoke scripts obtain a short-lived Keycloak service-account token.
 
 **Quick-start command block** (add to DEPLOYMENT.md):
 
 ```bash
 ./blockchain/fabric-network/scripts/bootstrap-fabric-full.sh
-cp .env.fabric.example .env
-docker compose --profile fabric up --build -d
-PDS_DEV_AUTH_TOKEN=dev-mvp-token node scripts/smoke-fabric-gateway.mjs
+docker compose --profile iam --profile fabric up --build -d
+PDS_BENCHMARK_CLIENT_SECRET='<from secret store>' node scripts/smoke-fabric-gateway.mjs
 ```
 
 ### 0.2 Web API authentication (critical blocker)
 
-Mirror the existing admin-token pattern in `[apps/web/src/admin-api.ts](apps/web/src/admin-api.ts)`:
-
-- Add `VITE_DEV_AUTH_TOKEN` to `[apps/web/src/vite-env.d.ts](apps/web/src/vite-env.d.ts)`.
-- Create `apps/web/src/auth-token.ts` — read token from `localStorage` key `pds-dev-auth-token`, fallback to `VITE_DEV_AUTH_TOKEN`.
-- Update `fetchJson` / `postJson` in `[apps/web/src/api.ts](apps/web/src/api.ts)` to attach `Authorization: Bearer <token>` when token is present.
-- Add lightweight **API token entry** in `[apps/web/src/components/layout/TopBar.tsx](apps/web/src/components/layout/TopBar.tsx)` or UserMenu (same UX as admin token): save to localStorage, show warning when `apiOnline && !token && ledgerMode=fabric` (fetch from `/admin/overview` or new `/health` field `ledgerMode`).
+Use Keycloak Authorization Code + PKCE-S256 through `apps/web/src/auth-token.ts`. Store OIDC state and access tokens only in session storage, attach bearer tokens to API calls, derive navigation from signed roles, and clear the session on logout.
 
 ### 0.3 Ledger mode visibility
 
-- Extend `[apps/api/src/modules/health/health.controller.ts](apps/api/src/modules/health/health.controller.ts)` response with `ledgerMode: 'demo' | 'fabric'` so the web can show **Live API (Fabric)** vs **Live API (Demo)** in `[ApiStatusBadge](apps/web/src/components/ApiStatusBadge.tsx)`.
+- Keep public health output minimal. Authenticated admin network responses expose ledger mode for operator displays.
 
 ### 0.4 Fabric e2e test suite
 
 Replace the stub in `[apps/api/test/e2e/fabric-api.e2e.spec.ts](apps/api/test/e2e/fabric-api.e2e.spec.ts)` by porting the happy-path from `[apps/api/test/e2e/demo-api.e2e.spec.ts](apps/api/test/e2e/demo-api.e2e.spec.ts)` and `[apps/api/test/service.test.ts](apps/api/test/service.test.ts)` `supports the role-workbench POC sequence`:
 
 - Guard: `describe.skipIf(process.env.PDS_E2E_FABRIC !== 'true')`
-- All requests include `Authorization: Bearer ${process.env.PDS_DEV_AUTH_TOKEN}`
+- All requests use a short-lived OIDC token (`PDS_E2E_ACCESS_TOKEN` for test automation or client credentials).
 - Assert `trace.verificationSource === 'chaincode'`
 - Assert `ledgerTxId` present on distribution
 
@@ -281,7 +277,7 @@ npm run regression
 With a live Fabric stack (`docker compose --profile fabric up -d`) and auth token:
 
 ```bash
-PDS_DEV_AUTH_TOKEN=dev-mvp-token npm run regression:fabric
+PDS_BENCHMARK_CLIENT_SECRET='<from secret store>' npm run regression:fabric
 ```
 
 | Command | Mode | Expected | Automated in `npm run regression` |

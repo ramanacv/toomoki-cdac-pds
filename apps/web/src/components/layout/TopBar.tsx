@@ -1,5 +1,5 @@
 import { Menu } from 'lucide-react';
-import type { DemoRole, DemoScenario } from '@/demo-model.js';
+import type { DemoRole } from '@/demo-model.js';
 import type { LedgerMode } from '@/api.js';
 import { ApiStatusBadge } from '@/components/ApiStatusBadge';
 import { UserMenu } from '@/components/layout/UserMenu';
@@ -11,6 +11,7 @@ type TopBarProps = {
   operatorName: string;
   role: DemoRole;
   onRoleChange: (role: DemoRole) => void;
+  allowRoleSelection: boolean;
   onLogout: () => void;
   onToggleSidebar: () => void;
 };
@@ -22,6 +23,7 @@ export function TopBar({
   operatorName,
   role,
   onRoleChange,
+  allowRoleSelection,
   onLogout,
   onToggleSidebar
 }: TopBarProps) {
@@ -42,6 +44,7 @@ export function TopBar({
           operatorName={operatorName}
           role={role}
           onRoleChange={onRoleChange}
+          allowRoleSelection={allowRoleSelection}
           onLogout={onLogout}
         />
       </div>

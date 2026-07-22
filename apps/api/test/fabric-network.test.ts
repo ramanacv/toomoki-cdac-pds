@@ -39,8 +39,10 @@ describe('fabric network scaffold', () => {
         peers: Record<string, { url: string }>;
       };
       expect(Object.keys(parsed.channels)).toContain('pdschannel');
-      expect(Object.keys(parsed.peers).length).toBe(1);
-      expect(Object.values(parsed.peers)[0]?.url).toContain('grpcs://');
+      expect(Object.keys(parsed.peers).length).toBeGreaterThanOrEqual(1);
+      for (const peer of Object.values(parsed.peers)) {
+        expect(peer.url).toContain('grpcs://');
+      }
     }
   });
 

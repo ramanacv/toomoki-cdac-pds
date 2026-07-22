@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { afterEach, describe, expect, it } from 'vitest';
 import { TransferStatus } from '@pds/shared-types';
 import { TransfersController } from '../src/modules/transfers/transfers.controller.js';
@@ -23,7 +24,7 @@ describe('TransfersModule', () => {
     });
 
     expect(transfer.status).toBe(TransferStatus.DISPATCHED);
-    expect(controller.transfers().some((item) => item.transferId === 'TR-MOD-001')).toBe(true);
+    expect(controller.transfers().some((item: any) => item.transferId === 'TR-MOD-001')).toBe(true);
 
     const received = await controller.receive('TR-MOD-001', { receivedQtyKg: 250 });
     expect(received.status).toBe(TransferStatus.RECEIVED);
@@ -41,7 +42,7 @@ describe('TransfersModule', () => {
     });
 
     expect(approval.ledgerTxId).toMatch(/^TX-/);
-    expect(controller.ledgerEvents().some((event) => event.eventType === 'AuthorizeMovement')).toBe(true);
+    expect(controller.ledgerEvents().some((event: any) => event.eventType === 'AuthorizeMovement')).toBe(true);
     fixture.facade.addStockForTest('GODOWN-S-001', 'Wheat', 250);
 
     const transfer = await controller.dispatch({

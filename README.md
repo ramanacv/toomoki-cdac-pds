@@ -41,7 +41,7 @@ The NestJS API is organized into feature modules under `apps/api/src/modules/` (
 
 | Layer | Technology |
 |-------|------------|
-| Blockchain | Hyperledger Fabric 3.1.x (2-org demo) or in-process chaincode runtime (demo mode) |
+| Blockchain | Hyperledger Fabric 2.5.15 (2-org demo) or in-process chaincode runtime (demo mode) |
 | Chaincode | TypeScript (`blockchain/chaincode/pds-chaincode`) |
 | API | NestJS 11 on Node.js 22 |
 | Database | PostgreSQL 16 |
@@ -214,7 +214,7 @@ Open http://localhost:4173. The Vite dev server proxies `/api` to `http://localh
 | `PDS_LEDGER_JOURNAL_PATH` | `./tmp/pds-ledger.ndjson` | Append-only ledger journal |
 | `PDS_CHAINCODE_STATE_PATH` | `./tmp/chaincode-world-state.json` | Chaincode world state file |
 | `PDS_FABRIC_ENVELOPE_PATH` | `./tmp/pds-fabric-envelope.ndjson` | Fabric envelope journal |
-| `VITE_DATA_SOURCE` | `auto` | Web data mode: `api`, `mock`, or `auto` |
+| `VITE_DATA_SOURCE` | `api` | Web data mode: `api` (jury/online) or explicitly selected `mock` (offline backup) |
 | `VITE_API_BASE_URL` | `/api` | Web API base URL |
 
 Docker Compose overrides these for container networking. See [DEPLOYMENT.md](DEPLOYMENT.md) for full deployment and backend-mode guidance.
@@ -227,7 +227,8 @@ Mock entities live under `mock/` and are loaded through `@pds/fixtures`. The API
 |--------------------|--------------|
 | `api` | Fetch only from the REST API |
 | `mock` | Use fixtures only (no API reads) |
-| `auto` | Use API when online, otherwise fixtures (default) |
+
+There is no automatic fallback: API or IAM failure is shown as a failure in online mode.
 
 ## NPM Scripts
 

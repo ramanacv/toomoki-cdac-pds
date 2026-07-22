@@ -16,6 +16,24 @@ export function AdminLedgerPage() {
       <AdminStateGate>
         {(overview) => (
           <>
+            {overview.proofSummary ? <Panel
+              eyebrow="Asynchronous proof pipeline"
+              title="Blockchain proof completion"
+              pill={`${overview.proofSummary.commitSuccessPercentage}% committed`}
+              wide
+            >
+              <div className="grid gap-3 sm:grid-cols-5">
+                {Object.entries(overview.proofSummary.counts).map(([status, count]) => (
+                  <div key={status} className="rounded-xl border border-border p-3">
+                    <div className="text-xs uppercase text-muted-foreground">{status}</div>
+                    <div className="mt-1 text-xl font-semibold">{count}</div>
+                  </div>
+                ))}
+              </div>
+              <p className="mt-3 text-sm text-muted-foreground">
+                Operational transactions commit to PostgreSQL first. Fabric proofs complete independently and remain visible for retry or intervention.
+              </p>
+            </Panel> : null}
             <Panel
               eyebrow="Ledger"
               title="Entitlement utilization"

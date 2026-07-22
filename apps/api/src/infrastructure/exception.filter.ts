@@ -46,7 +46,15 @@ const TITLES: Partial<Record<number, string>> = {
   [HttpStatus.BAD_REQUEST]: 'Bad Request',
   [HttpStatus.UNAUTHORIZED]: 'Unauthorized',
   [HttpStatus.FORBIDDEN]: 'Forbidden',
+  [HttpStatus.PAYLOAD_TOO_LARGE]: 'Payload Too Large',
   [HttpStatus.INTERNAL_SERVER_ERROR]: 'Internal Server Error'
+};
+
+const statusFromError = (exception: Error): HttpStatus => {
+  const candidate = exception as Error & { status?: unknown; statusCode?: unknown };
+  const rawStatus = typeof candidate.status === 'number' ? candidate.status : candidate.statusCode;
+  if (rawStatus === HttpStatus.PAYLOAD_TOO_LARGE) return HttpStatus.PAYLOAD_TOO_LARGE;
+  return statusFor(exception.message);
 };
 
 const statusFor = (message: string): HttpStatus => {
@@ -85,7 +93,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
             : exception.message;
       body = { statusCode: status, error: titleFor(status), message, requestId };
     } else if (exception instanceof Error) {
-      status = statusFor(exception.message);
+      status = statusFromError(exception);
       message = exception.message;
       body = { statusCode: status, error: titleFor(status), message };
       if (status === HttpStatus.INTERNAL_SERVER_ERROR) {

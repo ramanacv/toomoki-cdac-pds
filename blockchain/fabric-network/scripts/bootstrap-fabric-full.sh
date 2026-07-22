@@ -54,7 +54,7 @@ echo "==> Step 4: peers join channel"
 bash "${SCRIPTS}/peer-channel-join.sh"
 
 echo "==> Step 5: deploy chaincode"
-bash "${SCRIPTS}/deploy-chaincode.sh"
+CC_SIGNATURE_POLICY="OR('FoodAndCivilSuppliesMSP.peer', 'GodownWarehouseMSP.peer')" bash "${SCRIPTS}/deploy-chaincode.sh"
 
 echo ""
 echo "Bootstrap complete. Start the app in fabric mode:"

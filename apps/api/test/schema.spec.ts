@@ -57,6 +57,8 @@ describe('postgres schema indexes and foreign keys (T6.1)', () => {
     expect(schema).toMatch(/transfer_orders[\s\S]*to_org TEXT NOT NULL REFERENCES stakeholders\(stakeholder_id\)/);
     // transfer_orders.lot_id → commodity_lots
     expect(schema).toMatch(/transfer_orders[\s\S]*lot_id TEXT NOT NULL REFERENCES commodity_lots\(lot_id\)/);
+    expect(schema).toMatch(/approval_status TEXT CHECK \(approval_status IN \('PENDING', 'APPROVED', 'REJECTED', 'BLOCKED'\)\)/);
+    expect(schema).toMatch(/authorized_by TEXT REFERENCES stakeholders\(stakeholder_id\)/);
     // fps_allocations.fps_id / source_godown_id → stakeholders
     expect(schema).toMatch(/fps_allocations[\s\S]*fps_id TEXT NOT NULL REFERENCES stakeholders\(stakeholder_id\)/);
     expect(schema).toMatch(/fps_allocations[\s\S]*source_godown_id TEXT NOT NULL REFERENCES stakeholders\(stakeholder_id\)/);
@@ -68,6 +70,7 @@ describe('postgres schema indexes and foreign keys (T6.1)', () => {
 
   it('declares CHECK constraints protecting numeric quantities', () => {
     expect(schema).toMatch(/quantity_kg INTEGER NOT NULL CHECK \(quantity_kg > 0\)/);
+    expect(schema).toMatch(/UNIQUE NULLS NOT DISTINCT \(stakeholder_id, commodity, lot_id, month\)/);
     expect(schema).toMatch(/dispatched_qty_kg INTEGER NOT NULL CHECK \(dispatched_qty_kg > 0\)/);
     expect(schema).toMatch(/allocated_qty_kg INTEGER NOT NULL CHECK \(allocated_qty_kg > 0\)/);
     expect(schema).toMatch(/delivered_kg INTEGER NOT NULL CHECK \(delivered_kg > 0\)/);

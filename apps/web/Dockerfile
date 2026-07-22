@@ -4,6 +4,13 @@
 FROM node:22-alpine AS builder
 WORKDIR /app
 
+ARG VITE_DATA_SOURCE=api
+ARG VITE_OIDC_AUTHORITY=http://localhost:8080/realms/viksitpds
+ARG VITE_OIDC_CLIENT_ID=pds-web
+ENV VITE_DATA_SOURCE=$VITE_DATA_SOURCE
+ENV VITE_OIDC_AUTHORITY=$VITE_OIDC_AUTHORITY
+ENV VITE_OIDC_CLIENT_ID=$VITE_OIDC_CLIENT_ID
+
 COPY package.json package-lock.json tsconfig.base.json eslint.config.js ./
 COPY apps/api/package.json apps/api/package.json
 COPY apps/web/package.json apps/web/package.json

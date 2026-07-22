@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { mkdtempSync, rmSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -56,7 +57,7 @@ describe('PdsRuntime', () => {
 
       const second = await boot(false, statePath);
       service = second;
-      expect(second.listStakeholders().some((stakeholder) => stakeholder.stakeholderId === 'TEST-001')).toBe(true);
+      expect(second.listStakeholders().some((stakeholder: any) => stakeholder.stakeholderId === 'TEST-001')).toBe(true);
     } finally {
       if (service) await cleanup(service, statePath);
     }
@@ -89,7 +90,7 @@ describe('PdsRuntime', () => {
       expect(service.getTransfer('TR-LOOKUP-001').transferId).toBe('TR-LOOKUP-001');
       expect(service.getAllocation('ALLOC-LOOKUP-001').allocationId).toBe('ALLOC-LOOKUP-001');
       expect(service.getAuthTransaction(auth.authTxnId).authTxnId).toBe('AUTH-LOOKUP-001');
-      expect(service.listEntitlements().some((item) => item.rationCardHash === 'demo-ration-card-hash')).toBe(true);
+      expect(service.listEntitlements().some((item: any) => item.rationCardHash === 'demo-ration-card-hash')).toBe(true);
     } finally {
       await cleanup(service, statePath);
     }
@@ -118,7 +119,7 @@ describe('PdsRuntime', () => {
       });
       expect(distribution.ledgerTxId).toBeDefined();
       expect(service.getDistributionReceipt('DIST-API-001').distributionId).toBe('DIST-API-001');
-      expect(service.listDistributions().some((item) => item.distributionId === 'DIST-API-001')).toBe(true);
+      expect(service.listDistributions().some((item: any) => item.distributionId === 'DIST-API-001')).toBe(true);
     } finally {
       await cleanup(service, statePath);
     }
@@ -201,7 +202,7 @@ describe('PdsRuntime', () => {
           timestamp: '2026-06-30T10:05:00.000Z'
         })
       ).toThrow(/Requested quantity exceeds balance/);
-      expect(service.getAlerts().some((alert) => alert.alertType === AlertType.DUPLICATE_CLAIM)).toBe(true);
+      expect(service.getAlerts().some((alert: any) => alert.alertType === AlertType.DUPLICATE_CLAIM)).toBe(true);
 
       service.createOrUpdateEntitlement({
         rationCardHash: 'exception-ration-card-hash',
@@ -226,7 +227,7 @@ describe('PdsRuntime', () => {
         timestamp: '2026-06-30T10:10:00.000Z'
       });
       expect(exceptionDistribution.distributionId).toBe('DIST-POC-EXCEPTION');
-      expect(service.getAlerts().some((alert) => alert.alertType === AlertType.UNAUTHORIZED_TRANSACTION)).toBe(true);
+      expect(service.getAlerts().some((alert: any) => alert.alertType === AlertType.UNAUTHORIZED_TRANSACTION)).toBe(true);
     } finally {
       await cleanup(service, statePath);
     }
@@ -243,7 +244,7 @@ describe('PdsRuntime', () => {
       const reset = service.resetTransactionalData();
 
       for (const commodity of COMMODITIES) {
-        const lot = reset.lots.find((item) => item.commodity === commodity.name);
+        const lot = reset.lots.find((item: any) => item.commodity === commodity.name);
         expect(lot, `missing reset lot for ${commodity.name}`).toBeDefined();
 
         service.createOrUpdateEntitlement({
@@ -352,13 +353,13 @@ describe('PdsRuntime', () => {
     try {
       service.dispatchLot({ transferId: 'TR-ALERT-001', lotId: 'LOT-RICE-2026-001', fromOrg: 'PROC-001', toOrg: 'FCI-001', dispatchedQtyKg: demoQuantities.shortReceiptDispatchKg, vehicleNo: 'KA01AB9999' });
       service.receiveLot({ transferId: 'TR-ALERT-001', receivedQtyKg: demoQuantities.shortReceiptReceivedKg });
-      const alert = service.getAlerts().find((item) => item.alertType === 'SHORT_RECEIPT');
+      const alert = service.getAlerts().find((item: any) => item.alertType === 'SHORT_RECEIPT');
       expect(alert).toBeDefined();
 
       const resolved = service.resolveAuditAlert({ alertId: alert!.alertId, resolvedBy: 'AUD-001', resolutionNote: 'Checked shortage and closed case' });
 
       expect(resolved.status).toBe('RESOLVED');
-      expect(service.getAlerts().find((item) => item.alertId === alert!.alertId)?.status).toBe('RESOLVED');
+      expect(service.getAlerts().find((item: any) => item.alertId === alert!.alertId)?.status).toBe('RESOLVED');
     } finally {
       await cleanup(service, statePath);
     }

@@ -1,6 +1,6 @@
 # Fabric Network (2-org demo)
 
-This folder defines the Hyperledger Fabric topology for the ViksitPDS MVP and ships a **Fabric 3.1.x** two-organization demo (Food Department + Godown).
+This folder defines the Hyperledger Fabric topology for the ViksitPDS MVP and ships a **Fabric 2.5.15** two-organization demo (Food Department + Godown).
 
 ## Topology
 

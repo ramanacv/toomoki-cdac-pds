@@ -1,7 +1,6 @@
-import type { AuditAlert, DashboardSummary, LedgerEvent } from '@pds/shared-types';
+import type { AuditAlert, DashboardSummary, LedgerEvent, LedgerProofSummaryResponse } from '@pds/shared-types';
 import { buildApiUrl } from './api.js';
-
-const ADMIN_TOKEN_STORAGE_KEY = 'pds_admin_token';
+import { authHeaders } from './auth-token.js';
 
 export type AdminHealthCheck = {
   name: string;
@@ -94,6 +93,7 @@ export type AdminOverview = {
   entitlementSummary: AdminEntitlementSummary;
   health: AdminHealthCheck[];
   links: Record<string, string>;
+  proofSummary?: LedgerProofSummaryResponse;
 };
 
 export type AdminResetResult = {
@@ -103,24 +103,8 @@ export type AdminResetResult = {
   lots: Array<{ lotId: string; commodity: string; quantityKg: number }>;
 };
 
-export const getStoredAdminToken = (): string => {
-  if (typeof window === 'undefined') {
-    return import.meta.env.VITE_ADMIN_TOKEN ?? '';
-  }
-  return window.localStorage.getItem(ADMIN_TOKEN_STORAGE_KEY) ?? import.meta.env.VITE_ADMIN_TOKEN ?? '';
-};
-
-export const setStoredAdminToken = (token: string): void => {
-  window.localStorage.setItem(ADMIN_TOKEN_STORAGE_KEY, token);
-};
-
-const adminHeaders = (): HeadersInit => {
-  const token = getStoredAdminToken();
-  return token ? { 'X-Admin-Token': token } : {};
-};
-
 async function fetchAdminJson<T>(path: string): Promise<T> {
-  const response = await fetch(buildApiUrl(path), { headers: adminHeaders() });
+  const response = await fetch(buildApiUrl(path), { headers: authHeaders() });
   if (!response.ok) {
     const message = await response.text();
     throw new Error(message || `Admin request failed for ${path}`);
@@ -131,7 +115,7 @@ async function fetchAdminJson<T>(path: string): Promise<T> {
 async function postAdminJson<T>(path: string, body?: Record<string, unknown>): Promise<T> {
   const response = await fetch(buildApiUrl(path), {
     method: 'POST',
-    headers: { ...adminHeaders(), 'Content-Type': 'application/json' },
+    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
     body: JSON.stringify(body ?? {})
   });
   if (!response.ok) {
@@ -141,7 +125,13 @@ async function postAdminJson<T>(path: string, body?: Record<string, unknown>): P
   return (await response.json()) as T;
 }
 
-export const loadAdminOverview = (): Promise<AdminOverview> => fetchAdminJson('/admin/overview');
+export const loadAdminOverview = async (): Promise<AdminOverview> => {
+  const [overview, proofSummary] = await Promise.all([
+    fetchAdminJson<AdminOverview>('/admin/overview'),
+    fetchAdminJson<LedgerProofSummaryResponse>('/admin/proofs/summary')
+  ]);
+  return { ...overview, proofSummary };
+};
 
 export const loadAdminNetwork = (): Promise<AdminNetworkInfo> => fetchAdminJson('/admin/network');
 

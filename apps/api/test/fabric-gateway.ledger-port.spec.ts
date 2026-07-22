@@ -31,8 +31,14 @@ const baseConfig = (dir: string): FabricRuntimeConfig => ({
 
 describe('FabricGatewayLedgerPort', () => {
   let dir: string;
+  let ports: FabricGatewayLedgerPort[] = [];
 
   afterEach(() => {
+    for (const port of ports) {
+      port.stopOutboxWorker();
+    }
+    ports = [];
+    delete process.env.PDS_OUTBOX_STALE_SUBMITTING_MS;
     vi.restoreAllMocks();
     if (dir) {
       rmSync(dir, { recursive: true, force: true });
@@ -108,5 +114,78 @@ describe('FabricGatewayLedgerPort', () => {
     const journalRaw = readFileSync(join(dir, 'journal.ndjson'), 'utf8');
     expect(journalRaw).toContain('TX-DW');
     expect(submitLedgerEventAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it('reclaims stale SUBMITTING outbox rows back to PENDING without consuming a retry', async () => {
+    dir = mkdtempSync(join(tmpdir(), 'pds-fabric-port-'));
+    process.env.PDS_OUTBOX_STALE_SUBMITTING_MS = '1000';
+    const submitLedgerEventAsync = vi.fn().mockResolvedValue({ txId: 'tx-reclaim' });
+    vi.spyOn(FabricGatewayClient.prototype, 'submitLedgerEventAsync').mockImplementation(submitLedgerEventAsync);
+
+    const event = {
+      ledgerTxId: 'TX-ORPHAN',
+      entityType: 'stakeholder',
+      entityId: 'STK-ORPHAN',
+      eventType: 'RegisterStakeholder',
+      payload: { stakeholderId: 'STK-ORPHAN' },
+      timestamp: '2026-06-25T10:00:00.000Z'
+    } as unknown as LedgerEvent;
+
+    const query = vi.fn(async (sql: string, values?: unknown[]) => {
+      if (sql.includes("status = 'PENDING'") && sql.includes("status = 'SUBMITTING'")) {
+        expect(values?.[0]).toBe(1000);
+        return { rows: [{ outbox_id: 76 }], rowCount: 1 };
+      }
+      if (sql.includes('WITH ready AS')) {
+        return {
+          rows: [{ outbox_id: 76, event_payload: event }],
+          rowCount: 1
+        };
+      }
+      if (sql.includes("status = 'COMMITTED'")) {
+        return { rows: [], rowCount: 1 };
+      }
+      return { rows: [], rowCount: 0 };
+    });
+
+    const adapter = {
+      pool: {} as never,
+      query,
+      readSnapshotRows: async () => null,
+      writeStatements: async () => undefined
+    };
+
+    const port = new FabricGatewayLedgerPort(baseConfig(dir), adapter as never);
+    ports.push(port);
+    // processOutbox always reclaims before claiming; that is the path under test.
+    await (port as unknown as { processOutbox: () => Promise<void> }).processOutbox();
+    port.stopOutboxWorker();
+
+    const reclaimCalls = query.mock.calls.filter(
+      ([sql]) => typeof sql === 'string' && sql.includes("status = 'SUBMITTING'") && sql.includes("status = 'PENDING'")
+    );
+    expect(reclaimCalls.length).toBeGreaterThanOrEqual(1);
+    for (const [sql] of reclaimCalls) {
+      expect(sql).not.toMatch(/retry_count\s*=/);
+    }
+    expect(submitLedgerEventAsync).toHaveBeenCalledWith(event);
+    expect(query.mock.calls.some(([sql]) => typeof sql === 'string' && sql.includes("status = 'COMMITTED'"))).toBe(
+      true
+    );
+  });
+});
+
+describe('resolveOutboxStaleSubmittingMs', () => {
+  afterEach(() => {
+    delete process.env.PDS_OUTBOX_STALE_SUBMITTING_MS;
+  });
+
+  it('defaults to 60s and accepts a positive override', async () => {
+    const { resolveOutboxStaleSubmittingMs, DEFAULT_OUTBOX_STALE_SUBMITTING_MS } = await import(
+      '../src/modules/fabric/fabric-gateway.ledger-port.js'
+    );
+    expect(resolveOutboxStaleSubmittingMs()).toBe(DEFAULT_OUTBOX_STALE_SUBMITTING_MS);
+    process.env.PDS_OUTBOX_STALE_SUBMITTING_MS = '45000';
+    expect(resolveOutboxStaleSubmittingMs()).toBe(45000);
   });
 });

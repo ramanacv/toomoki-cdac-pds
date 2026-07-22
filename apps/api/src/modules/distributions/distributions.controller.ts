@@ -2,9 +2,11 @@ import { Plane } from '../../infrastructure/plane.decorator.js';
 import { Body, Controller, Get, Inject, Param, Post } from '@nestjs/common';
 import { PdsLedgerFacade } from '../core/pds-ledger.facade.js';
 import { DistributionDto } from './dto/distribution.dto.js';
+import { Roles } from '../auth/roles.decorator.js';
 
 @Plane('data')
 @Controller()
+@Roles('fps', 'department', 'auditor', 'management')
 export class DistributionsController {
   constructor(@Inject(PdsLedgerFacade) private readonly ledger: PdsLedgerFacade) {}
 
@@ -14,6 +16,7 @@ export class DistributionsController {
   }
 
   @Post('/distributions')
+  @Roles('fps')
   distribute(@Body() body: DistributionDto) {
     return this.ledger.recordDistributionPersisted(body);
   }

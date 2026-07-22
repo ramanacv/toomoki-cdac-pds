@@ -9,6 +9,8 @@ const expectSuccess = (status: number): void => {
   expect([200, 201]).toContain(status);
 };
 
+const asRole = (role: string) => ({ Authorization: `Bearer test-token:${role}` });
+
 describe('Demo API e2e', () => {
   let fixture: DemoHttpAppFixture;
 
@@ -22,19 +24,49 @@ describe('Demo API e2e', () => {
     await request(fixture.app.getHttpServer()).get('/health').expect(200);
     const health = await request(fixture.app.getHttpServer()).get('/health');
     expect(health.body.ok).toBe(true);
-    expect(health.body.ledgerMode).toBe('demo');
+    expect(health.body).toEqual({ ok: true });
 
     const openapi = await request(fixture.app.getHttpServer()).get('/openapi.json').expect(200);
     expect(openapi.body.paths['/stakeholders']).toBeDefined();
 
-    const summary = await request(fixture.app.getHttpServer()).get('/dashboard/summary').expect(200);
+    const ready = await request(fixture.app.getHttpServer()).get('/health/ready').expect(200);
+    expect(ready.body).toEqual({ ok: true });
+
+    const summary = await request(fixture.app.getHttpServer()).get('/dashboard/summary').set(asRole('management')).expect(200);
     expect(summary.body.activeLots).toBeGreaterThan(0);
   });
 
-  it('serves admin overview in demo mode without token', async () => {
+  it('applies security headers, exact CORS origins, and the 256 KB JSON limit', async () => {
+    fixture = await createDemoHttpApp();
+    const server = fixture.app.getHttpServer();
+    const health = await request(server).get('/health').expect(200);
+    expect(health.headers['x-frame-options']).toBe('DENY');
+    expect(health.headers['x-content-type-options']).toBe('nosniff');
+    expect(health.headers['content-security-policy']).toContain("frame-ancestors 'none'");
+
+    const allowed = await request(server).options('/dashboard/summary')
+      .set('Origin', 'http://jury.test')
+      .set('Access-Control-Request-Method', 'GET')
+      .expect(204);
+    expect(allowed.headers['access-control-allow-origin']).toBe('http://jury.test');
+
+    const denied = await request(server).options('/dashboard/summary')
+      .set('Origin', 'http://attacker.test')
+      .set('Access-Control-Request-Method', 'GET');
+    expect(denied.headers['access-control-allow-origin']).toBeUndefined();
+
+    await request(server).post('/stakeholders').set(asRole('department'))
+      .set('Content-Type', 'application/json')
+      .send(JSON.stringify({ padding: 'x'.repeat(270 * 1024) }))
+      .expect(413);
+  });
+
+  it('serves admin overview only to a platform administrator', async () => {
     fixture = await createDemoHttpApp();
 
-    const overview = await request(fixture.app.getHttpServer()).get('/admin/overview').expect(200);
+    await request(fixture.app.getHttpServer()).get('/admin/overview').expect(401);
+    await request(fixture.app.getHttpServer()).get('/admin/overview').set(asRole('auditor')).expect(403);
+    const overview = await request(fixture.app.getHttpServer()).get('/admin/overview').set(asRole('platform-admin')).expect(200);
     expect(overview.body.readOnly).toBe(true);
     expect(overview.body.network.ledgerMode).toBe('demo');
     expect(overview.body.metrics.stakeholders).toBeGreaterThan(0);
@@ -47,6 +79,7 @@ describe('Demo API e2e', () => {
 
     const stakeholderResponse = await request(server)
       .post('/stakeholders')
+      .set(asRole('department'))
       .send({
         stakeholderId: 'E2E-STK-001',
         stakeholderType: StakeholderType.DISTRICT_SUPPLY_OFFICE,
@@ -57,14 +90,14 @@ describe('Demo API e2e', () => {
       });
     expectSuccess(stakeholderResponse.status);
 
-    const stakeholders = await request(server).get('/stakeholders').expect(200);
+    const stakeholders = await request(server).get('/stakeholders').set(asRole('department')).expect(200);
     expect(stakeholders.body.some((item: { stakeholderId: string }) => item.stakeholderId === 'E2E-STK-001')).toBe(
       true
     );
 
     expectSuccess(
       (
-        await request(server).post('/lots').send({
+        await request(server).post('/lots').set(asRole('procurement')).send({
           lotId: 'LOT-E2E-001',
           commodity: 'Rice',
           season: 'Kharif 2026',
@@ -79,7 +112,7 @@ describe('Demo API e2e', () => {
 
     expectSuccess(
       (
-        await request(server).post('/transfers').send({
+        await request(server).post('/transfers').set(asRole('procurement')).send({
           transferId: 'TR-E2E-001',
           lotId: 'LOT-E2E-001',
           fromOrg: 'PROC-001',
@@ -91,10 +124,10 @@ describe('Demo API e2e', () => {
     );
 
     expectSuccess(
-      (await request(server).post('/transfers/TR-E2E-001/receive').send({ receivedQtyKg: 100 })).status
+      (await request(server).post('/transfers/TR-E2E-001/receive').set(asRole('fci')).send({ receivedQtyKg: 100 })).status
     );
 
-    const trace = await request(server).get('/trace/lots/LOT-E2E-001').expect(200);
+    const trace = await request(server).get('/trace/lots/LOT-E2E-001').set(asRole('auditor')).expect(200);
     expect(trace.body.lot.lotId).toBe('LOT-E2E-001');
     expect(trace.body.history.length).toBeGreaterThan(0);
   });
@@ -107,7 +140,7 @@ describe('Demo API e2e', () => {
 
     expectSuccess(
       (
-        await request(server).post('/fps-allocations').send({
+        await request(server).post('/fps-allocations').set(asRole('department')).send({
           allocationId: 'ALLOC-E2E-001',
           fpsId: 'FPS-101',
           commodity: 'Rice',
@@ -119,11 +152,12 @@ describe('Demo API e2e', () => {
     );
 
     expectSuccess(
-      (await request(server).post('/fps-allocations/ALLOC-E2E-001/receipt').send({ receivedQtyKg: 40 })).status
+      (await request(server).post('/fps-allocations/ALLOC-E2E-001/receipt').set(asRole('fps')).send({ receivedQtyKg: 40 })).status
     );
 
     const auth = await request(server)
       .post('/auth/mock-otp')
+      .set(asRole('fps'))
       .send({
         authTxnId: 'AUTH-E2E-001',
         beneficiaryRefHash: 'beneficiary-hash',
@@ -134,7 +168,7 @@ describe('Demo API e2e', () => {
 
     expectSuccess(
       (
-        await request(server).post('/distributions').send({
+        await request(server).post('/distributions').set(asRole('fps')).send({
           distributionId: 'DIST-E2E-001',
           fpsId: 'FPS-101',
           rationCardHash: 'demo-ration-card-hash',
@@ -150,7 +184,7 @@ describe('Demo API e2e', () => {
       ).status
     );
 
-    const distribution = await request(server).get('/distributions/DIST-E2E-001').expect(200);
+    const distribution = await request(server).get('/distributions/DIST-E2E-001').set(asRole('fps')).expect(200);
     expect(distribution.body.distributionId).toBe('DIST-E2E-001');
   });
 
@@ -159,11 +193,12 @@ describe('Demo API e2e', () => {
     const server = fixture.app.getHttpServer();
 
     // Non-existent lot → 404 (trace lookup throws "Lot ... not found").
-    await request(server).get('/trace/lots/LOT-DOES-NOT-EXIST').expect(404);
+    await request(server).get('/trace/lots/LOT-DOES-NOT-EXIST').set(asRole('auditor')).expect(404);
 
     // Duplicate create → 409 (create the same lot twice).
     await request(server)
       .post('/lots')
+      .set(asRole('procurement'))
       .send({
         lotId: 'LOT-DUP-E2E',
         commodity: 'Rice',
@@ -177,6 +212,7 @@ describe('Demo API e2e', () => {
       .expect(201);
     const duplicate = await request(server)
       .post('/lots')
+      .set(asRole('procurement'))
       .send({
         lotId: 'LOT-DUP-E2E',
         commodity: 'Rice',
@@ -206,21 +242,19 @@ describe('Demo API e2e', () => {
     expect(true).toBe(true);
   });
 
-  it('enforces the admin token on /admin/* when PDS_ADMIN_TOKEN is configured (T2.4 e2e)', async () => {
+  it('keeps admin, metrics, and reset privileges independent', async () => {
     fixture = await createDemoHttpApp();
     const server = fixture.app.getHttpServer();
-    const token = 'e2e-admin-token';
-
-    process.env.PDS_ADMIN_TOKEN = token;
+    process.env.PDS_ALLOW_RESET = 'true';
     try {
-      // No token → 401.
       await request(server).get('/admin/overview').expect(401);
-      // Wrong token → 401.
-      await request(server).get('/admin/overview').set('x-admin-token', 'wrong').expect(401);
-      // Correct token → 200.
-      await request(server).get('/admin/overview').set('x-admin-token', token).expect(200);
+      await request(server).get('/admin/overview').set(asRole('platform-admin')).expect(200);
+      await request(server).get('/metrics').set(asRole('metrics-reader')).expect(200);
+      await request(server).get('/metrics').set(asRole('demo-reset')).expect(403);
+      await request(server).post('/admin/reset').set(asRole('platform-admin')).send({}).expect(403);
+      await request(server).post('/admin/reset').set(asRole('demo-reset')).send({}).expect(200);
     } finally {
-      delete process.env.PDS_ADMIN_TOKEN;
+      delete process.env.PDS_ALLOW_RESET;
     }
   });
 
@@ -233,6 +267,7 @@ describe('Demo API e2e', () => {
     // Allocation → FPS receipt.
     await request(server)
       .post('/fps-allocations')
+      .set(asRole('department'))
       .send({
         allocationId: 'ALLOC-SYS-001',
         fpsId: 'FPS-101',
@@ -242,11 +277,12 @@ describe('Demo API e2e', () => {
         sourceGodownId: 'ISSUE-001'
       })
       .expect(201);
-    await request(server).post('/fps-allocations/ALLOC-SYS-001/receipt').send({ receivedQtyKg: 50 }).expect(201);
+    await request(server).post('/fps-allocations/ALLOC-SYS-001/receipt').set(asRole('fps')).send({ receivedQtyKg: 50 }).expect(201);
 
     // A short transfer receipt raises a SHORT_RECEIPT audit alert (exception path).
     await request(server)
       .post('/transfers')
+      .set(asRole('procurement'))
       .send({
         transferId: 'TR-SYS-SHORT',
         lotId: 'LOT-KEROSENE-2026-001',
@@ -256,14 +292,15 @@ describe('Demo API e2e', () => {
         vehicleNo: 'KA01SYS0001'
       })
       .expect(201);
-    await request(server).post('/transfers/TR-SYS-SHORT/receive').send({ receivedQtyKg: 18 }).expect(201);
+    await request(server).post('/transfers/TR-SYS-SHORT/receive').set(asRole('fci')).send({ receivedQtyKg: 18 }).expect(201);
 
-    const alertsAfterShort = await request(server).get('/audit-alerts').expect(200);
+    const alertsAfterShort = await request(server).get('/audit-alerts').set(asRole('auditor')).expect(200);
     expect(alertsAfterShort.body.some((a: { alertType: string }) => a.alertType === 'SHORT_RECEIPT')).toBe(true);
 
     // Auth + distribution.
     const auth = await request(server)
       .post('/auth/mock-otp')
+      .set(asRole('fps'))
       .send({
         authTxnId: 'AUTH-SYS-001',
         beneficiaryRefHash: 'beneficiary-hash',
@@ -274,6 +311,7 @@ describe('Demo API e2e', () => {
 
     await request(server)
       .post('/distributions')
+      .set(asRole('fps'))
       .send({
         distributionId: 'DIST-SYS-001',
         fpsId: 'FPS-101',
@@ -290,9 +328,9 @@ describe('Demo API e2e', () => {
       .expect(201);
 
     // End-to-end ledger state: the distribution is recorded and stock accounting holds.
-    const trace = await request(server).get('/trace/distributions/DIST-SYS-001').expect(200);
+    const trace = await request(server).get('/trace/distributions/DIST-SYS-001').set(asRole('auditor')).expect(200);
     expect(trace.body.distribution.distributionId).toBe('DIST-SYS-001');
-    const summary = await request(server).get('/dashboard/summary').expect(200);
+    const summary = await request(server).get('/dashboard/summary').set(asRole('management')).expect(200);
     expect(summary.body.completedDistributions).toBeGreaterThan(0);
     expect(summary.body.openAlerts).toBeGreaterThanOrEqual(0);
   });

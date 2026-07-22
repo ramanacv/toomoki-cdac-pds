@@ -33,9 +33,13 @@ describe('AdminModule', () => {
   let fixture: DemoLedgerFixture;
   let controller: AdminController;
 
-  afterEach(async () => { await fixture?.cleanup(); });
+  afterEach(async () => {
+    delete process.env.PDS_ALLOW_RESET;
+    await fixture?.cleanup();
+  });
 
   it('serves overview, network, activity, and stakeholder endpoints', async () => {
+    process.env.PDS_ALLOW_RESET = 'true';
     fixture = await createDemoLedgerFixture();
 
     const moduleRef = await Test.createTestingModule({
@@ -49,26 +53,26 @@ describe('AdminModule', () => {
 
     controller = moduleRef.get(AdminController);
 
-    const overview = controller.overview();
+    const overview = await controller.overview();
     expect(overview.readOnly).toBe(true);
     expect(overview.network.ledgerMode).toBe('demo');
 
-    const network = controller.network();
+    const network = await controller.network();
     expect(network.persistenceBackend).toBeDefined();
 
-    const activity = controller.activity();
+    const activity = await controller.activity();
     expect(activity.recentEvents.length).toBeGreaterThan(0);
 
-    const stakeholders = controller.stakeholdersSummary();
+    const stakeholders = await controller.stakeholdersSummary();
     expect(stakeholders.byType.length).toBeGreaterThan(0);
 
-    const beforeReset = controller.overview();
+    const beforeReset = await controller.overview();
     expect(beforeReset.metrics.lots).toBeGreaterThan(0);
 
     const resetResult = await controller.reset({});
     expect(resetResult.ledgerTxId).toMatch(/^TX-/);
 
-    const afterReset = controller.overview();
+    const afterReset = await controller.overview();
     // The demo's starting lots are recreated by the reset so the scripted rice
     // workflow can be replayed while the commodity catalog remains visible.
     expect(afterReset.metrics.lots).toBe(6);
@@ -78,6 +82,7 @@ describe('AdminModule', () => {
   });
 
   it('accepts a commodity-scoped reset and rejects an unknown commodity', async () => {
+    process.env.PDS_ALLOW_RESET = 'true';
     fixture = await createDemoLedgerFixture();
 
     const moduleRef = await Test.createTestingModule({

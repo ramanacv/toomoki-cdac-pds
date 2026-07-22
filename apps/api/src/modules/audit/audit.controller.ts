@@ -2,9 +2,11 @@ import { Plane } from '../../infrastructure/plane.decorator.js';
 import { Body, Controller, Get, Inject, Param, Post } from '@nestjs/common';
 import { PdsLedgerFacade } from '../core/pds-ledger.facade.js';
 import { ResolveAuditAlertDto } from './dto/resolve-audit-alert.dto.js';
+import { Roles } from '../auth/roles.decorator.js';
 
 @Plane('data')
 @Controller()
+@Roles('auditor')
 export class AuditController {
   constructor(@Inject(PdsLedgerFacade) private readonly ledger: PdsLedgerFacade) {}
 

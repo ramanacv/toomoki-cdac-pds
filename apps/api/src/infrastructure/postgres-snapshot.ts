@@ -25,6 +25,12 @@ export type SqlStatement = {
 
 const asString = (value: unknown): string => String(value);
 const asNumber = (value: unknown): number => Number(value);
+const toIsoStringDefault = (value: unknown): string => {
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+  return String(value);
+};
 
 export const mapStakeholderRow = (row: Record<string, unknown>): Stakeholder => ({
   stakeholderId: asString(row.stakeholder_id),
@@ -47,7 +53,7 @@ export const mapLotRow = (row: Record<string, unknown>): CommodityLot => ({
   status: asString(row.status) as LotStatus
 });
 
-export const mapTransferRow = (row: Record<string, unknown>, toIsoString = asString): TransferOrder => ({
+export const mapTransferRow = (row: Record<string, unknown>, toIsoString = toIsoStringDefault): TransferOrder => ({
   transferId: asString(row.transfer_id),
   lotId: asString(row.lot_id),
   fromOrg: asString(row.from_org),
@@ -58,7 +64,14 @@ export const mapTransferRow = (row: Record<string, unknown>, toIsoString = asStr
   vehicleNo: asString(row.vehicle_no),
   status: asString(row.status) as TransferStatus,
   dispatchTimestamp: toIsoString(row.dispatch_timestamp),
-  ...(row.receive_timestamp == null ? {} : { receiveTimestamp: toIsoString(row.receive_timestamp) })
+  ...(row.receive_timestamp == null ? {} : { receiveTimestamp: toIsoString(row.receive_timestamp) }),
+  ...(row.stage == null ? {} : { stage: asString(row.stage) as 'I' | 'II' }),
+  ...(row.ro_ref == null ? {} : { roRef: asString(row.ro_ref) }),
+  ...(row.authorized_by == null ? {} : { authorizedBy: asString(row.authorized_by) }),
+  ...(row.authorized_at == null ? {} : { authorizedAt: toIsoString(row.authorized_at) }),
+  ...(row.approval_status == null ? {} : { approvalStatus: asString(row.approval_status) as 'PENDING' | 'APPROVED' | 'REJECTED' | 'BLOCKED' }),
+  ...(row.transporter_id == null ? {} : { transporterId: asString(row.transporter_id) }),
+  ...(row.transformed_from_lot_id == null ? {} : { transformedFromLotId: asString(row.transformed_from_lot_id) })
 });
 
 export const mapAllocationRow = (row: Record<string, unknown>): FPSAllocation => ({
@@ -83,7 +96,7 @@ export const mapEntitlementRow = (row: Record<string, unknown>): MonthlyEntitlem
   active: Boolean(row.active)
 });
 
-export const mapAuthTransactionRow = (row: Record<string, unknown>, toIsoString = asString): AuthTransaction => ({
+export const mapAuthTransactionRow = (row: Record<string, unknown>, toIsoString = toIsoStringDefault): AuthTransaction => ({
   authTxnId: asString(row.auth_txn_id),
   beneficiaryRefHash: asString(row.beneficiary_ref_hash),
   rationCardHash: asString(row.ration_card_hash),
@@ -94,7 +107,7 @@ export const mapAuthTransactionRow = (row: Record<string, unknown>, toIsoString 
   timestamp: toIsoString(row.timestamp)
 });
 
-export const mapDistributionRow = (row: Record<string, unknown>, toIsoString = asString): DistributionTransaction => ({
+export const mapDistributionRow = (row: Record<string, unknown>, toIsoString = toIsoStringDefault): DistributionTransaction => ({
   distributionId: asString(row.distribution_id),
   fpsId: asString(row.fps_id),
   rationCardHash: asString(row.ration_card_hash),
@@ -109,7 +122,7 @@ export const mapDistributionRow = (row: Record<string, unknown>, toIsoString = a
   timestamp: toIsoString(row.timestamp)
 });
 
-export const mapAlertRow = (row: Record<string, unknown>, toIsoString = asString): AuditAlert => ({
+export const mapAlertRow = (row: Record<string, unknown>, toIsoString = toIsoStringDefault): AuditAlert => ({
   alertId: asString(row.alert_id),
   alertType: asString(row.alert_type) as AlertType,
   entityId: asString(row.entity_id),
@@ -123,7 +136,7 @@ export const mapAlertRow = (row: Record<string, unknown>, toIsoString = asString
   ...(row.resolution_note == null ? {} : { resolutionNote: asString(row.resolution_note) })
 });
 
-export const mapEventRow = (row: Record<string, unknown>, toIsoString = asString): LedgerEvent => ({
+export const mapEventRow = (row: Record<string, unknown>, toIsoString = toIsoStringDefault): LedgerEvent => ({
   ledgerTxId: asString(row.ledger_tx_id),
   entityType: asString(row.entity_type) as LedgerEvent['entityType'],
   entityId: asString(row.entity_id),
@@ -176,7 +189,7 @@ export const buildSnapshotWritePlan = (state: PdsLedgerState): SqlStatement[] =>
 
   for (const transfer of state.transfers) {
     statements.push({
-      text: 'INSERT INTO transfer_orders (transfer_id, lot_id, from_org, to_org, dispatched_qty_kg, received_qty_kg, shortage_qty_kg, vehicle_no, status, dispatch_timestamp, receive_timestamp) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) ON CONFLICT (transfer_id) DO UPDATE SET lot_id = EXCLUDED.lot_id, from_org = EXCLUDED.from_org, to_org = EXCLUDED.to_org, dispatched_qty_kg = EXCLUDED.dispatched_qty_kg, received_qty_kg = EXCLUDED.received_qty_kg, shortage_qty_kg = EXCLUDED.shortage_qty_kg, vehicle_no = EXCLUDED.vehicle_no, status = EXCLUDED.status, dispatch_timestamp = EXCLUDED.dispatch_timestamp, receive_timestamp = EXCLUDED.receive_timestamp',
+      text: 'INSERT INTO transfer_orders (transfer_id, lot_id, from_org, to_org, dispatched_qty_kg, received_qty_kg, shortage_qty_kg, vehicle_no, status, dispatch_timestamp, receive_timestamp, stage, ro_ref, authorized_by, authorized_at, approval_status, transporter_id, transformed_from_lot_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18) ON CONFLICT (transfer_id) DO UPDATE SET lot_id = EXCLUDED.lot_id, from_org = EXCLUDED.from_org, to_org = EXCLUDED.to_org, dispatched_qty_kg = EXCLUDED.dispatched_qty_kg, received_qty_kg = EXCLUDED.received_qty_kg, shortage_qty_kg = EXCLUDED.shortage_qty_kg, vehicle_no = EXCLUDED.vehicle_no, status = EXCLUDED.status, dispatch_timestamp = EXCLUDED.dispatch_timestamp, receive_timestamp = EXCLUDED.receive_timestamp, stage = EXCLUDED.stage, ro_ref = EXCLUDED.ro_ref, authorized_by = EXCLUDED.authorized_by, authorized_at = EXCLUDED.authorized_at, approval_status = EXCLUDED.approval_status, transporter_id = EXCLUDED.transporter_id, transformed_from_lot_id = EXCLUDED.transformed_from_lot_id',
       values: [
         transfer.transferId,
         transfer.lotId,
@@ -188,7 +201,14 @@ export const buildSnapshotWritePlan = (state: PdsLedgerState): SqlStatement[] =>
         transfer.vehicleNo,
         transfer.status,
         transfer.dispatchTimestamp,
-        transfer.receiveTimestamp ?? null
+        transfer.receiveTimestamp ?? null,
+        transfer.stage ?? null,
+        transfer.roRef ?? null,
+        transfer.authorizedBy ?? null,
+        transfer.authorizedAt ?? null,
+        transfer.approvalStatus ?? null,
+        transfer.transporterId ?? null,
+        transfer.transformedFromLotId ?? null
       ]
     });
   }

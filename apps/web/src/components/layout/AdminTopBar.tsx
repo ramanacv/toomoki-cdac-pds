@@ -8,9 +8,10 @@ type AdminTopBarProps = {
   apiOnline: boolean;
   ledgerMode: LedgerMode | null;
   onToggleSidebar: () => void;
+  onLogout: () => void;
 };
 
-export function AdminTopBar({ screenLabel, apiOnline, ledgerMode, onToggleSidebar }: AdminTopBarProps) {
+export function AdminTopBar({ screenLabel, apiOnline, ledgerMode, onToggleSidebar, onLogout }: AdminTopBarProps) {
   return (
     <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-border bg-background/85 px-4 py-3 backdrop-blur md:px-8">
       <button
@@ -27,6 +28,7 @@ export function AdminTopBar({ screenLabel, apiOnline, ledgerMode, onToggleSideba
         <Button variant="secondary" size="sm" asChild>
           <a href="/">Back to workspace</a>
         </Button>
+        <Button variant="secondary" size="sm" onClick={onLogout}>Log out</Button>
       </div>
     </header>
   );

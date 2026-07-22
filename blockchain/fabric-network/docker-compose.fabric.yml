@@ -39,9 +39,12 @@ services:
     profiles: [fabric]
     image: hyperledger/fabric-peer:2.5.15
     container_name: peer0.food.example.com
+    mem_limit: 1000m
     environment:
       - CORE_PEER_ID=peer0.food.example.com
       - CORE_PEER_ADDRESS=peer0.food.example.com:7051
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0.food.example.com:7051
+      - CORE_PEER_GOSSIP_BOOTSTRAP=peer0.godown.example.com:9051
       - CORE_PEER_LISTENADDRESS=0.0.0.0:7051
       - CORE_PEER_CHAINCODEADDRESS=peer0.food.example.com:7052
       - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:7052
@@ -54,6 +57,7 @@ services:
       - CORE_LEDGER_STATE_STATEDATABASE=CouchDB
       - CORE_VM_ENDPOINT=unix:///var/run/docker.sock
       - CORE_VM_DOCKER_HOSTCONFIG_NETWORKMODE=pds-fabric
+      - CORE_VM_DOCKER_HOSTCONFIG_MEMORY=536870912
       - CORE_CHAINCODE_EXECUTETIMEOUT=300s
       - CORE_LEDGER_STATE_COUCHDBCONFIG_COUCHDBADDRESS=couchdb0:5984
       - CORE_LEDGER_STATE_COUCHDBCONFIG_USERNAME=${PDS_COUCHDB_USER:-pds_couch}
@@ -73,9 +77,12 @@ services:
     profiles: [fabric]
     image: hyperledger/fabric-peer:2.5.15
     container_name: peer0.godown.example.com
+    mem_limit: 1000m
     environment:
       - CORE_PEER_ID=peer0.godown.example.com
       - CORE_PEER_ADDRESS=peer0.godown.example.com:9051
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0.godown.example.com:9051
+      - CORE_PEER_GOSSIP_BOOTSTRAP=peer0.food.example.com:7051
       - CORE_PEER_LISTENADDRESS=0.0.0.0:9051
       - CORE_PEER_CHAINCODEADDRESS=peer0.godown.example.com:9052
       - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:9052
@@ -88,6 +95,7 @@ services:
       - CORE_LEDGER_STATE_STATEDATABASE=CouchDB
       - CORE_VM_ENDPOINT=unix:///var/run/docker.sock
       - CORE_VM_DOCKER_HOSTCONFIG_NETWORKMODE=pds-fabric
+      - CORE_VM_DOCKER_HOSTCONFIG_MEMORY=536870912
       - CORE_CHAINCODE_EXECUTETIMEOUT=300s
       - CORE_LEDGER_STATE_COUCHDBCONFIG_COUCHDBADDRESS=couchdb1:5984
       - CORE_LEDGER_STATE_COUCHDBCONFIG_USERNAME=${PDS_COUCHDB_USER:-pds_couch}

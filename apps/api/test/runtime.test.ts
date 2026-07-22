@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { dirname, join } from 'node:path';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -57,7 +58,7 @@ describe('PdsRuntime', () => {
       await first.flushPersist();
 
       const second = await bootRuntime(false, port);
-      expect(second.listStakeholders().some((stakeholder) => stakeholder.stakeholderId === 'RUNTIME-002')).toBe(true);
+      expect(second.listStakeholders().some((stakeholder: any) => stakeholder.stakeholderId === 'RUNTIME-002')).toBe(true);
     } finally {
       rmSync(dirname(port.statePath), { recursive: true, force: true });
     }
@@ -98,7 +99,7 @@ describe('PdsRuntime', () => {
       ...result.lots.map(() => 'CreateCommodityLot')
     ]);
     expect(port.appended[0]?.slice(resetIndex + 1).map((event) => event.entityId)).toEqual(
-      result.lots.map((lot) => lot.lotId)
+      result.lots.map((lot: any) => lot.lotId)
     );
   });
 

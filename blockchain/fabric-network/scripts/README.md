@@ -1,7 +1,7 @@
 # Fabric Scaffold Scripts
 
-Scripts for the PDS Fabric network lifecycle. The network targets Fabric 3.1.x
-(`hyperledger/fabric-peer:3.1.5`, `hyperledger/fabric-tools:3.1.5`) with a
+Scripts for the PDS Fabric network lifecycle. The network targets Fabric 2.5.15
+(`hyperledger/fabric-peer:2.5.15`, `hyperledger/fabric-tools:2.5.15`) with a
 2-org deployment (`FoodAndCivilSuppliesMSP`, `GodownWarehouseMSP`) on the
 `pdschannel` channel; the remaining 3 orgs (procurement, FPS, audit) are
 documented as future peers — see `connection-profiles/` and
@@ -9,13 +9,13 @@ documented as future peers — see `connection-profiles/` and
 
 ## Bootstrap & lifecycle
 
-- `bootstrap-fabric-full.sh` — full bootstrap: pulls Fabric 3.1.x tool images,
+- `bootstrap-fabric-full.sh` — full bootstrap: pulls Fabric 2.5.15 tool images,
   generates crypto material, the channel artifact, and joins peers. End-to-end
   entry point for standing up the 2-org network.
 - `bootstrap-network.sh` — documents the planned bootstrap sequence for the
   MVP (network topology + channel + chaincode).
 - `generate-crypto.sh` — generates MSP material with `cryptogen` via the
-  `fabric-tools:3.1.5` image.
+  `fabric-tools:2.5.15` image.
 - `configtxgen.sh` — generates the channel genesis / configtx block.
 - `osnadmin-channel-join.sh` — joins the orderer to the channel via the
   osnadmin channel-participation API (Fabric 3.x pattern).
@@ -29,7 +29,7 @@ documented as future peers — see `connection-profiles/` and
   (`dist/src/server.js` entrypoint) for Fabric external builders. Fixtures are
   excluded from the bundle (not needed on the Fabric runtime path).
 - `deploy-chaincode.sh` — packages and deploys `pds-chaincode` to the channel
-  using the `fabric-tools:3.1.5` image.
+  using the `fabric-tools:2.5.15` image.
 - `smoke-fabric.sh` — smoke-tests a running network (query/invoke sanity).
 
 ## Validation

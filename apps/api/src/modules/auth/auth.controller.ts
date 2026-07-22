@@ -3,9 +3,11 @@ import { Body, Controller, Get, Inject, Param, Post } from '@nestjs/common';
 import { AuthMode, AuthResult } from '@pds/shared-types';
 import { PdsLedgerFacade } from '../core/pds-ledger.facade.js';
 import { AuthOtpDto, SupervisorExceptionAuthDto } from './dto/auth.dto.js';
+import { Roles } from './roles.decorator.js';
 
 @Plane('data')
 @Controller()
+@Roles('fps', 'department', 'auditor')
 export class AuthController {
   constructor(@Inject(PdsLedgerFacade) private readonly ledger: PdsLedgerFacade) {}
 
@@ -20,6 +22,7 @@ export class AuthController {
   }
 
   @Post('/auth/mock-otp')
+  @Roles('fps')
   authOtp(@Body() body: AuthOtpDto) {
     return this.ledger.simulateAuthenticationPersisted({
       ...body,
@@ -28,6 +31,7 @@ export class AuthController {
   }
 
   @Post('/auth/simulated-biometric')
+  @Roles('fps')
   authBiometric(@Body() body: AuthOtpDto) {
     return this.ledger.simulateAuthenticationPersisted({
       ...body,
@@ -36,6 +40,7 @@ export class AuthController {
   }
 
   @Post('/auth/supervisor-exception')
+  @Roles('fps')
   authException(@Body() body: SupervisorExceptionAuthDto) {
     return this.ledger.simulateAuthenticationPersisted({
       ...body,

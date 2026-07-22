@@ -9,6 +9,7 @@ import type {
   MonthlyEntitlement,
   Stakeholder,
   TransferOrder
+  ,LedgerProofStatusResponse
 } from '@pds/shared-types';
 import { AuthMode, AuthResult } from '@pds/shared-types';
 import { demoQuantities, getWorkspaceSnapshot, type DemoScenario } from '@pds/fixtures';
@@ -23,7 +24,6 @@ export type LedgerMode = 'demo' | 'fabric';
 
 export type ApiHealth = {
   ok: boolean;
-  ledgerMode?: LedgerMode;
 };
 
 export type StockPosition = {
@@ -57,7 +57,10 @@ async function readApiError(response: Response, path: string): Promise<string> {
   try {
     const body = JSON.parse(text) as { message?: string };
     if (response.status === 401) {
-      return 'Fabric mode requires a saved API bearer token. Enter dev-mvp-token in the banner at the top and click Save token.';
+      return 'Your identity session is missing or expired. Sign in again.';
+    }
+    if (response.status === 403) {
+      return 'Your authenticated role is not permitted to perform this operation.';
     }
     return body.message ?? text ?? `Request failed for ${path}`;
   } catch {
@@ -141,6 +144,10 @@ export async function loadLedgerEvents(apiOnline = true): Promise<LedgerEvent[]>
 
 export async function loadStockPositions(apiOnline = true): Promise<StockPosition[]> {
   return loadFromApiOrMock('/stock', [], apiOnline);
+}
+
+export async function loadLedgerProofStatus(eventId: string): Promise<LedgerProofStatusResponse> {
+  return fetchJson(`/ledger-proofs/${encodeURIComponent(eventId)}`);
 }
 
 export async function fetchApiHealth(): Promise<ApiHealth> {

@@ -12,7 +12,7 @@ This document covers how to deploy and operate ViksitPDS for local development, 
 | **Local dev (postgres)** | Integration testing | Demo mode (default) | PostgreSQL |
 | **Production pilot** | Post-MVP | Full Fabric consortium (5-org target) | PostgreSQL + CouchDB peers |
 
-The MVP ships with a **working Docker Compose stack** for both demo and live Fabric modes. The Fabric **2.5.13** 2-org network (channel participation, no system channel) lives under `blockchain/fabric-network/` and is started via `docker compose --profile fabric`.
+The MVP ships with a Docker Compose stack for demo and live Fabric modes. The Fabric **2.5.15** 2-org network (channel participation, no system channel) lives under `blockchain/fabric-network/` and is started via the `fabric` profile. A running set of containers does not prove that the channel and chaincode have been bootstrapped; verify them before every live demonstration.
 
 ## Default Docker Compose Deployment
 
@@ -33,7 +33,7 @@ The MVP ships with a **working Docker Compose stack** for both demo and live Fab
 
 ### Architecture (fabric profile)
 
-Adds Fabric **2.5.13** services on network `pds-fabric`. The API joins that network and uses `@hyperledger/fabric-gateway` to submit/evaluate on `pds-chaincode` / `pdschannel`.
+Adds Fabric **2.5.15** services on network `pds-fabric`. The API joins that network and uses `@hyperledger/fabric-gateway` to submit/evaluate on `pds-chaincode` / `pdschannel`.
 
 ```text
 web ──▶ api (PDS_LEDGER_MODE=fabric) ──▶ postgres
@@ -106,19 +106,19 @@ PostgreSQL is initialized from:
 # 1. Bootstrap crypto, channel, and chaincode (Docker-based tools)
 ./blockchain/fabric-network/scripts/bootstrap-fabric-full.sh
 
-# 2. Configure fabric mode + auth tokens
-cp .env.fabric.example .env
+# 2. Configure Fabric mode and OIDC (do not commit the resulting .env)
+cp .env.example .env
 
 # 3. Start full stack with live ledger
 docker compose --profile fabric up --build -d
 
-# 4. Verify API + gateway (from repo root)
-PDS_DEV_AUTH_TOKEN=dev-mvp-token npm run smoke:fabric
-# Optional: curl smoke with auth
-PDS_DEV_AUTH_TOKEN=dev-mvp-token blockchain/fabric-network/scripts/smoke-fabric.sh
+# 4. Obtain a short-lived service token and verify API + gateway
+# Set PDS_BENCHMARK_CLIENT_SECRET from the environment-driven IAM bootstrap.
+npm run smoke:fabric
+blockchain/fabric-network/scripts/smoke-fabric.sh
 ```
 
-Set the same `PDS_DEV_AUTH_TOKEN` in the web UI (banner on login) or via `VITE_DEV_AUTH_TOKEN` at build time.
+The smoke scripts obtain a client-credentials token from Keycloak. For test runners only, a short-lived token may be supplied as `PDS_E2E_ACCESS_TOKEN`. The browser uses Authorization Code + PKCE and never accepts a pasted deployment token.
 
 **Prerequisites (partial bootstrap):** Fabric CLI binaries on the host (`peer`, `osnadmin`, `configtxgen`). See [blockchain/fabric-network/README.md](blockchain/fabric-network/README.md).
 
@@ -147,9 +147,10 @@ Gateway env vars (defaults in root `docker-compose.yml`; overrides in `blockchai
 
 ```bash
 curl -f http://localhost:3000/health
-# Expected: {"ok":true,"ledgerMode":"demo"} or "fabric"
+# Expected public response: {"ok":true}
 
-curl -f http://localhost:3000/dashboard/summary
+# Authenticated operational checks require an OIDC bearer token.
+curl -f -H "Authorization: Bearer $PDS_E2E_ACCESS_TOKEN" http://localhost:3000/dashboard/summary
 ```
 
 Web UI: open http://localhost:4173 and confirm the API status indicator shows online.
@@ -268,7 +269,7 @@ Web image CMD: `npm run start --workspace=@pds/web` (Vite preview on `0.0.0.0:41
 
 ### Current status
 
-- **Fabric version:** 2.5.13 (peer/orderer images; channel participation APIs; no genesis system channel)
+- **Fabric version:** 2.5.15 (peer/orderer images; channel participation APIs; no genesis system channel)
 - **Channel:** `pdschannel`
 - **Chaincode:** `pds-chaincode` (TypeScript)
 - **Organizations (deployed):** Food Department + Godown (2-org demo)
@@ -311,14 +312,14 @@ See [blockchain/fabric-network/README.md](blockchain/fabric-network/README.md) f
 | ------- | ---- | ----- |
 | `npm run demo:happy` | In-process demo ledger | Default; no API required |
 | `npm run demo:exception` | In-process demo ledger | Short receipt + duplicate claim |
-| `node scripts/demo/happy-path.mjs --ledger=fabric` | Live API + Fabric | Requires `PDS_DEV_AUTH_TOKEN` and running stack |
+| `node scripts/demo/happy-path.mjs --ledger=fabric` | Live API + Fabric | Requires the Keycloak service client and running stack |
 | `node scripts/demo/exception-path.mjs --ledger=fabric` | Live API + Fabric | Same auth/env requirements |
 
 Fabric examples:
 
 ```bash
-PDS_DEV_AUTH_TOKEN=dev-mvp-token node scripts/demo/happy-path.mjs --ledger=fabric
-PDS_DEV_AUTH_TOKEN=dev-mvp-token node scripts/demo/exception-path.mjs --ledger=fabric
+PDS_BENCHMARK_CLIENT_SECRET='<from secret store>' node scripts/demo/happy-path.mjs --ledger=fabric
+PDS_BENCHMARK_CLIENT_SECRET='<from secret store>' node scripts/demo/exception-path.mjs --ledger=fabric
 ```
 
 ## Mock Data and SQL Generation
@@ -344,7 +345,7 @@ Web data source modes (`VITE_DATA_SOURCE`):
 |-------|----------|
 | `api` | Live API only |
 | `mock` | Fixtures only |
-| `auto` | API when online, fixtures otherwise (default) |
+There is no automatic fallback. A jury build fixes this value to `api`; use `mock` only as a deliberately selected and visibly labelled offline backup.
 
 ## Data Management
 
@@ -394,7 +395,7 @@ npm run regression
 Fabric profile (live stack + bearer token):
 
 ```bash
-PDS_DEV_AUTH_TOKEN=dev-mvp-token npm run regression:fabric
+PDS_BENCHMARK_CLIENT_SECRET='<from secret store>' npm run regression:fabric
 ```
 
 See [docs/technical/poc-to-mvp-with-fabric.md](docs/technical/poc-to-mvp-with-fabric.md) for the full matrix and manual web workbench gate.
@@ -412,9 +413,7 @@ See [docs/technical/poc-to-mvp-with-fabric.md](docs/technical/poc-to-mvp-with-fa
 
 ### Admin console (operator)
 
-Read-only operator endpoints under `/admin/*`. When `PDS_ADMIN_TOKEN` is set, every admin route requires header `X-Admin-Token` with the same value. In **demo mode** with no token configured, admin routes are open for local convenience. In **fabric mode**, a token is required unless explicitly set.
-
-**Hardening (T2.4):** token comparison is constant-time (`crypto.timingSafeEqual`); empty/missing tokens are rejected before any comparison; and an in-memory token-bucket rate limiter blocks an IP for 60s after 10 failed attempts. Misconfiguration (required but no token) fails closed.
+Read-only operator endpoints under `/admin/*` require an OIDC access token with `platform-admin`; proof summaries additionally accept `auditor`. Authentication is required in both demo and Fabric online modes.
 
 | Endpoint | Purpose |
 |----------|---------|
@@ -425,44 +424,23 @@ Read-only operator endpoints under `/admin/*`. When `PDS_ADMIN_TOKEN` is set, ev
 
 Web UI: open http://localhost:4173/admin (Vite dev/preview serves the SPA for `/admin`).
 
-Optional env vars:
-
-| Variable | Purpose |
-|----------|---------|
-| `PDS_ADMIN_TOKEN` | API-side admin auth secret |
-| `VITE_ADMIN_TOKEN` | Pre-fill admin token in the web UI (also storable in `localStorage` as `pds_admin_token`) |
-
 Example:
 
 ```bash
-export PDS_ADMIN_TOKEN=change-me-in-pilot
-curl -H "X-Admin-Token: change-me-in-pilot" http://localhost:3000/admin/overview
+curl -H "Authorization: Bearer $PDS_E2E_ACCESS_TOKEN" http://localhost:3000/admin/overview
 ```
 
 ## Security Notes (MVP)
 
-### Admin guard (T2.4)
+### OIDC and RBAC
 
-See [Admin console](#admin-console-operator). Constant-time token comparison, empty-token rejection, and per-IP rate limiting (10 failures / 60s window → 60s lockout). Demo mode is open; fabric mode fails closed without a configured token.
+The global authorization guard fails closed in every online ledger mode. Keycloak verifies issuer, audience, signature and token time bounds. Explicit public markers are limited to landing/docs/OpenAPI/liveness/readiness/health; all other routes require a bearer token and least-privilege role. The static identity provider is available only when both `NODE_ENV=test` and `PDS_AUTH_MODE=test` are set.
 
-### Business endpoint auth (T2.5)
+Configure `PDS_OIDC_ISSUER`, `PDS_OIDC_AUDIENCE`, `PDS_OIDC_JWKS_URI`, `PDS_OIDC_CLOCK_SKEW_SECONDS`, and the exact `PDS_CORS_ORIGINS` allowlist. Use the `iam` Compose profile and `scripts/iam/bootstrap-keycloak.sh`; all passwords and client secrets remain outside the repository.
 
-A global `BusinessAuthGuard` gates non-health, non-openapi, non-admin endpoints:
+### Asynchronous Fabric proof submission
 
-- **`PDS_LEDGER_MODE=demo`** — open access for dev/demo convenience. A warning is logged once on first request: *"business endpoints are open (no auth) … set PDS_LEDGER_MODE=fabric and configure an IdentityProvider for production."*
-- **`PDS_LEDGER_MODE=fabric`** — requires `Authorization: Bearer <token>`. The token is verified by a pluggable `IdentityProvider` (DI token `IDENTITY_PROVIDER`). The default `StubIdentityProvider` accepts a single configured static dev token (`PDS_DEV_AUTH_TOKEN`) and maps it to a role from `PDS_DEV_AUTH_ROLE` (`procurement` / `godown` / `fps` / `department` / `auditor`, aligned with the chaincode MSP mapping in T1.5). Per-controller role requirements can be added by overriding `BusinessAuthGuard.optionsFor`.
-
-JWT **issuance** is out of MVP scope — only the **enforcement** layer ships. For production, replace `StubIdentityProvider` with a real JWT verifier (Keycloak / enterprise IAM) and set `PDS_DEV_AUTH_*` vars only in dev.
-
-| Variable | Purpose |
-|----------|---------|
-| `PDS_DEV_AUTH_TOKEN` | Static dev token accepted by `StubIdentityProvider` (fabric mode) |
-| `PDS_DEV_AUTH_ROLE` | Role claim for the dev token (`procurement`/`godown`/`fps`/`department`/`auditor`) |
-| `PDS_DEV_AUTH_SUBJECT` | Subject claim for the dev token (default `dev-user`) |
-
-### Fabric gateway dual-write & commit errors (T2.3)
-
-In fabric mode the API writes ledger events both to the operational Postgres snapshot **and** to the Fabric gateway. `FabricGatewayClient.submit` is fully awaited — the API does **not** report success before the transaction commits. If the gateway commit fails, the error surfaces to the caller (no false success). This is an intentional dual-write: Postgres holds the queryable operational snapshot, Fabric holds the immutable proof. Treat Fabric commit failures as authoritative for the ledger proof even though the Postgres snapshot may already reflect the write.
+PostgreSQL is authoritative for operational workflow state. Valid operational commands enqueue immutable, non-sensitive Fabric proofs in the PostgreSQL outbox; Fabric delay or failure does not roll back the operation. Proof status remains visible and retryable, and a proof becomes `COMMITTED` only after Fabric commit status succeeds. The current snapshot save and outbox insertion are not yet one crash-atomic transaction, so this remains controlled-demo behavior with one API replica.
 
 ### Global exception filter (T5.2)
 
@@ -524,4 +502,4 @@ Recommended production hardening path:
 - [README.md](README.md) — project overview and quick start
 - [docs/technical/architecture.md](docs/technical/architecture.md) — system architecture
 - [docs/implementation/mvp-implementation-plan.md](docs/implementation/mvp-implementation-plan.md) — MVP scope and acceptance gates
-- [blockchain/fabric-network/README.md](blockchain/fabric-network/README.md) — Fabric 2.5.x topology and bootstrap
+- [blockchain/fabric-network/README.md](blockchain/fabric-network/README.md) — Fabric 2.5.15 topology and bootstrap

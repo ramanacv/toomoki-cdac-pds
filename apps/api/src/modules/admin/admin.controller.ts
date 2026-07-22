@@ -1,13 +1,13 @@
 import { Plane } from '../../infrastructure/plane.decorator.js';
-import { BadRequestException, Body, Controller, Get, HttpCode, Inject, Post, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, ForbiddenException, Get, HttpCode, Inject, Post } from '@nestjs/common';
 import { COMMODITIES } from '@pds/shared-types';
-import { AdminGuard } from './admin.guard.js';
 import { AdminService } from './admin.service.js';
 import { ResetLedgerDto } from './dto/reset-ledger.dto.js';
+import { Roles } from '../auth/roles.decorator.js';
 
 @Plane('control')
 @Controller('admin')
-@UseGuards(AdminGuard)
+@Roles('platform-admin')
 export class AdminController {
   constructor(@Inject(AdminService) private readonly admin: AdminService) {}
 
@@ -33,7 +33,11 @@ export class AdminController {
 
   @Post('reset')
   @HttpCode(200)
+  @Roles('demo-reset')
   reset(@Body() body: ResetLedgerDto = {}) {
+    if (process.env.PDS_ALLOW_RESET?.toLowerCase() !== 'true') {
+      throw new ForbiddenException('Demo reset is disabled');
+    }
     const commodity = body?.commodity?.trim() || undefined;
     if (commodity && !COMMODITIES.some((item) => item.name === commodity)) {
       throw new BadRequestException(`Unknown commodity: ${commodity}`);

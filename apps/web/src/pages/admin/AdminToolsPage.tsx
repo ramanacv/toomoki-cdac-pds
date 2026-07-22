@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { COMMODITIES, LotStatus, createdAtFromLotId, type CommodityLot } from '@pds/shared-types';
 import { formatDateTime } from '@/lib/constants.js';
-import { getStoredAdminToken, resetAdminLedger, setStoredAdminToken } from '@/admin-api.js';
+import { resetAdminLedger } from '@/admin-api.js';
 import { createStockLot, loadLots } from '@/api.js';
 import { Panel } from '@/components/Panel.js';
 import { Button } from '@/components/ui/button.js';
@@ -22,6 +22,7 @@ import {
   DialogTrigger
 } from '@/components/ui/dialog.js';
 import { useAdminContext } from '@/hooks/use-admin-context.js';
+import { getCurrentIdentity } from '@/auth-token.js';
 
 const getCommodityDefaults = (commodity: string) =>
   COMMODITIES.find((item) => item.name === commodity) ?? COMMODITIES[0]!;
@@ -33,9 +34,10 @@ const formatLotCreatedAt = (lot: CommodityLot): string => {
 
 export function AdminToolsPage() {
   const { apiOnline, stakeholders, refresh } = useAdminContext();
+  const roles = getCurrentIdentity()?.roles ?? [];
+  const canCreateStock = roles.includes('procurement');
+  const canReset = roles.includes('demo-reset');
 
-  const [tokenInput, setTokenInput] = useState(getStoredAdminToken());
-  const [tokenSaved, setTokenSaved] = useState(false);
   const [stockCommodity, setStockCommodity] = useState('Rice');
   const [stockQuantityKg, setStockQuantityKg] = useState('10000');
   const [stockQualityGrade, setStockQualityGrade] = useState('A');
@@ -63,15 +65,6 @@ export function AdminToolsPage() {
   useEffect(() => {
     void refreshLots();
   }, [refreshLots]);
-
-  const saveToken = () => {
-    setStoredAdminToken(tokenInput.trim());
-    setTokenSaved(true);
-    toast.success('Admin token saved', {
-      description: 'Used for /admin/* routes via X-Admin-Token (not workflow actions).'
-    });
-    void refresh();
-  };
 
   const selectCommodity = (commodity: string) => {
     const defaults = getCommodityDefaults(commodity);
@@ -138,8 +131,7 @@ export function AdminToolsPage() {
         <p className="eyebrow">ViksitPDS</p>
         <h2 className="text-3xl font-semibold tracking-tight">Admin tools</h2>
         <p className="mt-1 leading-relaxed text-muted-foreground">
-          Token access, test-data top-ups, and destructive ledger resets for demo and Fabric
-          deployments.
+          Controlled test-data top-ups and destructive ledger resets for authorized demo operators.
         </p>
       </header>
 
@@ -154,40 +146,6 @@ export function AdminToolsPage() {
           </AlertDescription>
         </Alert>
       )}
-
-      <Panel eyebrow="Access" title="Admin token" wide>
-        <p className="mb-4 text-sm text-muted-foreground">
-          Two tokens are used in Fabric mode. This field is the <strong>admin token</strong> for
-          read-only admin pages and ledger reset (<code className="text-xs">X-Admin-Token</code>,
-          default <code className="text-xs">admin-mvp-token</code>). Workflow actions in the main
-          workspace use a separate <strong>API bearer token</strong> in the yellow banner (
-          <code className="text-xs">Authorization: Bearer …</code>, default{' '}
-          <code className="text-xs">dev-mvp-token</code>).
-        </p>
-        <div className="flex flex-col gap-3 md:flex-row md:items-end">
-          <div className="grid flex-1 gap-2">
-            <Label htmlFor="admin-token">X-Admin-Token</Label>
-            <Input
-              id="admin-token"
-              type="password"
-              value={tokenInput}
-              onChange={(event) => {
-                setTokenInput(event.target.value);
-                setTokenSaved(false);
-              }}
-              placeholder="admin-mvp-token"
-            />
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <Button type="button" onClick={saveToken}>
-              {tokenSaved ? 'Saved' : 'Save token'}
-            </Button>
-            <Button type="button" variant="secondary" onClick={() => void refresh()}>
-              Refresh
-            </Button>
-          </div>
-        </div>
-      </Panel>
 
       <Panel eyebrow="Test data" title="Add stock" wide>
         <p className="mb-4 text-sm text-muted-foreground">
@@ -253,11 +211,14 @@ export function AdminToolsPage() {
           </div>
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-3">
-          <Button type="button" onClick={() => void addStock()} disabled={!apiOnline || stockSubmitting}>
+          <Button type="button" onClick={() => void addStock()} disabled={!apiOnline || stockSubmitting || !canCreateStock}>
             {stockSubmitting ? 'Adding stock…' : 'Add stock'}
           </Button>
           {!apiOnline && (
             <p className="text-sm text-muted-foreground">Disabled while API is offline (Demo data mode).</p>
+          )}
+          {!canCreateStock && (
+            <p className="text-sm text-muted-foreground">The procurement role is required to create a lot.</p>
           )}
           {stockMessage && <p className="text-sm text-muted-foreground">{stockMessage}</p>}
         </div>
@@ -341,7 +302,7 @@ export function AdminToolsPage() {
         </div>
         <Dialog>
           <DialogTrigger asChild>
-            <Button type="button" variant="destructive" disabled={!apiOnline || resetSubmitting}>
+            <Button type="button" variant="destructive" disabled={!apiOnline || resetSubmitting || !canReset}>
               {resetSubmitting
                 ? 'Resetting…'
                 : resetCommodity === 'ALL'
@@ -372,6 +333,7 @@ export function AdminToolsPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        {!canReset && <p className="mt-3 text-sm text-muted-foreground">The independent demo-reset role is required.</p>}
         {resetMessage && <p className="mt-3 text-sm text-muted-foreground">{resetMessage}</p>}
         {resetError && (
           <Alert variant="destructive" className="mt-3">

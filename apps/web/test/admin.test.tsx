@@ -121,6 +121,17 @@ vi.mock('@/admin-api.js', () => ({
   resetAdminLedger: vi.fn().mockResolvedValue({ ledgerTxId: 'TX-RESET-1', message: 'Ledger reset.' })
 }));
 
+vi.mock('@/auth-token.js', () => ({
+  getCurrentIdentity: vi.fn(() => ({
+    subject: 'admin-test',
+    displayName: 'Admin Test',
+    roles: ['platform-admin', 'procurement', 'demo-reset']
+  })),
+  signIn: vi.fn(),
+  signOut: vi.fn(),
+  authHeaders: vi.fn(() => ({ Authorization: 'Bearer test-only' }))
+}));
+
 import { AdminLayout } from '@/pages/AdminLayout.js';
 import { AdminOverviewPage } from '@/pages/admin/AdminOverviewPage.js';
 import { AdminNetworkPage } from '@/pages/admin/AdminNetworkPage.js';
@@ -192,12 +203,10 @@ describe('Admin console', () => {
     expect(screen.getByText('HIGH')).toBeInTheDocument();
   });
 
-  it('allows refreshing the overview from admin tools', async () => {
-    const user = userEvent.setup();
+  it('loads the authenticated admin tools view', async () => {
     renderAdmin('/admin/tools');
-    const refresh = await screen.findByRole('button', { name: 'Refresh' });
-    await user.click(refresh);
     expect(await screen.findByRole('button', { name: 'Add stock' })).toBeInTheDocument();
+    expect(await screen.findByText('Issued stock lots')).toBeInTheDocument();
   });
 
   it('submits a new stock lot via the add-stock form and surfaces a toast', async () => {

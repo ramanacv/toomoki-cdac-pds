@@ -25,6 +25,7 @@ type UserMenuProps = {
   role: DemoRole;
   onRoleChange: (role: DemoRole) => void;
   onLogout: () => void;
+  allowRoleSelection: boolean;
 };
 
 const RoleSelectItem = ({ role }: { role: DemoRole }) => {
@@ -39,7 +40,7 @@ const RoleSelectItem = ({ role }: { role: DemoRole }) => {
   );
 };
 
-export function UserMenu({ operatorName, role, onRoleChange, onLogout }: UserMenuProps) {
+export function UserMenu({ operatorName, role, onRoleChange, onLogout, allowRoleSelection }: UserMenuProps) {
   const currentMode = roleParticipation(role);
 
   return (
@@ -48,7 +49,7 @@ export function UserMenu({ operatorName, role, onRoleChange, onLogout }: UserMen
       <Label htmlFor="topbar-role" className="sr-only">
         Role
       </Label>
-      <Select value={role} onValueChange={(value) => onRoleChange(value as DemoRole)}>
+      {allowRoleSelection ? <Select value={role} onValueChange={(value) => onRoleChange(value as DemoRole)}>
         <SelectTrigger
           id="topbar-role"
           className={cn('h-9 w-[210px]', participationTriggerClass[currentMode])}
@@ -74,7 +75,7 @@ export function UserMenu({ operatorName, role, onRoleChange, onLogout }: UserMen
             ))}
           </SelectGroup>
         </SelectContent>
-      </Select>
+      </Select> : <span className="rounded-md border border-border px-3 py-1.5 text-sm">{roleTitle(role)}</span>}
       <Button variant="secondary" size="sm" onClick={onLogout}>
         Log out
       </Button>

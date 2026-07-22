@@ -1,0 +1,148 @@
+{
+  "realm": "viksitpds",
+  "enabled": true,
+  "displayName": "ViksitPDS",
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "resetPasswordAllowed": false,
+  "rememberMe": false,
+  "verifyEmail": false,
+  "loginWithEmailAllowed": false,
+  "duplicateEmailsAllowed": false,
+  "bruteForceProtected": true,
+  "permanentLockout": false,
+  "maxFailureWaitSeconds": 900,
+  "minimumQuickLoginWaitSeconds": 60,
+  "waitIncrementSeconds": 60,
+  "quickLoginCheckMilliSeconds": 1000,
+  "maxDeltaTimeSeconds": 43200,
+  "failureFactor": 5,
+  "passwordPolicy": "length(12) and upperCase(1) and lowerCase(1) and digits(1) and specialChars(1) and notUsername(undefined)",
+  "accessTokenLifespan": 300,
+  "accessTokenLifespanForImplicitFlow": 300,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 28800,
+  "offlineSessionIdleTimeout": 0,
+  "revokeRefreshToken": true,
+  "refreshTokenMaxReuse": 0,
+  "roles": {
+    "realm": [
+      { "name": "management", "description": "Read-only operational dashboards" },
+      { "name": "department", "description": "Department administration and movement authorization" },
+      { "name": "procurement", "description": "Procurement lot and dispatch operations" },
+      { "name": "fci", "description": "FCI receipt and onward dispatch operations" },
+      { "name": "godown", "description": "Godown receipt, dispatch and allocation operations" },
+      { "name": "fps", "description": "FPS receipt, simulated authentication and distribution" },
+      { "name": "auditor", "description": "Trace, reconciliation, proof and alert review" },
+      { "name": "platform-admin", "description": "Application administration views" },
+      { "name": "metrics-reader", "description": "Prometheus metrics access" },
+      { "name": "demo-reset", "description": "Controlled destructive demo reset" }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "pds-api",
+      "name": "ViksitPDS API audience",
+      "enabled": true,
+      "bearerOnly": true,
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false
+    },
+    {
+      "clientId": "pds-web",
+      "name": "ViksitPDS web application",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "rootUrl": "http://localhost:4173",
+      "baseUrl": "http://localhost:4173/",
+      "redirectUris": [
+        "http://localhost:4173/auth/callback",
+        "http://localhost:5173/auth/callback"
+      ],
+      "webOrigins": [
+        "http://localhost:4173",
+        "http://localhost:5173"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:4173/*##http://localhost:5173/*"
+      },
+      "protocolMappers": [
+        {
+          "name": "pds-api-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "pds-api",
+            "id.token.claim": "false",
+            "access.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        },
+        {
+          "name": "pds-org-id",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": { "user.attribute": "pds_org_id", "claim.name": "pds_org_id", "jsonType.label": "String", "access.token.claim": "true", "id.token.claim": "true", "userinfo.token.claim": "false" }
+        },
+        {
+          "name": "pds-stakeholder-id",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": { "user.attribute": "pds_stakeholder_id", "claim.name": "pds_stakeholder_id", "jsonType.label": "String", "access.token.claim": "true", "id.token.claim": "true", "userinfo.token.claim": "false" }
+        },
+        {
+          "name": "pds-msp-id",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": { "user.attribute": "pds_msp_id", "claim.name": "pds_msp_id", "jsonType.label": "String", "access.token.claim": "true", "id.token.claim": "true", "userinfo.token.claim": "false" }
+        }
+      ]
+    },
+    {
+      "clientId": "pds-metrics",
+      "name": "ViksitPDS metrics scraper",
+      "enabled": true,
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "protocolMappers": [
+        {
+          "name": "pds-api-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": { "included.client.audience": "pds-api", "access.token.claim": "true" }
+        }
+      ]
+    },
+    {
+      "clientId": "pds-benchmark",
+      "name": "ViksitPDS controlled benchmark",
+      "enabled": true,
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "protocolMappers": [
+        {
+          "name": "pds-api-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": { "included.client.audience": "pds-api", "access.token.claim": "true" }
+        }
+      ]
+    }
+  ]
+}

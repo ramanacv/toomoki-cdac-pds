@@ -1,35 +1,40 @@
 import { Injectable } from '@nestjs/common';
-import type { IdentityProvider, PdsIdentity, PdsRole } from './identity-provider.js';
+import { PDS_ROLES, type IdentityProvider, type PdsIdentity, type PdsRole } from './identity-provider.js';
 
 /**
- * Default stub identity provider (T2.5). Accepts a single configured static
- * dev token (PDS_DEV_AUTH_TOKEN) and maps it to a role from PDS_DEV_AUTH_ROLE.
- * Any other token is rejected (returns null). This is NOT a JWT verifier — it
- * exists so the enforcement layer is testable end-to-end without an IdP. Swap
- * for a real verifier in production.
+ * Static identity adapter for automated tests only. It cannot be selected in a
+ * deployed runtime because AuthModule rejects test mode unless NODE_ENV=test.
  */
-const ROLES: PdsRole[] = ['procurement', 'godown', 'fps', 'department', 'auditor'];
-
 @Injectable()
-export class StubIdentityProvider implements IdentityProvider {
+export class TestIdentityProvider implements IdentityProvider {
   async verify(token: string): Promise<PdsIdentity | null> {
-    const expected = process.env.PDS_DEV_AUTH_TOKEN?.trim();
+    const expected = process.env.PDS_TEST_AUTH_TOKEN?.trim();
     if (!expected || expected.length === 0) {
       return null;
     }
-    if (token !== expected) {
+
+    let roleFromToken: PdsRole | undefined;
+    if (token === expected) {
+      // default role from env
+    } else if (token.startsWith(`${expected}:`)) {
+      const suffix = token.slice(expected.length + 1).trim().toLowerCase();
+      if (!PDS_ROLES.includes(suffix as PdsRole)) {
+        return null;
+      }
+      roleFromToken = suffix as PdsRole;
+    } else {
       return null;
     }
-    const roleEnv = process.env.PDS_DEV_AUTH_ROLE?.trim().toLowerCase();
-    const role = roleEnv && ROLES.includes(roleEnv as PdsRole) ? (roleEnv as PdsRole) : undefined;
-    const claims = { sub: process.env.PDS_DEV_AUTH_SUBJECT ?? 'dev-user', role };
-    const identity: PdsIdentity = {
-      subject: process.env.PDS_DEV_AUTH_SUBJECT ?? 'dev-user',
-      claims
-    };
-    if (role) {
-      identity.role = role;
-    }
-    return identity;
+
+    const roleEnv = process.env.PDS_TEST_AUTH_ROLE?.trim().toLowerCase();
+    const role =
+      roleFromToken ??
+      (roleEnv && PDS_ROLES.includes(roleEnv as PdsRole) ? (roleEnv as PdsRole) : undefined);
+    const subject = process.env.PDS_TEST_AUTH_SUBJECT ?? 'test-user';
+    const roles = role ? [role] : [];
+    return { subject, roles, claims: { sub: subject, roles } };
   }
 }
+
+/** @deprecated Use TestIdentityProvider. */
+export { TestIdentityProvider as StubIdentityProvider };

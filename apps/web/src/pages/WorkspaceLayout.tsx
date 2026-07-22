@@ -1,19 +1,26 @@
 import { useState } from 'react';
-import { Outlet, useSearchParams } from 'react-router-dom';
+import { Navigate, Outlet, useLocation, useSearchParams } from 'react-router-dom';
 import { useWorkspace, useLiveScenarioView } from '@/hooks/use-workspace.js';
 import { parseRole, parseScenario } from '@/lib/url-state.js';
 import type { WorkspaceOutletContext } from '@/hooks/use-workspace-context.js';
 import { LoginPage } from '@/pages/LoginPage.js';
 import { AppShell } from '@/components/layout/AppShell';
+import { getCurrentIdentity, signIn, signOut } from '@/auth-token.js';
+import { getDataSourceMode } from '@/data-source.js';
+import { oidcRoleToDemoRole } from '@/demo-model.js';
 
 export function WorkspaceLayout() {
   const [params, setParams] = useSearchParams();
   const [authenticated, setAuthenticated] = useState(false);
   const [operatorName, setOperatorName] = useState('Demo Officer');
-  const role = parseRole(params.get('role'));
+  const offlineMode = getDataSourceMode() === 'mock';
+  const identity = getCurrentIdentity();
+  const selectedRole = parseRole(params.get('role'));
+  const role = offlineMode ? selectedRole : (oidcRoleToDemoRole(identity?.roles ?? []) ?? 'MANAGEMENT');
   const scenario = parseScenario(params.get('scenario'));
+  const location = useLocation();
 
-  const workspace = useWorkspace(scenario);
+  const workspace = useWorkspace(scenario, offlineMode || Boolean(identity));
   const { liveSummary, visibleAlerts } = useLiveScenarioView(scenario, workspace);
 
   const updateParam = (key: 'role' | 'scenario', value: string) => {
@@ -22,7 +29,7 @@ export function WorkspaceLayout() {
     setParams(next, { replace: true });
   };
 
-  if (!authenticated) {
+  if ((!offlineMode && !identity) || (offlineMode && !authenticated)) {
     return (
       <LoginPage
         apiOnline={workspace.apiOnline}
@@ -33,8 +40,22 @@ export function WorkspaceLayout() {
         onRoleChange={(next) => updateParam('role', next)}
         onSignIn={() => setAuthenticated(true)}
         adminHref="/admin"
+        offlineMode={offlineMode}
+        onOidcSignIn={() => { void signIn(location.pathname); }}
       />
     );
+  }
+
+  if (!offlineMode && identity?.roles.includes('platform-admin') && !oidcRoleToDemoRole(identity.roles)) {
+    return <Navigate to="/admin/overview" replace />;
+  }
+
+  if (!offlineMode && !oidcRoleToDemoRole(identity?.roles ?? [])) {
+    return <main className="mx-auto max-w-xl p-8"><h1 className="text-2xl font-semibold">Forbidden</h1><p className="mt-3 text-muted-foreground">Your token has no operational ViksitPDS role.</p></main>;
+  }
+
+  if (!offlineMode && workspace.error) {
+    return <main className="mx-auto max-w-xl p-8"><h1 className="text-2xl font-semibold">Online service unavailable</h1><p className="mt-3 text-muted-foreground">{workspace.error}</p><p className="mt-2 text-sm">Fixture data was not substituted. Choose the explicitly labelled offline build for a backup demonstration.</p></main>;
   }
 
   const context: WorkspaceOutletContext = {
@@ -49,12 +70,13 @@ export function WorkspaceLayout() {
     <AppShell
       role={role}
       scenario={scenario}
-      operatorName={operatorName}
+      operatorName={identity?.displayName ?? operatorName}
       apiOnline={workspace.apiOnline}
       ledgerMode={workspace.ledgerMode}
       onRoleChange={(next) => updateParam('role', next)}
       onScenarioChange={(next) => updateParam('scenario', next)}
-      onLogout={() => setAuthenticated(false)}
+      offlineMode={offlineMode}
+      onLogout={() => offlineMode ? setAuthenticated(false) : void signOut()}
     >
       <Outlet context={context} />
     </AppShell>

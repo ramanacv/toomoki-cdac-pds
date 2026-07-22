@@ -5,7 +5,7 @@ export const parseDemoArgs = (argv = process.argv.slice(2)) => {
 
   return {
     ledger: ledger === 'fabric' ? 'fabric' : 'demo',
-    token: tokenArg?.split('=')[1] ?? process.env.PDS_DEV_AUTH_TOKEN ?? process.env.SMOKE_AUTH_TOKEN ?? '',
+    token: tokenArg?.split('=')[1] ?? process.env.PDS_E2E_ACCESS_TOKEN ?? '',
     apiBase: process.env.API_BASE ?? 'http://127.0.0.1:3000'
   };
 };

@@ -8,7 +8,7 @@
  *
  * Fabric profile requires a live stack:
  *   docker compose --profile fabric up -d
- *   PDS_DEV_AUTH_TOKEN=dev-mvp-token npm run regression:fabric
+ *   PDS_BENCHMARK_CLIENT_SECRET=... npm run regression:fabric
  */
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -70,18 +70,16 @@ const main = async () => {
   step('demo-exception', () => run('Exception-path demo script', 'node', ['scripts/demo/exception-path.mjs']));
 
   if (fabric) {
-    const token = process.env.PDS_DEV_AUTH_TOKEN ?? process.env.SMOKE_AUTH_TOKEN ?? '';
-    if (!token) {
-      throw new Error('Fabric regression requires PDS_DEV_AUTH_TOKEN or SMOKE_AUTH_TOKEN');
+    if (!process.env.PDS_BENCHMARK_CLIENT_SECRET && !process.env.PDS_E2E_ACCESS_TOKEN) {
+      throw new Error('Fabric regression requires PDS_BENCHMARK_CLIENT_SECRET or a short-lived PDS_E2E_ACCESS_TOKEN');
     }
     await probeFabricStack();
     step('smoke-fabric', () =>
-      run('Fabric gateway smoke', 'npm', ['run', 'smoke:fabric'], { PDS_DEV_AUTH_TOKEN: token })
+      run('Fabric gateway smoke', 'npm', ['run', 'smoke:fabric'])
     );
     step('fabric-e2e', () =>
       run('Fabric API e2e (opt-in)', 'npm', ['test', '--workspace=apps/api', '--', 'test/e2e/fabric-api.e2e.spec.ts'], {
-        PDS_E2E_FABRIC: 'true',
-        PDS_DEV_AUTH_TOKEN: token
+        PDS_E2E_FABRIC: 'true'
       })
     );
   }

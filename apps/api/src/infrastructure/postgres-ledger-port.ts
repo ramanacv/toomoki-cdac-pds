@@ -4,14 +4,24 @@ import { FilePdsLedgerPort } from './ledger-port.js';
 import type { PdsLedgerPort } from './ledger-port.js';
 import type { PgPoolSnapshotAdapter } from './postgres-adapter.js';
 import { PostgresPdsStateStore, type PostgresSnapshotAdapter } from './postgres-state-store.js';
+import { Pool } from 'pg';
 
 export class PostgresPdsLedgerPort implements PdsLedgerPort {
   private readonly stateStore: PostgresPdsStateStore;
   private readonly eventPort: PdsLedgerPort;
+  public readonly adapter: PostgresSnapshotAdapter;
 
   constructor(adapter: PostgresSnapshotAdapter, eventPort: PdsLedgerPort) {
     this.stateStore = new PostgresPdsStateStore(adapter);
     this.eventPort = eventPort;
+    this.adapter = adapter;
+  }
+
+  getPool(): Pool | null {
+    if (this.adapter && 'pool' in this.adapter) {
+      return (this.adapter as PgPoolSnapshotAdapter).pool;
+    }
+    return null;
   }
 
   async loadState(): Promise<PdsLedgerState | null> {

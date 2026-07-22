@@ -17,7 +17,7 @@ todos:
     content: Implement FabricGatewayClient + FabricGatewayLedgerPort using @hyperledger/fabric-gateway (NBF-LITE gateway pattern)
     status: completed
   - id: fabric-3x-docker
-    content: Build Fabric 3.1.x 2-org Docker stack (orderer channel participation, 2 peers, CouchDB, CA) + bootstrap/deploy scripts for pds-chaincode
+    content: Build Fabric 2.5.15 2-org Docker stack (orderer, 2 peers, CouchDB, CA) + bootstrap/deploy scripts for pds-chaincode
     status: completed
   - id: compose-profiles
     content: "Add docker-compose profiles: default demo stack vs --profile fabric with mounted crypto and PDS_LEDGER_MODE=fabric"
@@ -256,7 +256,7 @@ Reuse org mapping from [`fabric-config.ts`](apps/api/src/fabric-config.ts) (`PDS
 
 ### Replaced genesis-based scaffold
 
-The previous `docker-compose.fabric.yml` used **Fabric 2.5.16 + `ORDERER_GENERAL_GENESISFILE`**. The implemented stack uses **Fabric 3.1.x** with channel participation (`ORDERER_CHANNELPARTICIPATION_ENABLED=true`, no system channel).
+The maintained `docker-compose.fabric.yml` uses explicit **Fabric 2.5.15** peer and orderer images. Verify the committed channel definition before demonstrations; historical 3.1.x migration notes are not the deployed topology.
 
 ### New stack (Fabric **3.1.x** latest patch, e.g. `3.1.5`)
 

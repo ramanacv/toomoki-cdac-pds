@@ -1,6 +1,7 @@
 import {
   CallHandler,
   ExecutionContext,
+  Inject,
   Injectable,
   Logger,
   NestInterceptor,
@@ -11,13 +12,15 @@ import { Observable } from 'rxjs';
 import { tap, catchError } from 'rxjs/operators';
 import { throwError } from 'rxjs';
 import { PLANE_KEY, type PlaneType } from './plane.decorator.js';
-import type { MetricsService } from '../modules/metrics/metrics.service.js';
+import { MetricsService } from '../modules/metrics/metrics.service.js';
 
 type RequestLike = {
   headers: Record<string, string | string[] | undefined>;
   method: string;
   path: string;
-  user?: { role?: string };
+  baseUrl?: string;
+  route?: { path?: string };
+  user?: { subject: string; roles: string[]; organizationId?: string; stakeholderId?: string; mspId?: string };
 };
 
 type ResponseLike = {
@@ -40,8 +43,8 @@ export class PdsLoggingInterceptor implements NestInterceptor {
   private readonly logger = new Logger('PdsRequest');
 
   constructor(
-    private readonly reflector: Reflector,
-    @Optional() private readonly metrics?: MetricsService
+    @Inject(Reflector) private readonly reflector: Reflector,
+    @Optional() @Inject(MetricsService) private readonly metrics?: MetricsService
   ) {}
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
@@ -57,14 +60,22 @@ export class PdsLoggingInterceptor implements NestInterceptor {
     const rawRequestId = req.headers['x-request-id'];
     const requestId = (Array.isArray(rawRequestId) ? rawRequestId[0] : rawRequestId) ?? `req-${Date.now().toString(36)}`;
     const start = Date.now();
-    const { method, path } = req;
-    const role = req.user?.role ?? 'anonymous';
+    const { method } = req;
+    const path = `${req.baseUrl ?? ''}${req.route?.path ?? req.path}`;
+    const identity = req.user;
+    const securityContext = identity ? {
+      subject: identity.subject,
+      roles: identity.roles,
+      organizationId: identity.organizationId,
+      stakeholderId: identity.stakeholderId,
+      mspId: identity.mspId
+    } : { subject: 'anonymous', roles: [] };
 
     return next.handle().pipe(
       tap(() => {
         const durationMs = Date.now() - start;
         this.logger.log(
-          JSON.stringify({ requestId, plane, method, path, statusCode: res.statusCode, role, durationMs, outcome: 'ok' })
+          JSON.stringify({ requestId, plane, method, path, statusCode: res.statusCode, ...securityContext, durationMs, outcome: 'ok' })
         );
         this.metrics?.recordRequest({ method, path, plane, statusCode: res.statusCode, durationMs });
       }),
@@ -72,7 +83,7 @@ export class PdsLoggingInterceptor implements NestInterceptor {
         const durationMs = Date.now() - start;
         const statusCode = (err as { status?: number }).status ?? 500;
         this.logger.error(
-          JSON.stringify({ requestId, plane, method, path, statusCode, role, durationMs, outcome: 'error', error: err instanceof Error ? err.message : String(err) })
+          JSON.stringify({ requestId, plane, method, path, statusCode, ...securityContext, durationMs, outcome: 'error', errorCategory: statusCode >= 500 ? 'server_error' : 'request_rejected' })
         );
         this.metrics?.recordRequest({ method, path, plane, statusCode, durationMs });
         return throwError(() => err);

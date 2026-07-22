@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { mkdtempSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -118,7 +119,7 @@ export const runExceptionDemo = async (): Promise<DemoExceptionResult> => {
       receivedQtyKg: demoQuantities.shortReceiptReceivedKg
     });
     const shortReceiptAlert =
-      service.getAlerts().find((item) => item.alertType === AlertType.SHORT_RECEIPT) ??
+      service.getAlerts().find((item: any) => item.alertType === AlertType.SHORT_RECEIPT) ??
       service.raiseAuditFlag({
         alertType: AlertType.SHORT_RECEIPT,
         entityId: transfer.transferId,
@@ -182,7 +183,7 @@ export const runExceptionDemo = async (): Promise<DemoExceptionResult> => {
     } catch {
       duplicateClaimAlert = service
         .getAlerts()
-        .find((item) => item.alertType === AlertType.DUPLICATE_CLAIM && item.entityId === 'demo-ration-card-hash');
+        .find((item: any) => item.alertType === AlertType.DUPLICATE_CLAIM && item.entityId === 'demo-ration-card-hash');
     }
 
     await service.flushPersist();

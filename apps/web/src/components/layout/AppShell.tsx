@@ -6,7 +6,6 @@ import { screenDefinitions } from '@/demo-model.js';
 import { routeToScreen } from '@/lib/screen-routes.js';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { TopBar } from '@/components/layout/TopBar';
-import { DevAuthTokenDialog } from '@/components/DevAuthTokenDialog';
 import { DemoControlsDrawer } from '@/components/layout/DemoControlsDrawer';
 
 type AppShellProps = {
@@ -18,6 +17,7 @@ type AppShellProps = {
   onRoleChange: (role: DemoRole) => void;
   onScenarioChange: (scenario: DemoScenario) => void;
   onLogout: () => void;
+  offlineMode: boolean;
   children: ReactNode;
 };
 
@@ -30,6 +30,7 @@ export function AppShell({
   onRoleChange,
   onScenarioChange,
   onLogout,
+  offlineMode,
   children
 }: AppShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -78,10 +79,10 @@ export function AppShell({
           operatorName={operatorName}
           role={role}
           onRoleChange={onRoleChange}
+          allowRoleSelection={offlineMode}
           onLogout={onLogout}
           onToggleSidebar={() => setSidebarOpen((open) => !open)}
         />
-        <DevAuthTokenDialog ledgerMode={ledgerMode} apiOnline={apiOnline} />
         <main id="main" className="mx-auto w-full max-w-[1100px] flex-1 px-4 py-6 md:px-8">
           {children}
         </main>
