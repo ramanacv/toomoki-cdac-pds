@@ -1,5 +1,10 @@
 # Competition Readiness and Pilot Hardening Plan
 
+> Preserved competition plan. Current implementation status is maintained in
+> [challenge readiness](challenge-readiness-plan.md),
+> [J&K/Maharashtra delivery](jkmaha-epos-smartpds-implementation-plan.md), and
+> [MVP hardening](mvp-hardening-plan.md).
+
 ## Summary
 
 Implement a two-track programme:
@@ -9,7 +14,8 @@ Implement a two-track programme:
 
 Use **Keycloak with OIDC Authorization Code + PKCE**, require authentication by default for every online API mode, and retain unauthenticated role selection only for the offline fixture UI and automated tests. Position the commercial offering as a **paid district pilot that converts into a state-wide annual platform, integration, and support contract**.
 
-Create the maintained tracker at `docs/implementation/challenge-readiness-plan.md`, referencing the findings in `docs/product/initial-evaluation.md`.
+Create the maintained tracker at `docs/implementation/challenge-readiness-plan.md`,
+referencing the initial evaluation snapshot.
 
 ## Implementation Changes
 

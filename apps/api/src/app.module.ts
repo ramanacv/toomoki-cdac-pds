@@ -19,6 +19,9 @@ import { AdminModule } from './modules/admin/admin.module.js';
 import { StockModule } from './modules/stock/stock.module.js';
 import { PdsLoggingInterceptor } from './infrastructure/logging.interceptor.js';
 import { ProofsModule } from './modules/proofs/proofs.module.js';
+import { IntegrationsModule } from './modules/integrations/integrations.module.js';
+import { EligibilityModule } from './modules/eligibility/eligibility.module.js';
+import { BeneficiaryRegistryModule } from './modules/beneficiary-registry/beneficiary-registry.module.js';
 
 @Module({
   imports: [
@@ -39,7 +42,10 @@ import { ProofsModule } from './modules/proofs/proofs.module.js';
     AuditModule,
     AdminModule,
     StockModule,
-    ProofsModule
+    ProofsModule,
+    IntegrationsModule,
+    EligibilityModule,
+    BeneficiaryRegistryModule
   ],
   providers: [
     {

@@ -6,6 +6,9 @@
 > This is a working plan, not a contract. Tasks are grouped into phases ordered by risk/dependency.
 > Each task lists: **Files**, **What to do**, **Acceptance criteria**, and **Tests**.
 > Severity tags match the analysis: CRITICAL / HIGH / MEDIUM / LOW.
+>
+> Historical remediation plan. Current unresolved gates are maintained in
+> [MVP hardening](mvp-hardening-plan.md).
 
 ## Conventions
 

@@ -1,5 +1,16 @@
 # Technical Plan: Postgres Atomicity, Concurrency, and Transactional Outbox Refactor
 
+> Current status, 23 July 2026: this is a target design, not completed
+> repository-wide behavior. Canonical source ingestion has an atomic PostgreSQL
+> slice, but FPS receipt, distribution, and the remaining operational commands
+> still depend on the snapshot runtime. The maintained gate and acceptance
+> status are in
+> [MVP hardening](../implementation/mvp-hardening-plan.md).
+>
+> `RecordLedgerProof` is the only maintained API submission boundary. Current
+> outbox states are `PENDING`, `SUBMITTING`, `COMMITTED`, `FAILED`, and
+> `DEAD_LETTER`; older `PROCESSED` examples below are superseded.
+
 This document analyzes the feedback regarding the non-atomic state updates and unsafe full-table TRUNCATE-and-rebuild snapshots in ViksitPDS, and outlines a comprehensive plan to transition to an **Incremental Transactional Outbox** pattern.
 
 > **Review-traceable checklist:** For the full Gemini-architecture-review remediation (Postgres SoT, read-path OOM, REST roles, chaincode key-scope, and finding-specific tests), use [`implementation_plan.md`](../../implementation_plan.md) as the authoritative workstream checklist. This file remains the deeper Postgres write-path design note.
@@ -48,8 +59,8 @@ sequenceDiagram
     activate Worker
     Worker->>DB: SELECT FOR UPDATE PENDING outbox rows
     Worker->>Ledger: Submit transaction to blockchain
-    Ledger-->>Worker: Return ledgerTxId
-    Worker->>DB: UPDATE ledger_outbox SET status = 'PROCESSED', ledger_tx_id = ...
+    Ledger-->>Worker: Return confirmed Fabric transaction ID
+    Worker->>DB: UPDATE ledger_outbox SET status = 'COMMITTED', fabric_tx_id = ...
     Worker->>DB: COMMIT
     deactivate Worker
 ```
@@ -213,6 +224,10 @@ Under the refactored architecture, the blockchain synchronization flow functions
 1. **Immediate API Response:**
    Once the database transaction (containing the business update and pending outbox record) commits successfully, the API returns a `201 Created` status with the calculated event ID to the client. The client is assured that the transaction is safely registered.
 2. **Reliable Async Ledger Submission:**
-   The `startOutboxWorker` poller runs in a background thread. It fetches `PENDING` rows from `ledger_outbox` using a lock (`SELECT * FROM ledger_outbox WHERE status = 'PENDING' ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 10`), submits them sequentially using `FabricGatewayClient.submit`, receives the real blockchain `ledgerTxId`, and changes the outbox row status to `PROCESSED`.
+   The outbox poller fetches eligible rows with `FOR UPDATE SKIP LOCKED`,
+   transitions them through `SUBMITTING`, calls `RecordLedgerProof`, and records
+   `COMMITTED` plus the real Fabric transaction ID only after commit
+   confirmation. Retryable errors become `FAILED`; exhausted retries become
+   `DEAD_LETTER`.
 3. **Auto-Recovery on Crash:**
    If the API container crashes midway during Fabric submission, the outbox row remains marked as `PENDING`. Upon restart, the poller picks up where it left off, guaranteeing eventual consistency with zero loss of audit events.

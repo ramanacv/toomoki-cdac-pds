@@ -263,6 +263,30 @@ describe('PdsLedgerEngine', () => {
     ).toThrow(/Unsupported ledger event type/);
   });
 
+  it.each([
+    'EligibilityDecisionAuthorized',
+    'EligibilityDecisionReversed',
+    'BENEFICIARY_CREATED',
+    'MEMBER_REMOVED',
+    'HOUSEHOLD_BIFURCATED',
+    'MIGRATION_RECORDED',
+    'RECORD_DEACTIVATED'
+  ])('accepts privacy-safe beneficiary proof event %s without projecting identity state', (eventType) => {
+    const engine = new PdsLedgerEngine(false);
+    expect(() => engine.applyLedgerEvent({
+      ledgerTxId: `TX-${eventType}`,
+      entityType: 'beneficiary-registry',
+      entityId: 'beneficiary-demo-hash',
+      eventType,
+      payload: {
+        beneficiaryRefHash: 'beneficiary-demo-hash',
+        rationCardHash: 'ration-card-demo-hash',
+        evidenceDigest: 'a'.repeat(64)
+      },
+      timestamp: '2026-07-23T00:00:00.000Z'
+    })).not.toThrow();
+  });
+
   it('rejects PII-bearing payloads and raw numeric hashes (T6.4)', () => {
     const engine = new PdsLedgerEngine(false);
     expect(() =>

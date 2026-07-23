@@ -12,7 +12,7 @@ describe('DashboardModule', () => {
     fixture = await createDemoLedgerFixture();
     controller = await createControllerWithFacade(DashboardController, fixture.facade);
 
-    const summary = controller.summary();
+    const summary = await controller.summary();
     expect(summary.activeLots).toBeGreaterThan(0);
     expect(summary.trackedStockKg).toBeGreaterThan(0);
     expect(summary.openAlerts).toBeGreaterThanOrEqual(0);

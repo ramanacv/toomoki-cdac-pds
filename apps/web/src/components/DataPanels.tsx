@@ -25,6 +25,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { formatDateTime, stakeholderParticipation } from '@/lib/constants';
 import { cn } from '@/lib/utils';
+import { ProvenanceBadges } from '@/components/ProvenanceBadges.js';
 import { ParticipationBadge, participationCardClass } from '@/components/ParticipationIndicator';
 
 const alertTone: Record<AuditAlert['riskLevel'], 'low' | 'medium' | 'high'> = {
@@ -292,6 +293,7 @@ export function AuthLedgerPanel({ authTransactions }: { authTransactions: AuthTr
                 { label: 'Auth time', value: formatDateTime(auth.timestamp) }
               ]}
             />
+            <ProvenanceBadges provenance={auth.provenance} />
           </EntityCard>
         ))}
       </div>
@@ -319,6 +321,7 @@ export function AllocationPanel({ allocations }: { allocations: FPSAllocation[] 
                 { label: 'Received', value: `${allocation.receivedQtyKg ?? 'Pending'} kg` }
               ]}
             />
+            <ProvenanceBadges provenance={allocation.provenance} />
           </EntityCard>
         ))}
       </div>
@@ -346,6 +349,7 @@ export function EntitlementsPanel({ entitlements }: { entitlements: MonthlyEntit
                 { label: 'Balance', value: `${entitlement.availableBalanceKg} kg` }
               ]}
             />
+            <ProvenanceBadges provenance={entitlement.provenance} />
           </EntityCard>
         ))}
       </div>
@@ -370,10 +374,11 @@ export function DistributionPanel({ distributions }: { distributions: Distributi
             <DefinitionList
               entries={[
                 { label: 'Auth ref', value: distribution.authTxnRefHash },
-                { label: 'Ledger tx', value: distribution.ledgerTxId ?? 'Pending' },
+                { label: 'Operational event ID', value: distribution.ledgerTxId ?? 'Pending' },
                 { label: 'Issued at', value: formatDateTime(distribution.timestamp) }
               ]}
             />
+            <ProvenanceBadges provenance={distribution.provenance} eventId={distribution.ledgerTxId} />
           </EntityCard>
         ))}
       </div>

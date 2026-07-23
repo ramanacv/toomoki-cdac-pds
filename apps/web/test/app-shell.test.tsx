@@ -186,6 +186,14 @@ describe('app shell', () => {
     expect(await screen.findByRole('heading', { name: 'Demo operating network' })).toBeInTheDocument();
   });
 
+  it('exposes eligibility review to oversight roles but keeps offline screening read-only', async () => {
+    const user = await renderApp('/?role=AUDITOR');
+    await user.click(sidebar().getByRole('link', { name: 'Eligibility review' }));
+    expect(await screen.findByText('External-service simulation using synthetic beneficiaries')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Run external eligibility check' })).toBeDisabled();
+    expect(screen.getByText(/Offline fixture mode is read-only/)).toBeInTheDocument();
+  });
+
   it('keeps workflow actions on the workbench only', async () => {
     const user = await renderApp('/?role=GODOWN');
 
@@ -203,7 +211,7 @@ describe('app shell', () => {
     await screen.findByRole('heading', { name: 'Overview' });
 
     await user.click(screen.getByRole('combobox'));
-    await user.click(await screen.findByRole('option', { name: 'Fair Price Shop' }));
+    await user.click(await screen.findByRole('option', { name: 'Fair Price Shop Demo' }));
 
     expect(await sidebar().findByRole('link', { name: 'Distribution' })).toBeInTheDocument();
     expect(sidebar().queryByRole('link', { name: 'Stakeholders' })).not.toBeInTheDocument();

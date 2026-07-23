@@ -5,8 +5,9 @@ export class DistributionDto {
   @IsString()
   distributionId!: string;
 
+  @IsOptional()
   @IsString()
-  fpsId!: string;
+  fpsId?: string;
 
   @IsString()
   rationCardHash!: string;
@@ -30,8 +31,9 @@ export class DistributionDto {
   @IsString()
   authTxnRefHash!: string;
 
+  @IsOptional()
   @IsString()
-  dealerId!: string;
+  dealerId?: string;
 
   @IsOptional()
   @IsString()

@@ -1,4 +1,4 @@
-const DEFAULT_TOKEN_URL = 'http://127.0.0.1:8080/realms/viksitpds/protocol/openid-connect/token';
+const DEFAULT_TOKEN_URL = 'http://localhost:8080/realms/viksitpds/protocol/openid-connect/token';
 
 export async function getServiceAccessToken(options = {}) {
   if (process.env.PDS_E2E_ACCESS_TOKEN) return process.env.PDS_E2E_ACCESS_TOKEN;

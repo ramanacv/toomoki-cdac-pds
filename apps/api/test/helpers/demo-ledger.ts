@@ -5,6 +5,7 @@ import type { Type } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { PdsLedgerFacade } from '../../src/modules/core/pds-ledger.facade.js';
 import { FilePdsLedgerPort } from '../../src/infrastructure/ledger-port.js';
+import type { AuthenticatedRequest } from '../../src/modules/auth/identity-provider.js';
 
 export type DemoLedgerFixture = {
   facade: PdsLedgerFacade;
@@ -61,3 +62,16 @@ export const prepareFpsStock = (facade: PdsLedgerFacade, allocationId: string, q
   });
   facade.recordFpsReceipt({ allocationId, receivedQtyKg: quantityKg });
 };
+
+export const asFpsRequest = (
+  stakeholderId = 'FPS-101',
+  subject = 'demo-fps'
+): AuthenticatedRequest => ({
+  headers: {},
+  user: {
+    subject,
+    stakeholderId,
+    roles: ['fps'],
+    claims: { sub: subject, pds_stakeholder_id: stakeholderId }
+  }
+});

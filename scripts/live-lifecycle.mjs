@@ -327,7 +327,6 @@ async function runCommodity(reset, commodity, qty, index) {
     '/distributions',
     {
       distributionId: ids.distribution,
-      fpsId: 'FPS-101',
       rationCardHash,
       beneficiaryRefHash,
       commodity,
@@ -335,7 +334,6 @@ async function runCommodity(reset, commodity, qty, index) {
       authMode: auth.authMode,
       authResult: auth.authResult,
       authTxnRefHash: auth.authTxnRefHash,
-      dealerId: 'FPS-DEALER-101',
       timestamp: `${month}-15T10:00:00.000Z`
     },
     { role: 'fps' }

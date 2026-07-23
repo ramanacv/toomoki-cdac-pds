@@ -137,7 +137,7 @@ const lifecycle = async (index) => {
   await post('/fps-allocations', { allocationId, fpsId: 'FPS-101', commodity: 'Rice', allocatedQtyKg: quantityKg, month, sourceGodownId: 'ISSUE-001' });
   await post(`/fps-allocations/${allocationId}/receipt`, { receivedQtyKg: quantityKg });
   const auth = await post('/auth/mock-otp', { authTxnId: `AUTH-${prefix}`, beneficiaryRefHash: beneficiaryHash, rationCardHash: cardHash, authMode: 'MOCK_OTP', authResult: 'SUCCESS' });
-  await post('/distributions', { distributionId: `DIST-${prefix}`, fpsId: 'FPS-101', rationCardHash: cardHash, beneficiaryRefHash: beneficiaryHash, commodity: 'Rice', deliveredKg: quantityKg, authMode: auth.authMode, authResult: auth.authResult, authTxnRefHash: auth.authTxnRefHash, dealerId: 'FPS-DEALER-101', timestamp: `${month}-15T10:00:00.000Z` });
+  await post('/distributions', { distributionId: `DIST-${prefix}`, rationCardHash: cardHash, beneficiaryRefHash: beneficiaryHash, commodity: 'Rice', deliveredKg: quantityKg, authMode: auth.authMode, authResult: auth.authResult, authTxnRefHash: auth.authTxnRefHash, timestamp: `${month}-15T10:00:00.000Z` });
 };
 
 await runPool(20, lifecycleConcurrency, lifecycle);

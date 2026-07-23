@@ -1,0 +1,77 @@
+[
+  {
+    "endpoint": "/integrations/smartpds/v1/master-references",
+    "envelope": {
+      "sourceSystem": "SMARTPDS_RCMS",
+      "sourceEventId": "MAHA-RCMS-FPS-101-v1",
+      "eventType": "MASTER_REFERENCE",
+      "schemaVersion": "maha-sandbox-1",
+      "occurredAt": "2026-06-01T06:00:00.000Z",
+      "payload": {
+        "entityType": "fps-master",
+        "entityId": "FPS-101",
+        "fpsRef": "FPS-101",
+        "districtCode": "DEMO-MH-01",
+        "active": true
+      }
+    }
+  },
+  {
+    "endpoint": "/integrations/scm/v1/allocation-events",
+    "envelope": {
+      "sourceSystem": "STATE_SCM",
+      "sourceEventId": "MAHA-SCM-ALLOC-101-v1",
+      "eventType": "ALLOCATION",
+      "schemaVersion": "maha-sandbox-1",
+      "occurredAt": "2026-06-02T08:00:00.000Z",
+      "payload": {
+        "entityType": "allocation",
+        "entityId": "ALLOC-2026-001",
+        "fpsRef": "FPS-101",
+        "commodityCode": "RICE",
+        "quantityKg": 1000
+      }
+    }
+  },
+  {
+    "endpoint": "/integrations/scm/v1/movement-events",
+    "envelope": {
+      "sourceSystem": "STATE_SCM",
+      "sourceEventId": "MAHA-SCM-MOVE-101-v1",
+      "eventType": "MOVEMENT",
+      "schemaVersion": "maha-sandbox-1",
+      "occurredAt": "2026-06-03T08:00:00.000Z",
+      "parentSourceEventId": "MAHA-SCM-ALLOC-101-v1",
+      "payload": {
+        "entityType": "movement",
+        "entityId": "TR-SEED-ISSUE-FPS",
+        "fromFacilityRef": "ISSUE-001",
+        "toFpsRef": "FPS-101",
+        "commodityCode": "RICE",
+        "quantityKg": 1000
+      }
+    }
+  },
+  {
+    "endpoint": "/integrations/epos/v1/distribution-events",
+    "envelope": {
+      "sourceSystem": "AEPDS_EPOS",
+      "sourceEventId": "MAHA-EPOS-DIST-101-v1",
+      "eventType": "DISTRIBUTION",
+      "schemaVersion": "maha-sandbox-1",
+      "occurredAt": "2026-06-09T10:10:00.000Z",
+      "deviceSyncAt": "2026-06-09T10:10:30.000Z",
+      "payload": {
+        "entityType": "distribution",
+        "entityId": "DIST-2026-001",
+        "fpsRef": "FPS-101",
+        "rationCardHash": "demo-ration-card-hash",
+        "beneficiaryRefHash": "beneficiary-hash",
+        "commodityCode": "RICE",
+        "quantityKg": 25,
+        "portability": false,
+        "authenticationOutcome": "SUCCESS"
+      }
+    }
+  }
+]

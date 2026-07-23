@@ -74,7 +74,6 @@ export const runHappyPathFabric = async ({ apiBase, token }) => {
     method: 'POST',
     body: JSON.stringify({
       distributionId: `${prefix}-DIST`,
-      fpsId: 'FPS-101',
       rationCardHash: 'demo-ration-card-hash',
       beneficiaryRefHash: 'beneficiary-hash',
       commodity: 'Rice',
@@ -82,7 +81,6 @@ export const runHappyPathFabric = async ({ apiBase, token }) => {
       authMode: auth.authMode,
       authResult: auth.authResult,
       authTxnRefHash: auth.authTxnRefHash,
-      dealerId: 'FPS-DEALER-101',
       timestamp: '2026-06-30T10:00:00.000Z'
     })
   });
@@ -164,7 +162,6 @@ export const runExceptionPathFabric = async ({ apiBase, token }) => {
     method: 'POST',
     body: JSON.stringify({
       distributionId: `${prefix}-DIST-1`,
-      fpsId: 'FPS-101',
       rationCardHash: 'demo-ration-card-hash',
       beneficiaryRefHash: 'beneficiary-hash',
       commodity: 'Rice',
@@ -172,7 +169,6 @@ export const runExceptionPathFabric = async ({ apiBase, token }) => {
       authMode: auth.authMode,
       authResult: auth.authResult,
       authTxnRefHash: auth.authTxnRefHash,
-      dealerId: 'FPS-DEALER-101',
       timestamp: '2026-06-30T10:00:00.000Z'
     })
   });
@@ -184,7 +180,6 @@ export const runExceptionPathFabric = async ({ apiBase, token }) => {
       method: 'POST',
       body: JSON.stringify({
         distributionId: `${prefix}-DIST-2`,
-        fpsId: 'FPS-101',
         rationCardHash: 'demo-ration-card-hash',
         beneficiaryRefHash: 'beneficiary-hash',
         commodity: 'Rice',
@@ -192,7 +187,6 @@ export const runExceptionPathFabric = async ({ apiBase, token }) => {
         authMode: auth.authMode,
         authResult: auth.authResult,
         authTxnRefHash: auth.authTxnRefHash,
-        dealerId: 'FPS-DEALER-101',
         timestamp: '2026-06-30T10:05:00.000Z'
       })
     });

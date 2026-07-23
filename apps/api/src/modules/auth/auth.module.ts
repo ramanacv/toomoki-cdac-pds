@@ -1,10 +1,11 @@
-import { Module } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { AuthController } from './auth.controller.js';
 import { BusinessAuthGuard } from './auth.guard.js';
 import { IDENTITY_PROVIDER } from './identity-provider.js';
 import { OidcIdentityProvider } from './oidc-identity-provider.js';
 import { TestIdentityProvider } from './stub-identity-provider.js';
+import { DurableAuthorizationService } from './durable-authorization.service.js';
 
 export const createIdentityProvider = () => {
   const mode = (process.env.PDS_AUTH_MODE ?? 'oidc').toLowerCase();
@@ -18,11 +19,14 @@ export const createIdentityProvider = () => {
   return new OidcIdentityProvider();
 };
 
+@Global()
 @Module({
   controllers: [AuthController],
   providers: [
     { provide: IDENTITY_PROVIDER, useFactory: createIdentityProvider },
+    DurableAuthorizationService,
     { provide: APP_GUARD, useClass: BusinessAuthGuard }
-  ]
+  ],
+  exports: [DurableAuthorizationService]
 })
 export class AuthModule {}

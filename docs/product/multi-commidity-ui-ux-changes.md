@@ -1,5 +1,8 @@
 # Multi-commodity workbench & lots visibility redesign
 
+> Historical UI redesign note. Current FPS identity, provenance, and status
+> behavior is specified in the [feature specification](feature-spec.md).
+
 ## Context
 
 Multi-commodity support (Rice, Wheat, Dal, Sugar, Cooking Oil, Kerosene — see `COMMODITIES` / `COMMODITY_ROUTE_TEMPLATES` in [packages/shared-types/src/index.ts](packages/shared-types/src/index.ts)) was recently layered onto a UI that was built assuming a single commodity (Rice). Two problems have surfaced for the product owner testing the demo:

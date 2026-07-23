@@ -4,6 +4,8 @@ Last updated: 2026-07-11
 
 PostgreSQL is authoritative for operational state. Fabric receives immutable `LedgerProof` records asynchronously and never decides whether an operational command is valid.
 
+The state-system ingestion, FPS identity scoping, and Maharashtra-first pilot gates that depend on this work are tracked in the [J&K/Maharashtra ePoS–SMART-PDS implementation plan](jkmaha-epos-smartpds-implementation-plan.md). Its pilot gate cannot pass until the transactional-command and concurrency/crash requirements in this tracker pass.
+
 ## Status and gates
 
 | Phase | Status | Acceptance gate | Dependencies / remaining blockers |

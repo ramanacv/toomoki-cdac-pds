@@ -9,6 +9,7 @@ export {
   distributions,
   authTransactions,
   entitlements,
+  eligibilityBeneficiaries,
   commodities,
   backendSeed,
   dashboardSummary,

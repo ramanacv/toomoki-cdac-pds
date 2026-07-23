@@ -2,7 +2,7 @@ import { UserManager, WebStorageStateStore, type User } from 'oidc-client-ts';
 
 export const WEB_ROLES = [
   'management', 'department', 'procurement', 'fci', 'godown', 'fps', 'auditor',
-  'platform-admin', 'metrics-reader', 'demo-reset'
+  'platform-admin', 'metrics-reader', 'demo-reset', 'integration-service'
 ] as const;
 export type WebRole = (typeof WEB_ROLES)[number];
 

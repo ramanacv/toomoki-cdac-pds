@@ -3,13 +3,14 @@
 
 INSERT INTO stakeholders (stakeholder_id, stakeholder_type, name, district, license_no, status)
 VALUES
+  ('PROC-001', 'PROCUREMENT_CENTER', 'Procurement Centre 01', 'Demo District', 'PROC-LIC-001', 'ACTIVE'),
   ('FCI-001', 'FCI', 'Food Corporation of India', 'Central', 'FCI-POC-001', 'ACTIVE'),
   ('DSO-001', 'DISTRICT_SUPPLY_OFFICE', 'District Supply Office', 'Demo District', 'DSO-LIC-001', 'ACTIVE'),
-  ('PROC-001', 'PROCUREMENT_CENTER', 'Procurement Centre 01', 'Demo District', 'PROC-LIC-001', 'ACTIVE'),
   ('GODOWN-S-001', 'STATE_GODOWN', 'State Government Depot 01', 'Demo District', 'SG-LIC-001', 'ACTIVE'),
   ('ISSUE-001', 'ISSUE_POINT', 'Issue Point 01', 'Demo District', 'ISSUE-LIC-001', 'ACTIVE'),
   ('TRANS-001', 'TRANSPORTER', 'Transport Contractor 01', 'Demo District', 'TRANS-LIC-001', 'ACTIVE'),
   ('FPS-101', 'FAIR_PRICE_SHOP', 'FPS 101', 'Demo District', 'FPS-LIC-101', 'ACTIVE'),
+  ('FPS-202', 'FAIR_PRICE_SHOP', 'FPS 202', 'Neighbouring Demo District', 'FPS-LIC-202', 'ACTIVE'),
   ('AUD-001', 'AUDITOR', 'Auditor 01', 'Demo District', 'AUD-LIC-001', 'ACTIVE');
 
 INSERT INTO commodity_lots (lot_id, commodity, season, quantity_kg, quality_grade, source, current_owner, current_location, status)
@@ -33,8 +34,32 @@ VALUES
 INSERT INTO ration_cards_mock (ration_card_hash, household_size, district, status)
 VALUES ('demo-ration-card-hash', 5, 'Demo District', 'ACTIVE');
 
+INSERT INTO ration_cards_mock (ration_card_hash, household_size, district, status)
+VALUES
+  ('ration-card-demo-001-hash', 5, 'MH-DEMO', 'ACTIVE'),
+  ('ration-card-demo-002-hash', 4, 'MH-DEMO', 'ACTIVE'),
+  ('ration-card-demo-003-hash', 3, 'MH-DEMO', 'ACTIVE'),
+  ('ration-card-demo-004-hash', 4, 'MH-DEMO', 'ACTIVE'),
+  ('ration-card-demo-005-hash', 5, 'MH-DEMO-05', 'ACTIVE'),
+  ('ration-card-jk-demo-001-hash', 5, 'JK-DEMO-01', 'ACTIVE'),
+  ('ration-card-jk-demo-002-hash', 4, 'JK-DEMO-02', 'ACTIVE'),
+  ('ration-card-jk-demo-003-hash', 6, 'JK-DEMO-03', 'ACTIVE'),
+  ('ration-card-jk-demo-004-hash', 3, 'JK-DEMO-04', 'ACTIVE');
+
 INSERT INTO beneficiary_registry_mock (beneficiary_ref_hash, name_masked, district, ration_card_hash, active)
 VALUES ('beneficiary-hash', 'Beneficiary ****01', 'Demo District', 'demo-ration-card-hash', TRUE);
+
+INSERT INTO beneficiary_registry_mock (beneficiary_ref_hash, name_masked, district, ration_card_hash, active)
+VALUES
+  ('beneficiary-demo-001-hash', 'Asha Patil (Fictional)', 'MH-DEMO', 'ration-card-demo-001-hash', TRUE),
+  ('beneficiary-demo-002-hash', 'Ravi Shinde (Fictional)', 'MH-DEMO', 'ration-card-demo-002-hash', TRUE),
+  ('beneficiary-demo-003-hash', 'Meera Kulkarni (Fictional)', 'MH-DEMO', 'ration-card-demo-003-hash', TRUE),
+  ('beneficiary-demo-004-hash', 'Sunita More (Fictional)', 'MH-DEMO', 'ration-card-demo-004-hash', TRUE),
+  ('beneficiary-demo-005-hash', 'Imran Shaikh (Fictional)', 'MH-DEMO-05', 'ration-card-demo-005-hash', TRUE),
+  ('beneficiary-jk-demo-001-hash', 'Zoya Dar (Fictional)', 'JK-DEMO-01', 'ration-card-jk-demo-001-hash', TRUE),
+  ('beneficiary-jk-demo-002-hash', 'Arif Lone (Fictional)', 'JK-DEMO-02', 'ration-card-jk-demo-002-hash', TRUE),
+  ('beneficiary-jk-demo-003-hash', 'Nusrat Bano (Fictional)', 'JK-DEMO-03', 'ration-card-jk-demo-003-hash', TRUE),
+  ('beneficiary-jk-demo-004-hash', 'Tariq Mir (Fictional)', 'JK-DEMO-04', 'ration-card-jk-demo-004-hash', TRUE);
 
 INSERT INTO monthly_entitlements (ration_card_hash, commodity, month, monthly_entitlement_kg, already_lifted_kg, available_balance_kg, active)
 VALUES
@@ -44,3 +69,15 @@ VALUES
   ('demo-ration-card-hash', 'Sugar', '2026-06', 2, 0, 2, TRUE),
   ('demo-ration-card-hash', 'Cooking Oil', '2026-06', 1, 0, 1, TRUE),
   ('demo-ration-card-hash', 'Kerosene', '2026-06', 3, 0, 3, TRUE);
+
+INSERT INTO monthly_entitlements (ration_card_hash, commodity, month, monthly_entitlement_kg, already_lifted_kg, available_balance_kg, active)
+VALUES
+  ('ration-card-demo-001-hash', 'Rice', '2026-07', 25, 0, 25, TRUE),
+  ('ration-card-demo-002-hash', 'Rice', '2026-07', 20, 5, 15, TRUE),
+  ('ration-card-demo-003-hash', 'Rice', '2026-07', 15, 5, 10, TRUE),
+  ('ration-card-demo-004-hash', 'Rice', '2026-07', 20, 0, 20, TRUE),
+  ('ration-card-demo-005-hash', 'Rice', '2026-07', 25, 10, 15, TRUE),
+  ('ration-card-jk-demo-001-hash', 'Rice', '2026-07', 25, 5, 20, TRUE),
+  ('ration-card-jk-demo-002-hash', 'Rice', '2026-07', 20, 0, 20, TRUE),
+  ('ration-card-jk-demo-003-hash', 'Rice', '2026-07', 30, 10, 20, TRUE),
+  ('ration-card-jk-demo-004-hash', 'Rice', '2026-07', 15, 0, 15, TRUE);

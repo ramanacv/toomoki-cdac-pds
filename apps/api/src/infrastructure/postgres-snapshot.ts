@@ -98,6 +98,8 @@ export const mapEntitlementRow = (row: Record<string, unknown>): MonthlyEntitlem
 
 export const mapAuthTransactionRow = (row: Record<string, unknown>, toIsoString = toIsoStringDefault): AuthTransaction => ({
   authTxnId: asString(row.auth_txn_id),
+  ...(row.fps_id == null ? {} : { fpsId: asString(row.fps_id) }),
+  ...(row.operator_ref == null ? {} : { operatorRef: asString(row.operator_ref) }),
   beneficiaryRefHash: asString(row.beneficiary_ref_hash),
   rationCardHash: asString(row.ration_card_hash),
   authMode: asString(row.auth_mode) as AuthMode,
@@ -168,7 +170,7 @@ export const buildSnapshotWritePlan = (state: PdsLedgerState): SqlStatement[] =>
       values: []
     },
     {
-      text: 'TRUNCATE stakeholders, commodity_lots, stock_positions, transfer_orders, fps_allocations, monthly_entitlements, auth_transactions, distribution_transactions, audit_alerts, ledger_events, ledger_tx_index RESTART IDENTITY CASCADE',
+      text: 'TRUNCATE integration_event_attempts, integration_events, stakeholders, commodity_lots, stock_positions, transfer_orders, fps_allocations, monthly_entitlements, auth_transactions, distribution_transactions, audit_alerts, ledger_events, ledger_tx_index RESTART IDENTITY CASCADE',
       values: []
     }
   ];
@@ -247,9 +249,11 @@ export const buildSnapshotWritePlan = (state: PdsLedgerState): SqlStatement[] =>
 
   for (const authTransaction of state.authTransactions) {
     statements.push({
-      text: 'INSERT INTO auth_transactions (auth_txn_id, beneficiary_ref_hash, ration_card_hash, auth_mode, auth_result, auth_txn_ref_hash, approved_by, timestamp) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (auth_txn_id) DO UPDATE SET beneficiary_ref_hash = EXCLUDED.beneficiary_ref_hash, ration_card_hash = EXCLUDED.ration_card_hash, auth_mode = EXCLUDED.auth_mode, auth_result = EXCLUDED.auth_result, auth_txn_ref_hash = EXCLUDED.auth_txn_ref_hash, approved_by = EXCLUDED.approved_by, timestamp = EXCLUDED.timestamp',
+      text: 'INSERT INTO auth_transactions (auth_txn_id, fps_id, operator_ref, beneficiary_ref_hash, ration_card_hash, auth_mode, auth_result, auth_txn_ref_hash, approved_by, timestamp) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) ON CONFLICT (auth_txn_id) DO UPDATE SET fps_id = EXCLUDED.fps_id, operator_ref = EXCLUDED.operator_ref, beneficiary_ref_hash = EXCLUDED.beneficiary_ref_hash, ration_card_hash = EXCLUDED.ration_card_hash, auth_mode = EXCLUDED.auth_mode, auth_result = EXCLUDED.auth_result, auth_txn_ref_hash = EXCLUDED.auth_txn_ref_hash, approved_by = EXCLUDED.approved_by, timestamp = EXCLUDED.timestamp',
       values: [
         authTransaction.authTxnId,
+        authTransaction.fpsId ?? null,
+        authTransaction.operatorRef ?? null,
         authTransaction.beneficiaryRefHash,
         authTransaction.rationCardHash,
         authTransaction.authMode,

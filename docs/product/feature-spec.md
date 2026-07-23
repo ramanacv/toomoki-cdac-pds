@@ -3,7 +3,9 @@
 ## Common Rules
 
 - All write operations must capture actor, timestamp, request ID, and resulting status.
-- Ledger writes must return a `ledgerTxId`.
+- Proof-bearing operations must return a stable operational event/operation ID.
+  Fabric submission is asynchronous; callers query proof status separately and
+  receive a Fabric transaction ID only after `COMMITTED`.
 - Beneficiary-sensitive data must be represented by hashes or references.
 - Raw Aadhaar number, raw biometric, OTP, mobile number, and full ration card number must not be written on-chain.
 - Inactive stakeholders, inactive users, and unauthorized roles must be blocked.
@@ -23,8 +25,9 @@ Main flow:
 1. Admin submits stakeholder details.
 2. System validates unique stakeholder ID and allowed type.
 3. System stores stakeholder in PostgreSQL.
-4. System writes stakeholder registration proof to Fabric.
-5. System returns stakeholder record and `ledgerTxId`.
+4. System atomically records the domain event and Fabric outbox intent where
+   the PostgreSQL command path supports it.
+5. System returns stakeholder state and the operational event reference.
 
 Error cases:
 
@@ -52,8 +55,9 @@ Main flow:
 1. User creates lot.
 2. System validates positive quantity and active owner.
 3. System stores lot and stock position.
-4. System writes `CreateCommodityLot` ledger event.
-5. System returns lot and `ledgerTxId`.
+4. System records operational event and asynchronous proof intent.
+5. System returns lot and the stable event/operation reference; Fabric
+   transaction ID appears only after proof status becomes `COMMITTED`.
 
 Error cases:
 
@@ -85,7 +89,7 @@ Main flow:
 1. Sender creates dispatch.
 2. System validates stock availability.
 3. System marks quantity as in transit.
-4. System writes `DispatchLot` ledger event.
+4. System records the dispatch event and asynchronous proof intent.
 5. System returns transfer with status `DISPATCHED`.
 
 Error cases:
@@ -114,7 +118,7 @@ Main flow:
 1. Receiver confirms received quantity.
 2. System compares received and dispatched quantities.
 3. System updates receiver stock by received quantity.
-4. System writes `ReceiveLot` ledger event.
+4. System records the receipt event and asynchronous proof intent.
 5. If shortage exists, system creates audit alert.
 
 Error cases:
@@ -147,7 +151,7 @@ Main flow:
 1. Admin creates FPS allocation.
 2. System validates stock availability.
 3. System reserves or dispatches allocated stock.
-4. System writes `AllocateToFPS` ledger event.
+4. System records the allocation event and asynchronous proof intent.
 5. System returns allocation status.
 
 Error cases:
@@ -171,11 +175,15 @@ Inputs: `allocationId`, `receivedQtyKg`, `receiveTimestamp`.
 
 Preconditions: Allocation exists and is pending receipt.
 
+Authorization: the authenticated subject must have an active
+`FAIR_PRICE_SHOP` assignment matching the allocation. Another shop receives
+`404`, not resource details.
+
 Main flow:
 
 1. FPS dealer confirms received quantity.
 2. System updates FPS stock.
-3. System writes `RecordFPSReceipt` ledger event.
+3. System records the FPS receipt event and asynchronous proof intent.
 4. System creates shortage alert if received quantity is lower than allocated quantity.
 
 Acceptance criteria:
@@ -186,6 +194,10 @@ Acceptance criteria:
 ## Mock Beneficiary Authentication
 
 Purpose: Simulate authentication before distribution.
+
+This is a controlled-PoC simulation. In a state integration, AePDS/ePoS owns
+shop/device-bound authentication and ViksitPDS consumes only the approved,
+non-sensitive result event.
 
 Primary actors: FPS Dealer, Beneficiary, Supervisor for exception.
 
@@ -202,7 +214,8 @@ Main flow:
 1. FPS dealer initiates authentication.
 2. System simulates success or failure.
 3. System records authentication transaction in PostgreSQL.
-4. System writes only authentication hash/reference to ledger if needed for distribution proof.
+4. System retains only an approved authentication hash/reference for any later
+   proof; no raw authentication material is persisted or submitted.
 
 Error cases:
 
@@ -269,7 +282,9 @@ Main flow:
 2. System reduces FPS stock.
 3. System updates monthly lifted quantity.
 4. System stores distribution in PostgreSQL.
-5. System writes `RecordDistribution` receipt to Fabric.
+5. System records proof intent for asynchronous `RecordLedgerProof`
+   submission. Fabric delay or retryable failure does not roll back the valid
+   PostgreSQL operation.
 6. System returns citizen receipt and verification ID.
 
 Acceptance criteria:

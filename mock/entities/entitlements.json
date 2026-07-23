@@ -6,7 +6,17 @@
     "monthlyEntitlementKg": 25,
     "alreadyLiftedKg": 0,
     "availableBalanceKg": 25,
-    "active": true
+    "active": true,
+    "provenance": {
+      "sourceSystem": "SMARTPDS_RCMS",
+      "sourceEventId": "FIXTURE-RCMS-ENTITLEMENT-RICE-2026-06",
+      "schemaVersion": "fixture-1",
+      "occurredAt": "2026-06-01T06:00:00.000Z",
+      "ingestedAt": "2026-06-01T06:01:00.000Z",
+      "approvedPayloadHash": "4aadeb4df02f58167c9f8daff4c683b8b516ff0889984a676ff1d93a490cad34",
+      "operationId": "fixture-rcms-entitlement-rice",
+      "status": "ACCEPTED"
+    }
   },
   {
     "rationCardHash": "demo-ration-card-hash",

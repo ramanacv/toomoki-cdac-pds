@@ -33,7 +33,12 @@ export const OPENAPI_SPEC = {
     transferReceipt: ['fci', 'godown'], stageTwoAuthorization: ['department'], allocation: ['department', 'godown'],
     fpsReceipt: ['fps'], authentication: ['fps'], distribution: ['fps'], entitlementWrite: ['department'],
     entitlementValidation: ['department', 'fps'], reconciliation: ['auditor'], admin: ['platform-admin'],
-    metrics: ['metrics-reader', 'platform-admin'], reset: ['demo-reset']
+    metrics: ['metrics-reader', 'platform-admin'], reset: ['demo-reset'],
+    integrations: ['integration-service'],
+    eligibilityRead: ['department', 'auditor', 'management'],
+    eligibilityMutation: ['department'],
+    beneficiaryRegistryRead: ['department', 'auditor', 'management'],
+    beneficiaryRegistryMutation: ['department']
   },
   servers: [{ url: '/', description: 'Current host' }],
   paths: {
@@ -95,6 +100,35 @@ export const OPENAPI_SPEC = {
     '/admin/activity': { get: secured('Get recent application activity', ['platform-admin']) },
     '/admin/stakeholders/summary': { get: secured('Get stakeholder summary', ['platform-admin']) },
     '/admin/reset': { post: secured('Reset explicitly authorized demo data', ['demo-reset']) },
-    '/metrics': { get: secured('Get Prometheus metrics', ['metrics-reader', 'platform-admin']) }
+    '/metrics': { get: secured('Get Prometheus metrics', ['metrics-reader', 'platform-admin']) },
+    '/integrations/smartpds/v1/master-references': { post: secured('Ingest SMART-PDS/RCMS master reference event', ['integration-service']) },
+    '/integrations/scm/v1/allocation-events': { post: secured('Ingest state-SCM allocation event', ['integration-service']) },
+    '/integrations/scm/v1/movement-events': { post: secured('Ingest state-SCM movement event', ['integration-service']) },
+    '/integrations/epos/v1/distribution-events': { post: secured('Ingest AePDS/ePoS distribution event', ['integration-service']) },
+    '/integrations/events': { get: secured('List privacy-safe source-event provenance', ['integration-service']) },
+    '/integrations/events/{sourceSystem}/{sourceEventId}/trace': {
+      get: secured('Trace a source event to its operation and Fabric proof state', ['integration-service'])
+    },
+    '/integrations/health': { get: secured('Get per-source ingestion health', ['integration-service']) },
+    '/integrations/reconcile': { post: secured('Reconcile imported source events', ['integration-service']) }
+    ,
+    '/eligibility/v1/summary': { get: secured('Summarize synthetic external eligibility screening', ['department', 'auditor', 'management']) },
+    '/eligibility/v1/screenings': { post: secured('Run external eligibility screening', ['department']) },
+    '/eligibility/v1/cases': { get: secured('List eligibility review cases', ['department', 'auditor', 'management']) },
+    '/eligibility/v1/cases/{caseId}': { get: secured('Get eligibility review case', ['department', 'auditor', 'management']) },
+    '/eligibility/v1/cases/{caseId}/notice': { post: secured('Issue guided review notice', ['department']) },
+    '/eligibility/v1/cases/{caseId}/verification': { post: secured('Record guided verification', ['department']) },
+    '/eligibility/v1/cases/{caseId}/recommendation': { post: secured('Record review recommendation', ['department']) },
+    '/eligibility/v1/cases/{caseId}/decision': { post: secured('Record authorized mock RCMS decision', ['department']) },
+    '/eligibility/v1/cases/{caseId}/appeals': { post: secured('Record eligibility appeal', ['department']) },
+    '/eligibility/v1/cases/{caseId}/reinstate': { post: secured('Reverse decision and reinstate remaining entitlement', ['department']) },
+    '/eligibility/v1/entitlement-gate': { post: secured('Demonstrate effective entitlement gate', ['department', 'auditor', 'management']) },
+    '/eligibility/v1/demo/reset': { post: secured('Reset only synthetic eligibility demo state', ['demo-reset']) },
+    '/beneficiary-registry/v1/summary': {
+      get: secured('Summarize privacy-safe beneficiary lifecycle projections', ['department', 'auditor', 'management'])
+    },
+    '/beneficiary-registry/v1/events': {
+      post: secured('Record an authorized beneficiary lifecycle mutation and proof intent', ['department'])
+    }
   }
 } as const;

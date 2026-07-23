@@ -21,6 +21,7 @@ import {
 import {
   type LedgerEvent
 } from '@pds/shared-types';
+import { assertEligibilityGateOpen } from '../eligibility/eligibility-gate.js';
 
 const asChainQueryPort = (port: PdsLedgerPort): ChainQueryPort | null => {
   const candidate = port as Partial<ChainQueryPort>;
@@ -492,11 +493,12 @@ export class PdsRuntime extends PdsLedgerEngine {
 
     for (const authTransaction of state.authTransactions) {
       await client.query(
-        `INSERT INTO auth_transactions (auth_txn_id, beneficiary_ref_hash, ration_card_hash, auth_mode, auth_result, auth_txn_ref_hash, approved_by, timestamp)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        `INSERT INTO auth_transactions (auth_txn_id, fps_id, operator_ref, beneficiary_ref_hash, ration_card_hash, auth_mode, auth_result, auth_txn_ref_hash, approved_by, timestamp)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
          ON CONFLICT (auth_txn_id) DO NOTHING`,
         [
-          authTransaction.authTxnId, authTransaction.beneficiaryRefHash, authTransaction.rationCardHash,
+          authTransaction.authTxnId, authTransaction.fpsId ?? null, authTransaction.operatorRef ?? null,
+          authTransaction.beneficiaryRefHash, authTransaction.rationCardHash,
           authTransaction.authMode, authTransaction.authResult, authTransaction.authTxnRefHash,
           authTransaction.approvedBy ?? null, authTransaction.timestamp
         ]
@@ -840,6 +842,11 @@ export class PdsRuntime extends PdsLedgerEngine {
     ) as any;
   }
 
+  override validateEntitlement(...args: Parameters<PdsLedgerEngine['validateEntitlement']>) {
+    assertEligibilityGateOpen(args[0].rationCardHash);
+    return super.validateEntitlement(...args);
+  }
+
   override recordDistribution(...args: Parameters<PdsLedgerEngine['recordDistribution']>) {
     const pool = this.getDbPool();
     if (!pool) {
@@ -949,7 +956,7 @@ export class PdsRuntime extends PdsLedgerEngine {
       try {
         await client.query('BEGIN');
         await client.query(
-          'TRUNCATE commodity_lots, stock_positions, transfer_orders, fps_allocations, monthly_entitlements, auth_transactions, distribution_transactions, audit_alerts, ledger_events, ledger_tx_index RESTART IDENTITY CASCADE'
+          'TRUNCATE integration_event_attempts, integration_events, commodity_lots, stock_positions, transfer_orders, fps_allocations, monthly_entitlements, auth_transactions, distribution_transactions, audit_alerts, ledger_events, ledger_tx_index RESTART IDENTITY CASCADE'
         );
         const stakeholdersRes = await client.query('SELECT * FROM stakeholders');
         stakeholders = stakeholdersRes.rows.map(row => mapStakeholderRow(row));

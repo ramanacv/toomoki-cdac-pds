@@ -8,7 +8,8 @@ import type {
   FPSAllocation,
   MonthlyEntitlement,
   Stakeholder,
-  TransferOrder
+  TransferOrder,
+  EligibilityBeneficiary
 } from '@pds/shared-types';
 import stakeholdersJson from '../../../mock/entities/stakeholders.json' with { type: 'json' };
 import lotsJson from '../../../mock/entities/lots.json' with { type: 'json' };
@@ -22,6 +23,7 @@ import dashboardSummaryJson from '../../../mock/workspace/dashboard-summary.json
 import happyPathScenarioJson from '../../../mock/scenarios/happy-path.json' with { type: 'json' };
 import shortReceiptScenarioJson from '../../../mock/scenarios/short-receipt.json' with { type: 'json' };
 import duplicateClaimScenarioJson from '../../../mock/scenarios/duplicate-claim.json' with { type: 'json' };
+import eligibilityBeneficiariesJson from '../../../mock/entities/eligibility-beneficiaries.json' with { type: 'json' };
 
 export type DemoScenario = 'happy-path' | 'short-receipt' | 'duplicate-claim';
 
@@ -60,6 +62,7 @@ export const allocations = allocationsJson as FPSAllocation[];
 export const distributions = distributionsJson as DistributionTransaction[];
 export const authTransactions = authTransactionsJson as AuthTransaction[];
 export const entitlements = entitlementsJson as MonthlyEntitlement[];
+export const eligibilityBeneficiaries = eligibilityBeneficiariesJson as EligibilityBeneficiary[];
 const rawBackendSeed = backendSeedJson as Omit<BackendSeed, 'initialLot' | 'initialEntitlement'>;
 if (!rawBackendSeed.initialLots[0] || !rawBackendSeed.initialEntitlements[0]) {
   throw new Error('Backend seed must define at least one initial lot and entitlement');

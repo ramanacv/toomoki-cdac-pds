@@ -1,5 +1,11 @@
 # Architectural Review & Gap Analysis: ViksitPDS MVP
 
+> Historical architecture review. Its findings informed the maintained
+> [architecture](../technical/architecture.md) and
+> [hardening plan](../implementation/mvp-hardening-plan.md). Statements about
+> current authority, authorization, or Fabric submission below are not current
+> specifications.
+
 This document contains a critical architectural review and gap analysis of the ViksitPDS project, focusing on two main areas:
 1. **The Workflow Action Engine & State Transfers**
 2. **The Hyperledger Fabric Integration Model (Gateway, Peers, and Endorsers)**

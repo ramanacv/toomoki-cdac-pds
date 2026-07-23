@@ -49,8 +49,20 @@ The demo UI groups current stakeholders into these operational roles:
 | FPS | FPS receipt, authentication, and beneficiary distribution. |
 | Management | Read-only operational overview. |
 | Auditor | Trace, alert, and proof review. |
+| Platform Administration | IAM-independent administration and proof-pipeline views; no operational workflow authority. |
+| Integration Service | Server-to-server source-event ingestion, health, reconciliation, and trace, restricted by durable source-contract assignments. |
+
+An FPS role alone is insufficient. The API requires an active
+`FAIR_PRICE_SHOP` assignment. In the controlled PoC, `demo-fps` is assigned to
+`FPS-101`; `FPS-202` exists to prove isolation. The server derives the effective
+shop and opaque operator reference from the authenticated subject.
 
 ## Current Operations
+
+The named chaincode business functions below remain compatibility functions.
+The maintained API accepts business commands in PostgreSQL and submits
+`RecordLedgerProof` asynchronously; it does not re-execute those commands on
+Fabric.
 
 | Operation | Purpose |
 |---|---|
@@ -65,6 +77,21 @@ The demo UI groups current stakeholders into these operational roles:
 | `RecordDistribution` | Record FPS distribution to a beneficiary. |
 | `RaiseAuditFlag` / `ResolveAuditFlag` | Audit exception lifecycle. |
 | `RecordLedgerProof` | Auditor/control evidence projection. |
+| Canonical source-event ingestion | Normalize privacy-approved SMART-PDS/RCMS, state-SCM, and AePDS/ePoS fixture events. |
+| Integration reconciliation | Compare allocation/movement and FPS stock equations without changing quantity through alerts. |
+
+## Authorization Boundaries
+
+- Department, management, and auditor reads may span shops as allowed by their
+  role; FPS reads are identity-filtered.
+- Cross-shop individual FPS resources return `404` to avoid disclosure.
+- Compatibility `fpsId` and `dealerId` mutation fields are accepted only when
+  they match the server-derived identity; browser requests omit both.
+- Token claims identify the subject and requested roles. In database
+  authorization mode, active role, shop/scope, source-contract, and credential
+  assignments in PostgreSQL are authoritative.
+- `platform-admin` does not imply procurement, godown, department, FPS, or
+  integration-service authority.
 
 ## Demo Workflow
 
@@ -79,7 +106,7 @@ The demo UI groups current stakeholders into these operational roles:
 | 7 | Issue Point | Receive stock. |
 | 8 | Issue Point | Allocate stock to FPS. |
 | 9 | FPS | Confirm FPS receipt. |
-| 10 | FPS | Authenticate beneficiary and record distribution. |
+| 10 | FPS | Simulate authentication and distribution as AePDS/ePoS-originated events. |
 | 11 | Auditor / Management | Inspect trace, alerts, and stock evidence. |
 
 ## Out Of Current Scope

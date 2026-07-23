@@ -65,6 +65,15 @@
     "jurisdiction": "STATE"
   },
   {
+    "stakeholderId": "FPS-202",
+    "stakeholderType": "FAIR_PRICE_SHOP",
+    "name": "FPS 202",
+    "district": "Neighbouring Demo District",
+    "licenseNo": "FPS-LIC-202",
+    "status": "ACTIVE",
+    "jurisdiction": "STATE"
+  },
+  {
     "stakeholderId": "AUD-001",
     "stakeholderType": "AUDITOR",
     "name": "Auditor 01",

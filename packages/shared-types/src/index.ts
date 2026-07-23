@@ -359,6 +359,87 @@ export enum EntitlementRuleStatus {
   SUPERSEDED = 'SUPERSEDED'
 }
 
+export enum SourceSystem {
+  SMARTPDS_RCMS = 'SMARTPDS_RCMS',
+  STATE_SCM = 'STATE_SCM',
+  AEPDS_EPOS = 'AEPDS_EPOS',
+  VIKSITPDS_DEMO = 'VIKSITPDS_DEMO'
+}
+
+export enum CanonicalSourceEventType {
+  MASTER_REFERENCE = 'MASTER_REFERENCE',
+  ALLOCATION = 'ALLOCATION',
+  MOVEMENT = 'MOVEMENT',
+  DISTRIBUTION = 'DISTRIBUTION'
+}
+
+export type SourceEventStatus =
+  | 'ACCEPTED'
+  | 'DUPLICATE'
+  | 'CONFLICTED'
+  | 'REJECTED'
+  | 'QUARANTINED'
+  | 'PROCESSED'
+  | 'RECONCILED';
+
+export type SourceEventEnvelope<T = Record<string, unknown>> = {
+  sourceSystem: SourceSystem;
+  sourceEventId: string;
+  eventType: CanonicalSourceEventType;
+  schemaVersion: string;
+  occurredAt: string;
+  deviceSyncAt?: string;
+  parentSourceEventId?: string;
+  amendmentOfSourceEventId?: string;
+  reversalOfSourceEventId?: string;
+  payload: T;
+};
+
+export type SourceProvenance = {
+  sourceSystem: SourceSystem;
+  sourceEventId: string;
+  schemaVersion: string;
+  occurredAt: string;
+  ingestedAt: string;
+  approvedPayloadHash: string;
+  operationId: string;
+  status: SourceEventStatus;
+};
+
+export type IntegrationEventResult = {
+  provenance: SourceProvenance;
+  entityType?: string;
+  entityId?: string;
+  parentSourceEventId?: string;
+  amendmentOfSourceEventId?: string;
+  reversalOfSourceEventId?: string;
+};
+
+export type IntegrationReconciliationException = {
+  kind: 'ALLOCATION_MOVEMENT' | 'MOVEMENT_RECEIPT' | 'FPS_CLOSING_STOCK';
+  entityId: string;
+  expectedKg: number;
+  actualKg: number;
+  differenceKg: number;
+  sourceEventIds: string[];
+};
+
+export type IntegrationReconciliationSummary = {
+  checkedAt: string;
+  checkedEvents: number;
+  reconciledEvents: number;
+  exceptions: IntegrationReconciliationException[];
+};
+
+export type IntegrationSourceHealth = {
+  sourceSystem: SourceSystem;
+  lastSuccessAt: string | null;
+  counts: Record<string, number>;
+  reconciliationLagSeconds: number | null;
+  unresolvedParentAgeSeconds: number | null;
+  schemaVersions: string[];
+};
+
 export type Stakeholder = {
   stakeholderId: string;
   stakeholderType: StakeholderType;
@@ -411,6 +492,7 @@ export type TransferOrder = {
   roRef?: string;
   transporterId?: string;
   transformedFromLotId?: string;
+  provenance?: SourceProvenance;
 };
 
 export type FPSAllocation = {
@@ -423,6 +505,7 @@ export type FPSAllocation = {
   month: string;
   sourceGodownId: string;
   status: 'ALLOCATED' | 'RECEIVED' | 'RECEIVED_WITH_SHORTAGE';
+  provenance?: SourceProvenance;
 };
 
 export type MonthlyEntitlement = {
@@ -434,10 +517,15 @@ export type MonthlyEntitlement = {
   availableBalanceKg: number;
   active: boolean;
   category?: RationCardType;
+  provenance?: SourceProvenance;
 };
 
 export type AuthTransaction = {
   authTxnId: string;
+  /** Shop scope derived from the authenticated FPS assignment. */
+  fpsId?: string;
+  /** Opaque, server-derived operator reference. Never a dealer name or credential. */
+  operatorRef?: string;
   beneficiaryRefHash: string;
   rationCardHash: string;
   authMode: AuthMode;
@@ -445,6 +533,7 @@ export type AuthTransaction = {
   authTxnRefHash: string;
   approvedBy?: string;
   timestamp: string;
+  provenance?: SourceProvenance;
 };
 
 export type DistributionTransaction = {
@@ -460,6 +549,7 @@ export type DistributionTransaction = {
   dealerId: string;
   timestamp: string;
   ledgerTxId?: string;
+  provenance?: SourceProvenance;
 };
 
 export type AuditAlert = {
@@ -478,7 +568,7 @@ export type AuditAlert = {
 
 export type LedgerEvent = {
   ledgerTxId: string;
-  entityType: 'stakeholder' | 'lot' | 'transfer' | 'allocation' | 'auth' | 'distribution' | 'audit' | 'rationcard' | 'grievance' | 'entitlementrule' | 'workflow';
+  entityType: 'stakeholder' | 'lot' | 'transfer' | 'allocation' | 'auth' | 'distribution' | 'audit' | 'rationcard' | 'grievance' | 'entitlementrule' | 'workflow' | 'eligibility-case' | 'beneficiary-registry';
   entityId: string;
   eventType: string;
   payload: Record<string, unknown>;
@@ -683,3 +773,5 @@ export const hashReference = (value: string): string => {
 };
 
 export const makeTimestamp = (date: Date = new Date()): string => date.toISOString();
+export * from './eligibility.js';
+export * from './beneficiary-registry.js';

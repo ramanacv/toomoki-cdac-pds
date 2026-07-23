@@ -8,14 +8,15 @@ This folder contains implementation guidance derived from the product and techni
 - [NestJS 11 + Fabric Gateway refactor](fabric-gateway-plus-refactor.md) — completed implementation plan
 - [Sprint backlog](sprint-backlog.md)
 - [Mock data and fixtures](mock-data.md)
+- [J&K/Maharashtra ePoS–SMART-PDS implementation plan](jkmaha-epos-smartpds-implementation-plan.md)
+- [Near-MVP hardening tracker](mvp-hardening-plan.md)
+- [External ghost-beneficiary screening and review implementation](ghost-detection-impl.md)
+- [Beneficiary registry and fraud-detection alignment](beneficiary-registry-alignment.md)
 
 ## Intended Use
 
-Start with the MVP implementation plan before creating code. It defines:
-
-- Build order.
-- Suggested repository structure.
-- Backend, blockchain, and frontend workstreams.
-- Seed data, mock fixtures, and demo flow.
-- Acceptance gates.
-- Deferred items that should not enter the 2-week MVP.
+For the maintained current-state path, start with the J&K/Maharashtra plan and
+the near-MVP hardening tracker. The original MVP plan and sprint backlog are
+retained as implementation history. `mock-data.md` is the source for fixture
+layout and regeneration; `production-readiness-todos.md` captures additional
+deployment and assurance work beyond the integration and transactional gates.

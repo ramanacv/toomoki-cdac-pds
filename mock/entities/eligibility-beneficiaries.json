@@ -1,0 +1,111 @@
+[
+  {
+    "demoBeneficiaryId": "BEN-DEMO-001",
+    "fictionalName": "Asha Patil (Fictional)",
+    "maskedCardRef": "RC-DEMO-***001",
+    "subjectRefHash": "beneficiary-demo-001-hash",
+    "rationCardHash": "ration-card-demo-001-hash",
+    "householdSize": 5,
+    "monthlyRiceEntitlementKg": 25,
+    "alreadyLiftedKg": 0,
+    "eligibilityStatus": "ELIGIBLE"
+  },
+  {
+    "demoBeneficiaryId": "BEN-DEMO-002",
+    "fictionalName": "Ravi Shinde (Fictional)",
+    "maskedCardRef": "RC-DEMO-***002",
+    "subjectRefHash": "beneficiary-demo-002-hash",
+    "rationCardHash": "ration-card-demo-002-hash",
+    "householdSize": 4,
+    "monthlyRiceEntitlementKg": 20,
+    "alreadyLiftedKg": 5,
+    "eligibilityStatus": "ELIGIBLE"
+  },
+  {
+    "demoBeneficiaryId": "BEN-DEMO-003",
+    "fictionalName": "Meera Kulkarni (Fictional)",
+    "maskedCardRef": "RC-DEMO-***003",
+    "subjectRefHash": "beneficiary-demo-003-hash",
+    "rationCardHash": "ration-card-demo-003-hash",
+    "householdSize": 3,
+    "monthlyRiceEntitlementKg": 15,
+    "alreadyLiftedKg": 5,
+    "eligibilityStatus": "ELIGIBLE"
+  },
+  {
+    "demoBeneficiaryId": "BEN-DEMO-004",
+    "fictionalName": "Sunita More (Fictional)",
+    "maskedCardRef": "RC-DEMO-***004",
+    "subjectRefHash": "beneficiary-demo-004-hash",
+    "rationCardHash": "ration-card-demo-004-hash",
+    "householdSize": 4,
+    "monthlyRiceEntitlementKg": 20,
+    "alreadyLiftedKg": 0,
+    "eligibilityStatus": "ELIGIBLE"
+  },
+  {
+    "demoBeneficiaryId": "BEN-DEMO-005",
+    "fictionalName": "Imran Shaikh (Fictional)",
+    "maskedCardRef": "RC-DEMO-***005",
+    "subjectRefHash": "beneficiary-demo-005-hash",
+    "rationCardHash": "ration-card-demo-005-hash",
+    "householdSize": 5,
+    "monthlyRiceEntitlementKg": 25,
+    "alreadyLiftedKg": 10,
+    "eligibilityStatus": "ELIGIBLE",
+    "jurisdictionCode": "MH",
+    "districtCode": "MH-DEMO-05"
+  },
+  {
+    "demoBeneficiaryId": "BEN-JK-DEMO-001",
+    "fictionalName": "Zoya Dar (Fictional)",
+    "maskedCardRef": "RC-JK-DEMO-***001",
+    "subjectRefHash": "beneficiary-jk-demo-001-hash",
+    "rationCardHash": "ration-card-jk-demo-001-hash",
+    "householdSize": 5,
+    "monthlyRiceEntitlementKg": 25,
+    "alreadyLiftedKg": 5,
+    "eligibilityStatus": "ELIGIBLE",
+    "jurisdictionCode": "JK",
+    "districtCode": "JK-DEMO-01"
+  },
+  {
+    "demoBeneficiaryId": "BEN-JK-DEMO-002",
+    "fictionalName": "Arif Lone (Fictional)",
+    "maskedCardRef": "RC-JK-DEMO-***002",
+    "subjectRefHash": "beneficiary-jk-demo-002-hash",
+    "rationCardHash": "ration-card-jk-demo-002-hash",
+    "householdSize": 4,
+    "monthlyRiceEntitlementKg": 20,
+    "alreadyLiftedKg": 0,
+    "eligibilityStatus": "ELIGIBLE",
+    "jurisdictionCode": "JK",
+    "districtCode": "JK-DEMO-02"
+  },
+  {
+    "demoBeneficiaryId": "BEN-JK-DEMO-003",
+    "fictionalName": "Nusrat Bano (Fictional)",
+    "maskedCardRef": "RC-JK-DEMO-***003",
+    "subjectRefHash": "beneficiary-jk-demo-003-hash",
+    "rationCardHash": "ration-card-jk-demo-003-hash",
+    "householdSize": 6,
+    "monthlyRiceEntitlementKg": 30,
+    "alreadyLiftedKg": 10,
+    "eligibilityStatus": "ELIGIBLE",
+    "jurisdictionCode": "JK",
+    "districtCode": "JK-DEMO-03"
+  },
+  {
+    "demoBeneficiaryId": "BEN-JK-DEMO-004",
+    "fictionalName": "Tariq Mir (Fictional)",
+    "maskedCardRef": "RC-JK-DEMO-***004",
+    "subjectRefHash": "beneficiary-jk-demo-004-hash",
+    "rationCardHash": "ration-card-jk-demo-004-hash",
+    "householdSize": 3,
+    "monthlyRiceEntitlementKg": 15,
+    "alreadyLiftedKg": 0,
+    "eligibilityStatus": "ELIGIBLE",
+    "jurisdictionCode": "JK",
+    "districtCode": "JK-DEMO-04"
+  }
+]

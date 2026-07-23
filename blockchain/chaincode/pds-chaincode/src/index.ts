@@ -93,7 +93,23 @@ const ALLOWED_LEDGER_EVENT_TYPES = new Set([
   'ProposeEntitlementRule',
   'ApproveEntitlementRule',
   'RolloverUnclaimedQuota',
-  'ResetTransactionalData'
+  'ResetTransactionalData',
+  'EligibilityDecisionAuthorized',
+  'EligibilityDecisionReversed',
+  'BENEFICIARY_CREATED',
+  'MEMBER_ADDED',
+  'MEMBER_REMOVED',
+  'HOUSEHOLD_BIFURCATED',
+  'MIGRATION_RECORDED',
+  'CARD_TRANSFERRED',
+  'VERIFICATION_COMPLETED',
+  'STATUS_CHANGED',
+  'RECORD_DEACTIVATED',
+  'MASTER_REFERENCE',
+  'ALLOCATION',
+  'MOVEMENT',
+  'DISTRIBUTION',
+  'IntegrationReconciliation'
 ]);
 
 const assertAllowedLedgerEventType = (eventType: string): void => {
@@ -751,6 +767,8 @@ export class PdsLedgerEngine {
 
   simulateAuthentication(input: {
     authTxnId: string;
+    fpsId?: string;
+    operatorRef?: string;
     beneficiaryRefHash: string;
     rationCardHash: string;
     authMode: AuthMode;
@@ -1585,6 +1603,25 @@ export class PdsLedgerEngine {
       }
       case 'RolloverUnclaimedQuota':
         // Rollover updates multiple entitlements; projection not applicable for replay.
+        break;
+      case 'EligibilityDecisionAuthorized':
+      case 'EligibilityDecisionReversed':
+      case 'BENEFICIARY_CREATED':
+      case 'MEMBER_ADDED':
+      case 'MEMBER_REMOVED':
+      case 'HOUSEHOLD_BIFURCATED':
+      case 'MIGRATION_RECORDED':
+      case 'CARD_TRANSFERRED':
+      case 'VERIFICATION_COMPLETED':
+      case 'STATUS_CHANGED':
+      case 'RECORD_DEACTIVATED':
+      case 'MASTER_REFERENCE':
+      case 'ALLOCATION':
+      case 'MOVEMENT':
+      case 'DISTRIBUTION':
+      case 'IntegrationReconciliation':
+        // These are privacy-safe evidence events. Their authoritative
+        // operational projections remain in PostgreSQL/source systems.
         break;
       case 'ResetTransactionalData': {
         const commodity = typeof payload.commodity === 'string' ? payload.commodity : undefined;

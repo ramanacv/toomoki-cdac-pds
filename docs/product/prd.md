@@ -23,6 +23,9 @@ ViksitPDS provides a blockchain-enabled trust layer for PDS transactions so gove
 - Beneficiary: receives entitled commodity after authentication.
 - Auditor: reviews trace history, mismatches, and alerts.
 - System Admin: manages users, roles, configuration, and seed data.
+- Integration Service: non-interactive client restricted by active database
+  assignments to approved source systems, endpoint families, event types, and
+  credentials.
 
 ## MVP User Journeys
 
@@ -40,11 +43,24 @@ A sender creates a dispatch record. The receiver confirms receipt. If received q
 
 ### FPS Allocation And Receipt
 
-The department allocates stock to an FPS. The FPS confirms receipt. FPS stock is increased only after receipt confirmation.
+The department allocates stock to an FPS. The authenticated FPS confirms only
+its assigned shop's receipt. FPS stock is increased only after confirmation.
 
 ### Beneficiary Distribution
 
-The FPS dealer selects a mock beneficiary, completes simulated authentication, validates monthly entitlement, records delivery, reduces FPS stock, and writes a privacy-preserving distribution receipt to the blockchain.
+In the controlled PoC, the FPS dealer uses visibly simulated authentication and
+distribution actions. The API derives the shop and opaque operator reference
+from the authenticated identity. PostgreSQL accepts the operation first and a
+privacy-preserving Fabric proof is submitted asynchronously. In a pilot,
+AePDS/ePoS remains authoritative and ViksitPDS ingests its approved event.
+
+### State-System Event Ingestion
+
+An integration service submits privacy-approved canonical envelopes for
+SMART-PDS/RCMS master references, state-SCM allocations and movements, and
+AePDS/ePoS distributions. Matching replay returns the original operation,
+conflicting replay returns `409`, and missing dependencies remain durably
+`QUARANTINED` until correlation is possible.
 
 ### Audit Review
 
@@ -79,6 +95,10 @@ An auditor views lot history, distribution receipts, pending receipts, duplicate
 - Prevent allocation above available stock.
 - Confirm FPS receipt.
 - Track FPS opening, received, distributed, and closing stock.
+- Scope FPS lists, individual reads, receipts, authentication, distributions,
+  stock, dashboard, and trace access to the active shop assignment.
+- Return `404` for an FPS request for another shop's resource and `403` for a
+  caller-supplied mutation identity that conflicts with the assignment.
 
 ### Beneficiary Authentication Simulator
 
@@ -101,8 +121,20 @@ An auditor views lot history, distribution receipts, pending receipts, duplicate
 - Record delivered commodity and quantity.
 - Reduce FPS stock.
 - Update monthly lifted quantity.
-- Write privacy-preserving receipt to ledger.
+- Enqueue a privacy-preserving receipt proof without blocking the accepted
+  PostgreSQL operation on Fabric availability.
 - Generate citizen receipt text and verification ID.
+
+### Canonical Integration Events
+
+- Accept versioned `SourceEventEnvelope` records only from `integration-service`.
+- Recompute a canonical approved-payload hash at the API boundary.
+- Recursively reject prohibited identity, authentication, and credential fields.
+- Persist unique `(source_system, source_event_id)` events and attempt outcomes.
+- Support identical replay, conflicting replay, missing-parent quarantine,
+  recovery, amendments, and reversals.
+- Expose per-source health, reconciliation, and source-to-operation-to-proof
+  tracing without returning raw source payloads.
 
 ### Audit And Anomaly Rules
 
@@ -141,23 +173,33 @@ An auditor views lot history, distribution receipts, pending receipts, duplicate
 - Provide OpenAPI/Swagger documentation.
 - Run MVP with Docker Compose.
 - Support seeded demo data from canonical JSON fixtures (`mock/` via `@pds/fixtures`).
-- Keep business APIs integration-ready for future SMART-PDS/state system adapters.
+- Keep the canonical domain state-neutral; provisional Maharashtra fixture
+  adapters must not be presented as real state integrations.
 - Store operational state in PostgreSQL and immutable audit records in Fabric.
+- Keep operational acceptance and Fabric proof completion separate and visible.
 
 ## Acceptance Criteria
 
 - A seeded demo can execute the full rice journey from procurement to delivery.
-- Every lot, transfer, FPS allocation, FPS receipt, distribution, and audit alert has a ledger transaction ID where applicable.
+- Every accepted proof-bearing operation has a traceable operation/event ID and
+  queryable outbox state; `COMMITTED` additionally carries the real Fabric
+  transaction ID.
 - Duplicate beneficiary monthly claim is rejected.
 - Failed authentication blocks distribution unless supervisor exception is used.
 - Short receipt creates an audit alert.
 - Tampered operational quantity can be detected through ledger reconciliation.
 - Dashboard can display stock, distributions, alerts, and traceability.
 - Blockchain payloads contain only hashes/references for beneficiary identity and authentication.
+- `demo-fps` is restricted to `FPS-101`, and automated tests demonstrate
+  isolation from `FPS-202`.
+- Integration fixtures demonstrate `201`, identical replay `200`, quarantine
+  `202`, conflict `409`, privacy rejection, reconciliation, and proof tracing.
 
 ## Roadmap
 
 - Phase 1: 2-week MVP with mock data and simulated integrations.
-- Phase 2: District pilot with CSV, batch, or API integration from state systems.
-- Phase 3: SMART-PDS, ePoS, and approved authentication integration.
+- Phase 2: Controlled PoC with fixture-backed canonical adapters and assigned
+  FPS scoping.
+- Phase 3: Maharashtra-first non-production adapter validation using
+  department/NIC-approved contracts and transactional hardening gates.
 - Phase 4: Offline FPS mobile app, IoT-GPS oracle, AI/ML leakage analytics, production hardening, and government cloud deployment.

@@ -10,10 +10,11 @@ import { RoleLoginPage, quickRoleLogins } from '@/pages/RoleLoginPage.js';
 describe('quick role login', () => {
   it('lists the Keycloak demo personas without storing passwords', () => {
     render(<RoleLoginPage />);
-    expect(screen.getByRole('heading', { name: 'Quick role login' })).toBeInTheDocument();
-    expect(screen.getByText('demo-management')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Choose an entry journey' })).toBeInTheDocument();
+    expect(screen.getByText('demo-fps')).toBeInTheDocument();
     expect(screen.getByText('demo-platform-admin')).toBeInTheDocument();
-    expect(quickRoleLogins).toHaveLength(8);
+    expect(screen.getByText(/complements SMART-PDS\/RCMS/)).toBeInTheDocument();
+    expect(quickRoleLogins).toHaveLength(5);
   });
 
   it('starts the real Keycloak flow with a username hint and role-specific return URL', async () => {

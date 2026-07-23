@@ -10,7 +10,8 @@ The MVP stack is standardized on:
 - React 19 and Vite 7 for frontend dashboard.
 - Docker Compose for local/demo deployment (demo and fabric profiles).
 
-This stack matches the expert proposal and supports a practical 2-week MVP while leaving room for production hardening.
+This stack supports the controlled PoC while leaving the documented persistence,
+security, integration-contract, and operations gates open for a pilot.
 
 ## Blockchain Layer
 
@@ -49,6 +50,8 @@ Selected:
 - Hand-rolled OpenAPI at `/openapi.json` and `/docs`.
 - Keycloak OIDC Authorization Code + PKCE for the web and client credentials for service clients.
 - Secure-by-default bearer-token authentication and least-privilege role guards.
+- Database-backed authorization assignments for application roles,
+  organization/geography, stakeholders, FPS/facilities, and integration sources.
 
 Rationale:
 
@@ -75,7 +78,10 @@ PostgreSQL stores:
 - Distribution transactions.
 - Ledger transaction index.
 - Audit alerts.
-- Integration logs.
+- Canonical integration events and attempts.
+- Source/entity/operation correlations, quarantine, reconciliation, and health.
+- Durable authorization assignments.
+- Fabric proof outbox and delivery status.
 
 Rationale:
 
@@ -95,13 +101,13 @@ Selected:
 
 Main views:
 
-- Dashboard summary.
-- Supply chain flow.
+- Department and supply-chain dashboards.
+- FPS-101-scoped demo workspace.
 - Lot trace.
-- FPS stock and distribution view.
+- FPS allocation, stock, receipt, and simulated distribution view.
 - Beneficiary authentication log with masked references.
 - Audit alert view.
-- Proof-of-integrity verification.
+- Source provenance and proof-of-integrity verification.
 
 Rationale:
 
@@ -119,7 +125,9 @@ MVP:
 - PostgreSQL container.
 - CouchDB containers (fabric profile).
 - Frontend container.
-- `.env`-driven configuration: `PDS_LEDGER_MODE`, `VITE_DATA_SOURCE`, gateway vars in `blockchain/fabric-network/fabric-env.example`.
+- `.env`-driven configuration for OIDC, database authorization, integration
+  credentials, `PDS_LEDGER_MODE`, `VITE_DATA_SOURCE`, and Fabric Gateway values.
+- Exactly one API replica while the snapshot persistence limitation remains.
 
 Future production:
 
@@ -133,15 +141,17 @@ Future production:
 
 ## Authentication And Authorization
 
-MVP:
+Controlled PoC:
 
-- JWT login.
-- Role-based API guards.
-- Mock beneficiary authentication.
+- Keycloak OIDC Authorization Code + PKCE for browser users.
+- Client credentials for metrics, benchmark, and integration service accounts.
+- JWT validation plus active database assignment checks.
+- `demo-fps` bound to `FPS-101`; a second FPS fixture verifies isolation.
+- Mock beneficiary authentication, visibly labelled as simulation.
 
 Future production:
 
-- Keycloak or government-approved identity provider.
+- Federation with a government-approved identity provider.
 - Integration with approved Aadhaar authentication infrastructure where legally permitted.
 - Device-bound FPS dealer identity.
 - HSM-backed signing keys.
@@ -152,9 +162,12 @@ MVP controls:
 
 - No sensitive beneficiary data on-chain.
 - Hash/reference-only ledger records for beneficiary and authentication fields.
-- Role-based access control.
+- Role and resource-assignment access control.
+- Recursive prohibited-field rejection before persistence, logs, dead letters,
+  or proof construction.
 - Audit trail for privileged workflows.
-- Request IDs and ledger transaction IDs for traceability.
+- Source event, request, operation, proof status, and Fabric transaction
+  references for traceability.
 
 Future controls:
 
@@ -171,7 +184,6 @@ NBF-LITE exists in the repository and can be referenced as demo or research tool
 
 ## Future Roadmap Technologies
 
-- Keycloak for identity and access management.
 - Kubernetes for orchestration.
 - API gateway for external integrations.
 - Event bus for high-volume integration events.
@@ -186,6 +198,8 @@ NBF-LITE exists in the repository and can be referenced as demo or research tool
 - Real Aadhaar authentication.
 - Real ePoS integration.
 - Real SMART-PDS integration.
+- Claims that fixture-backed Maharashtra or J&K mappings are approved state
+  contracts.
 - Real PFMS/DBT integration.
 - Real IoT-GPS hardware ingestion.
 - AI/ML model training.

@@ -1,11 +1,12 @@
-import { IsInt, IsString, Min } from 'class-validator';
+import { IsInt, IsOptional, IsString, Min } from 'class-validator';
 
 export class AllocationDto {
   @IsString()
   allocationId!: string;
 
+  @IsOptional()
   @IsString()
-  fpsId!: string;
+  fpsId?: string;
 
   @IsString()
   commodity!: string;

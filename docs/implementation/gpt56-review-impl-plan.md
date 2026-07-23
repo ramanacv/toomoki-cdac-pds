@@ -1,4 +1,9 @@
- Proposed Plan
+# Preserved Near-MVP Architecture Plan
+
+> This plan fed the maintained
+> [MVP hardening tracker](mvp-hardening-plan.md). Use that tracker and the
+> [J&K/Maharashtra plan](jkmaha-epos-smartpds-implementation-plan.md) for
+> current status.
 
 
   # Near-MVP Architecture Hardening Plan

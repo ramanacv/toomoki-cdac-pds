@@ -10,6 +10,11 @@ import type {
   Stakeholder,
   TransferOrder
   ,LedgerProofStatusResponse
+  ,EligibilityCase
+  ,EligibilitySummary
+  ,BeneficiaryLifecycleEvent
+  ,BeneficiaryLifecycleEventResult
+  ,BeneficiaryRegistrySummary
 } from '@pds/shared-types';
 import { AuthMode, AuthResult } from '@pds/shared-types';
 import { demoQuantities, getWorkspaceSnapshot, type DemoScenario } from '@pds/fixtures';
@@ -166,6 +171,48 @@ export async function loadLedgerProofStatus(eventId: string): Promise<LedgerProo
   return fetchJson(`/ledger-proofs/${encodeURIComponent(eventId)}`);
 }
 
+export const loadEligibilitySummary = (): Promise<EligibilitySummary> =>
+  fetchJson('/eligibility/v1/summary');
+
+export const loadEligibilityCases = (): Promise<EligibilityCase[]> =>
+  fetchJson('/eligibility/v1/cases');
+
+export const loadBeneficiaryRegistrySummary = (): Promise<BeneficiaryRegistrySummary> =>
+  fetchJson('/beneficiary-registry/v1/summary');
+
+export const submitBeneficiaryLifecycleEvent = (
+  event: BeneficiaryLifecycleEvent
+): Promise<BeneficiaryLifecycleEventResult> =>
+  postJson('/beneficiary-registry/v1/events', event);
+
+export const runEligibilityScreening = (
+  demoBeneficiaryId: string,
+  screeningRequestId: string
+): Promise<{ screening: EligibilityCase['screening']; case: EligibilityCase | null; entitlementPreserved: boolean }> =>
+  postJson('/eligibility/v1/screenings', {
+    demoBeneficiaryId,
+    screeningRequestId,
+    checks: ['DEATH', 'ACTIVITY', 'ECONOMIC', 'LAND']
+  });
+
+export const performEligibilityAction = (
+  caseId: string,
+  action: 'notice' | 'verification' | 'recommendation' | 'decision' | 'appeals' | 'reinstate',
+  body: Record<string, unknown>
+): Promise<EligibilityCase> => postJson(`/eligibility/v1/cases/${encodeURIComponent(caseId)}/${action}`, body);
+
+export const checkEligibilityGate = (
+  demoBeneficiaryId: string,
+  requestedQtyKg = 1
+): Promise<{
+  allowed: boolean;
+  rcmsStatus: string;
+  monthlyEntitlementKg: number;
+  alreadyLiftedKg: number;
+  availableBalanceKg: number;
+  reason: string;
+}> => postJson('/eligibility/v1/entitlement-gate', { demoBeneficiaryId, requestedQtyKg });
+
 export async function fetchApiHealth(): Promise<ApiHealth> {
   if (getDataSourceMode() === 'mock') {
     return { ok: false };
@@ -245,15 +292,24 @@ export async function executeWorkflowAction(request: WorkflowActionRequest): Pro
     case 'auth':
       return postJson('/auth/mock-otp', request.payload);
     case 'distribute':
-      return postJson('/distributions', request.payload);
+      return postJson('/distributions', withoutCallerControlledFpsIdentity(request.payload));
     case 'duplicate-distribute':
-      return postJson('/distributions', request.payload);
+      return postJson('/distributions', withoutCallerControlledFpsIdentity(request.payload));
     case 'supervisor-exception-distribute':
-      return postJson('/distributions', request.payload);
+      return postJson('/distributions', withoutCallerControlledFpsIdentity(request.payload));
     default:
       throw new Error('Unsupported workflow action');
   }
 }
+
+const withoutCallerControlledFpsIdentity = <T extends { fpsId?: string; dealerId?: string }>(
+  payload: T
+): Omit<T, 'fpsId' | 'dealerId'> => {
+  const serverDerived = { ...payload } as T & { fpsId?: string; dealerId?: string };
+  delete serverDerived.fpsId;
+  delete serverDerived.dealerId;
+  return serverDerived;
+};
 
 export const runShortReceiptDemo = async (): Promise<TransferOrder> => {
   await postJson('/transfers', {

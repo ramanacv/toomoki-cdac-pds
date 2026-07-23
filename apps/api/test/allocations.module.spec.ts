@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { afterEach, describe, expect, it } from 'vitest';
 import { AllocationsController } from '../src/modules/allocations/allocations.controller.js';
-import { createControllerWithFacade, createDemoLedgerFixture, moveLotToIssuePoint, type DemoLedgerFixture } from './helpers/demo-ledger.js';
+import { asFpsRequest, createControllerWithFacade, createDemoLedgerFixture, moveLotToIssuePoint, type DemoLedgerFixture } from './helpers/demo-ledger.js';
 
 describe('AllocationsModule', () => {
   let fixture: DemoLedgerFixture;
@@ -24,11 +24,11 @@ describe('AllocationsModule', () => {
     });
 
     expect(allocation.allocationId).toBe('ALLOC-MOD-001');
-    expect(controller.allocations().some((item: any) => item.allocationId === 'ALLOC-MOD-001')).toBe(true);
+    expect((await controller.allocations()).some((item: any) => item.allocationId === 'ALLOC-MOD-001')).toBe(true);
     
-    const receipt = await controller.fpsReceipt('ALLOC-MOD-001', { receivedQtyKg: 75 });
+    const receipt = await controller.fpsReceipt('ALLOC-MOD-001', { receivedQtyKg: 75 }, asFpsRequest());
     expect(receipt.receivedQtyKg).toBe(75);
-    expect(controller.allocation('ALLOC-MOD-001').status).toBe('RECEIVED');
+    expect((await controller.allocation('ALLOC-MOD-001')).status).toBe('RECEIVED');
   });
 
   it('raises a short-receipt alert when FPS receives less than allocated', async () => {
@@ -45,7 +45,7 @@ describe('AllocationsModule', () => {
       sourceGodownId: 'ISSUE-001'
     });
 
-    const receipt = await controller.fpsReceipt('ALLOC-MOD-SHORT', { receivedQtyKg: 25 });
+    const receipt = await controller.fpsReceipt('ALLOC-MOD-SHORT', { receivedQtyKg: 25 }, asFpsRequest());
 
     expect(receipt).toMatchObject({
       allocationId: 'ALLOC-MOD-SHORT',

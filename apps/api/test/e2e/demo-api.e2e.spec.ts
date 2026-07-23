@@ -9,7 +9,9 @@ const expectSuccess = (status: number): void => {
   expect([200, 201]).toContain(status);
 };
 
-const asRole = (role: string) => ({ Authorization: `Bearer test-token:${role}` });
+const asRole = (role: string) => ({
+  Authorization: `Bearer test-token:${role}${role === 'fps' ? ':FPS-101' : ''}`
+});
 
 describe('Demo API e2e', () => {
   let fixture: DemoHttpAppFixture;
@@ -170,7 +172,6 @@ describe('Demo API e2e', () => {
       (
         await request(server).post('/distributions').set(asRole('fps')).send({
           distributionId: 'DIST-E2E-001',
-          fpsId: 'FPS-101',
           rationCardHash: 'demo-ration-card-hash',
           beneficiaryRefHash: 'beneficiary-hash',
           commodity: 'Rice',
@@ -178,7 +179,6 @@ describe('Demo API e2e', () => {
           authMode: AuthMode.MOCK_OTP,
           authResult: AuthResult.SUCCESS,
           authTxnRefHash: auth.body.authTxnRefHash,
-          dealerId: 'DEALER-001',
           timestamp: '2026-06-09T10:10:00.000Z'
         })
       ).status
@@ -186,6 +186,32 @@ describe('Demo API e2e', () => {
 
     const distribution = await request(server).get('/distributions/DIST-E2E-001').set(asRole('fps')).expect(200);
     expect(distribution.body.distributionId).toBe('DIST-E2E-001');
+  });
+
+  it('enforces canonical integration replay, quarantine, and privacy semantics over HTTP', async () => {
+    fixture = await createDemoHttpApp();
+    const server = fixture.app.getHttpServer();
+    const headers = asRole('integration-service');
+    const event = {
+      sourceSystem: 'STATE_SCM',
+      sourceEventId: 'HTTP-SCM-ALLOC-1',
+      eventType: 'ALLOCATION',
+      schemaVersion: 'maha-sandbox-1',
+      occurredAt: '2026-07-23T08:00:00.000Z',
+      payload: { entityType: 'allocation', entityId: 'ALLOC-HTTP-1', fpsRef: 'FPS-101', quantityKg: 10 }
+    };
+    const accepted = await request(server).post('/integrations/scm/v1/allocation-events').set(headers).send(event).expect(201);
+    expect(accepted.body.provenance.status).toBe('ACCEPTED');
+    const duplicate = await request(server).post('/integrations/scm/v1/allocation-events').set(headers).send(event).expect(200);
+    expect(duplicate.body.provenance.operationId).toBe(accepted.body.provenance.operationId);
+    await request(server).post('/integrations/scm/v1/allocation-events').set(headers)
+      .send({ ...event, payload: { ...event.payload, quantityKg: 11 } }).expect(409);
+    await request(server).post('/integrations/scm/v1/allocation-events').set(headers)
+      .send({ ...event, sourceEventId: 'HTTP-PRIVATE', payload: { nested: { mobileNumber: '9999999999' } } })
+      .expect(400);
+    const quarantined = await request(server).post('/integrations/scm/v1/allocation-events').set(headers)
+      .send({ ...event, sourceEventId: 'HTTP-CHILD', parentSourceEventId: 'HTTP-PARENT' }).expect(202);
+    expect(quarantined.body.provenance.status).toBe('QUARANTINED');
   });
 
   it('maps domain errors to correct HTTP status codes via the global filter (T5.2 e2e)', async () => {
@@ -314,7 +340,6 @@ describe('Demo API e2e', () => {
       .set(asRole('fps'))
       .send({
         distributionId: 'DIST-SYS-001',
-        fpsId: 'FPS-101',
         rationCardHash: 'demo-ration-card-hash',
         beneficiaryRefHash: 'beneficiary-hash',
         commodity: 'Rice',
@@ -322,7 +347,6 @@ describe('Demo API e2e', () => {
         authMode: AuthMode.MOCK_OTP,
         authResult: AuthResult.SUCCESS,
         authTxnRefHash: auth.body.authTxnRefHash,
-        dealerId: 'DEALER-001',
         timestamp: '2026-06-09T10:10:00.000Z'
       })
       .expect(201);

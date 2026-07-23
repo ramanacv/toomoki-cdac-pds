@@ -7,7 +7,17 @@
     "receivedQtyKg": 1000,
     "month": "2026-06",
     "sourceGodownId": "ISSUE-001",
-    "status": "RECEIVED"
+    "status": "RECEIVED",
+    "provenance": {
+      "sourceSystem": "STATE_SCM",
+      "sourceEventId": "FIXTURE-SCM-ALLOC-2026-001",
+      "schemaVersion": "fixture-1",
+      "occurredAt": "2026-06-01T08:00:00.000Z",
+      "ingestedAt": "2026-06-01T08:01:00.000Z",
+      "approvedPayloadHash": "5ab38fe8784fd2f8f37876e4797a7a3b665bcdc02ae2b78ff8efad2fdd550221",
+      "operationId": "fixture-scm-allocation-001",
+      "status": "RECONCILED"
+    }
   },
   {
     "allocationId": "ALLOC-2026-002",
@@ -16,6 +26,16 @@
     "allocatedQtyKg": 500,
     "month": "2026-07",
     "sourceGodownId": "ISSUE-001",
-    "status": "ALLOCATED"
+    "status": "ALLOCATED",
+    "provenance": {
+      "sourceSystem": "STATE_SCM",
+      "sourceEventId": "FIXTURE-SCM-ALLOC-2026-002",
+      "schemaVersion": "fixture-1",
+      "occurredAt": "2026-07-01T08:00:00.000Z",
+      "ingestedAt": "2026-07-01T08:01:00.000Z",
+      "approvedPayloadHash": "0f0ea721c394268f037d1dd9d81ff71ce1a498786f6293281cdb463d6168ad12",
+      "operationId": "fixture-scm-allocation-002",
+      "status": "ACCEPTED"
+    }
   }
 ]

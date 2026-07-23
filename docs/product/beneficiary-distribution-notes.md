@@ -1,211 +1,99 @@
-## Summary
+# Beneficiary Distribution And FPS Demo Notes
 
-**End distribution to beneficiary is implemented** — as a **mock/simulated** last-mile flow, not real UIDAI Aadhaar integration. The backend, chaincode, and workbench all support it; what’s missing is a **dedicated Aadhaar-style OTP screen** that makes the demo feel realistic.
+## Product Boundary
 
----
+The repository implements an end-to-end last-mile demonstration, but the
+browser authentication and distribution controls are simulations. In an
+authorized state integration, AePDS/ePoS remains the system of entry for
+shop/device-bound authentication and ration issue. ViksitPDS consumes the
+approved, non-sensitive event for correlation, reconciliation, and immutable
+proof.
 
-## What exists today
+ViksitPDS is not an Aadhaar authentication provider, ePoS terminal, ration-card
+system, or beneficiary registry.
 
-The full PDS chain is wired:
+## Controlled-PoC Flow
 
 ```text
-Procurement → FCI → Depot → Issue Point → RO-lite approval
-  → Allocate to FPS → FPS receipt
-  → Beneficiary auth (mock) → Entitlement check → RecordDistribution (ledger)
-  → Audit / trace
+FPS allocation and receipt
+  -> simulated authentication
+  -> entitlement-reference validation
+  -> simulated distribution
+  -> PostgreSQL operational acceptance
+  -> asynchronous Fabric proof
+  -> audit and trace
 ```
 
-### Backend (implemented)
+Supported simulation modes are mock OTP, simulated biometric, and approved
+supervisor exception. The UI must label each mode as a simulation and must not
+collect a real Aadhaar number, OTP, biometric, phone number, or full ration-card
+value.
 
-| Step | API | Status |
-|------|-----|--------|
-| Mock OTP auth | `POST /auth/mock-otp` | Done |
-| Simulated biometric | `POST /auth/simulated-biometric` | Done |
-| Supervisor override | `POST /auth/supervisor-exception` | Done |
-| Entitlement check | `POST /entitlements/validate` | Done |
-| Record distribution | `POST /distributions` | Done |
-| Trace proof | `GET /trace/distributions/:id` | Done |
+## FPS Authorization
 
-Auth controller:
+`demo-fps` is assigned to `FPS-101`.
 
-```22:28:apps/api/src/modules/auth/auth.controller.ts
-  @Post('/auth/mock-otp')
-  authOtp(@Body() body: AuthOtpDto) {
-    return this.ledger.simulateAuthentication({
-      ...body,
-      authMode: AuthMode.MOCK_OTP
-    });
-  }
+- The API requires an active `FAIR_PRICE_SHOP` assignment.
+- It derives shop and opaque operator references from authenticated identity and
+  database assignments.
+- Allocation, stock, receipt, authentication, entitlement, distribution,
+  dashboard, and trace data are scoped to that shop.
+- Another shop's individual resource returns `404`.
+- A legacy mutation `fpsId` or `dealerId` that conflicts with the assignment
+  returns `403`; the maintained browser omits both fields.
+- `FPS-202` fixtures and tests demonstrate isolation.
+
+## Source And Proof Status
+
+Pilot AePDS/ePoS distribution events use:
+
+```text
+POST /integrations/epos/v1/distribution-events
 ```
 
-Chaincode enforces:
-- Failed auth blocks distribution
-- Entitlement balance / duplicate-claim checks
-- FPS stock debit on delivery
-- `RecordDistribution` ledger event with `ledgerTxId`
+Fixture-backed Maharashtra events exercise this seam but are not a real
+integration. Distribution views may include source provenance: source system,
+source event ID, schema version, occurrence/ingestion times, approved-payload
+hash, operation ID, and processing status.
 
-### Privacy (by design)
+An accepted distribution has a stable event and operation reference. Fabric
+proof submission is asynchronous:
 
-Per the feature spec, **raw Aadhaar, OTP, mobile, and full ration card numbers never go on-chain** — only hashes like `beneficiary-hash` and `demo-ration-card-hash`. Demo beneficiary: **"Beneficiary ****01"** in seed data.
+- operational acceptance means PostgreSQL accepted the command or source event;
+- proof completion means the outbox status is `COMMITTED` and a real
+  `fabricTxId` is recorded;
+- `PENDING`, `FAILED`, or `DEAD_LETTER` proof state does not erase the
+  operational result.
 
-Real Aadhaar/UIDAI is explicitly **out of scope** in the sprint backlog.
+## Privacy
 
----
+The boundary recursively rejects:
 
-## The gap: UI doesn’t show a separate OTP step
+- Aadhaar numbers or images;
+- biometric material;
+- OTP values;
+- phone/mobile values;
+- full ration-card values;
+- unmasked beneficiary names or addresses;
+- device credentials.
 
-The workbench bundles auth + distribution into one click:
+Responses, logs, PostgreSQL event/dead-letter payloads, and Fabric proofs use
+approved values such as `rationCardHash`, `beneficiaryRefHash`,
+authentication-transaction reference hashes, and server-derived operator
+references.
 
-```523:547:apps/web/src/workflow-actions.ts
-  if (fpsAllocationReceived && !context.distributions.some((item) => item.distributionId === distributionId)) {
-    const timestamp = getDistributionTimestamp(context, DEMO_RATION_CARD_HASH, route.commodity);
-    actions.push({
-      id: distributionId,
-      label: `Authenticate and issue ${route.commodity} ration`,
-      detail: 'FPS operator verifies the ration-card holder with mock OTP/biometric auth, records the household delivery, and writes the citizen receipt proof.',
-      roles: ['FPS'],
-      status: 'pending',
-      request: {
-        kind: 'distribute',
-        payload: {
-          distributionId,
-          fpsId: 'FPS-101',
-          rationCardHash: DEMO_RATION_CARD_HASH,
-          beneficiaryRefHash: DEMO_BENEFICIARY_HASH,
-          commodity: route.commodity,
-          deliveredKg: Math.min(demoQuantities.citizenDistributionKg, commodityDefinition(route.commodity).defaultMonthlyEntitlementKg),
-          authMode: AuthMode.MOCK_OTP,
-          authResult: AuthResult.SUCCESS,
-          authTxnRefHash: 'auth-ref-poc-001',
-          ...
-```
+## Demonstration Checklist
 
-`api.ts` already supports a separate `kind: 'auth'` → `POST /auth/mock-otp`, but the workbench **never queues that step**. CLI demos do it correctly (auth first, then distribute):
+1. Sign in through the Fair Price Shop Demo journey.
+2. Confirm the workspace displays assigned shop `FPS-101` and simulated device
+   mapping.
+3. Review the assigned allocation, stock, and pending receipt.
+4. Execute the visibly simulated authentication and distribution path.
+5. Confirm the receipt is privacy-preserving and scoped to `FPS-101`.
+6. Inspect source provenance where present.
+7. Show operational status and proof status separately.
+8. Display the Fabric transaction reference only after `COMMITTED`.
 
-```64:90:scripts/demo/fabric-api.mjs
-  const auth = await request('/auth/mock-otp', {
-    method: 'POST',
-    body: JSON.stringify({
-      authTxnId: `${prefix}-AUTH`,
-      beneficiaryRefHash: 'beneficiary-hash',
-      rationCardHash: 'demo-ration-card-hash',
-      authMode: 'MOCK_OTP',
-      authResult: 'SUCCESS'
-    })
-  });
-
-  const distribution = await request('/distributions', {
-    method: 'POST',
-    body: JSON.stringify({
-      ...
-      authTxnRefHash: auth.authTxnRefHash,
-      ...
-    })
-  });
-```
-
-The **Distribution page** is read-only panels (auth ledger, allocations, entitlements, distributions) — no interactive OTP form.
-
----
-
-## How to showcase it today (no code changes)
-
-### Option A — Live UI demo (fastest)
-
-1. `docker compose up` → open the web app (typically `http://localhost:4173`)
-2. Walk the supply chain: **PROCUREMENT → DEPOT → FPS** via Workbench
-3. As **FPS**: run **"Authenticate and issue Rice ration"**
-4. Open **Distribution** — see auth txn, entitlement, distribution with `ledgerTxId`
-5. Switch to **Auditor** → **Verify** page for trace proof
-6. Demo exceptions:
-   - **"Attempt duplicate claim"** → blocked with audit alert
-   - **"Approve supervisor exception issue"** → exception path with alert
-
-### Option B — Scripted CLI demo
-
-```bash
-npm run demo:happy      # full happy path
-npm run demo:exception  # duplicate claim / exceptions
-npm run smoke           # both
-```
-
-With Fabric ledger: `scripts/demo/fabric-api.mjs` (uses the Keycloak service client, or a short-lived `PDS_E2E_ACCESS_TOKEN` in test automation).
-
-### Option C — API curl (for technical audience)
-
-Auth → distribute → trace, using the same hashes as seed data.
-
----
-
-## Simulated Aadhaar OTP — suggested approach
-
-You don’t need UIDAI. A **thin UI layer** on existing APIs is enough for a convincing showcase.
-
-### Demo narrative (3-screen flow)
-
-```mermaid
-sequenceDiagram
-    participant FPS as FPS Dealer
-    participant UI as OTP Simulation UI
-    participant API as API
-    participant Ledger as Fabric Ledger
-
-    FPS->>UI: Select beneficiary (masked name)
-    UI->>API: POST /auth/mock-otp
-    API-->>UI: authTxnRefHash
-    FPS->>UI: Enter any 6-digit OTP (cosmetic)
-    UI->>API: GET /entitlements/{hash}
-    API-->>UI: balance 25 kg Rice
-    FPS->>UI: Confirm delivery
-    UI->>API: POST /distributions
-    API->>Ledger: RecordDistribution
-    API-->>UI: ledgerTxId + citizen receipt
-```
-
-| Screen | What to show | Backend call |
-|--------|--------------|--------------|
-| 1. Identify beneficiary | Dropdown: "Beneficiary ****01" (maps to `demo-ration-card-hash`) | None (fixture) |
-| 2. Aadhaar OTP | "OTP sent to registered mobile ****3210" — any 6 digits accepted | `POST /auth/mock-otp` |
-| 3. Confirm issue | Entitlement balance + quantity + ledger proof | `GET /entitlements/...` then `POST /distributions` |
-
-### Failure demos (same UI, different payloads)
-
-| Scenario | How |
-|----------|-----|
-| OTP failed | `authResult: 'FAILURE'` → distribution blocked |
-| Biometric fail + supervisor | `POST /auth/supervisor-exception` then distribute with `EXCEPTION_APPROVED` |
-| Duplicate claim | Second distribution same month → `DUPLICATE_CLAIM` alert |
-| Over-entitlement | `deliveredKg` > balance → rejected |
-
-### Minimal implementation effort
-
-| Change | Effort | Impact |
-|--------|--------|--------|
-| Split workbench into `kind: 'auth'` then `kind: 'distribute'` | Small | Aligns UI with CLI/e2e |
-| Add `BeneficiaryOtpDialog` on Distribution/Workbench | Medium | Makes demo visually clear |
-| Wire returned `authTxnRefHash` into distribute payload | Small | Proper auth→distribute link |
-| Optional: SMS toast animation ("OTP sent") | Trivial | Polish |
-
-**No new backend work required** — endpoints and chaincode logic already exist.
-
----
-
-## What is NOT implemented (and shouldn’t be promised in a demo)
-
-- Real UIDAI / Aadhaar OTP verification
-- Real SMART-PDS / ePoS integration
-- Dedicated beneficiary lookup API (`GET /beneficiaries/{hash}` — spec only)
-- QR scan, citizen SMS/PDF receipt
-- Strict validation that distribution’s `authTxnRefHash` matches a prior auth record (reference is passed but not cross-checked)
-
----
-
-## Recommendation
-
-For a **CDAC showcase**, I'd suggest:
-
-1. **Short term (demo-ready):** Use the existing FPS workbench flow + Distribution/Audit pages, and narrate the OTP step verbally ("in production this would be UIDAI OTP; here we simulate it").
-2. **Medium term (polished demo):** Add a simulated Aadhaar OTP dialog and split the workbench into two visible steps — this is ~1–2 days of frontend work, zero backend changes.
-3. **Positioning:** Frame it as *"privacy-preserving, hash-based beneficiary verification with mock OTP — production would plug into UIDAI/ePoS via the same auth txn contract."*
-
-If you want, I can implement the OTP simulation UI and split the workbench auth/distribute steps so the showcase matches the CLI flow end-to-end.
+Run one API replica and use an explicitly authorized reset/reseed before a
+controlled demonstration. This flow does not prove crash atomicity, concurrent
+command safety, or pilot readiness.

@@ -2,7 +2,8 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { AlertType, AuthMode, AuthResult } from '@pds/shared-types';
 import { DistributionsController } from '../src/modules/distributions/distributions.controller.js';
-import { createControllerWithFacade, createDemoLedgerFixture, prepareFpsStock, type DemoLedgerFixture } from './helpers/demo-ledger.js';
+import { asFpsRequest, createControllerWithFacade, createDemoLedgerFixture, prepareFpsStock, type DemoLedgerFixture } from './helpers/demo-ledger.js';
+import { removeEligibilityGate, setEligibilityGate } from '../src/modules/eligibility/eligibility-gate.js';
 
 describe('DistributionsModule', () => {
   let fixture: DemoLedgerFixture;
@@ -33,13 +34,12 @@ describe('DistributionsModule', () => {
       authMode: auth.authMode,
       authResult: auth.authResult,
       authTxnRefHash: auth.authTxnRefHash,
-      dealerId: 'DEALER-001',
       timestamp: '2026-06-09T10:10:00.000Z'
-    });
+    }, asFpsRequest());
 
     expect(distribution.distributionId).toBe('DIST-MOD-001');
-    expect(controller.distributions().some((item: any) => item.distributionId === 'DIST-MOD-001')).toBe(true);
-    expect(controller.distribution('DIST-MOD-001').deliveredKg).toBe(10);
+    expect((await controller.distributions()).some((item: any) => item.distributionId === 'DIST-MOD-001')).toBe(true);
+    expect((await controller.distribution('DIST-MOD-001')).deliveredKg).toBe(10);
   });
 
   it('raises an audit alert when a duplicate or over-entitlement distribution is blocked', async () => {
@@ -57,9 +57,8 @@ describe('DistributionsModule', () => {
       authMode: AuthMode.MOCK_OTP,
       authResult: AuthResult.SUCCESS,
       authTxnRefHash: 'auth-ref-dup-1',
-      dealerId: 'DEALER-001',
       timestamp: '2026-06-09T10:10:00.000Z'
-    });
+    }, asFpsRequest());
 
     await expect(
       controller.distribute({
@@ -72,9 +71,8 @@ describe('DistributionsModule', () => {
         authMode: AuthMode.MOCK_OTP,
         authResult: AuthResult.SUCCESS,
         authTxnRefHash: 'auth-ref-dup-2',
-        dealerId: 'DEALER-001',
         timestamp: '2026-06-09T10:11:00.000Z'
-      })
+      }, asFpsRequest())
     ).rejects.toThrow(/exceeds balance/);
 
     expect(fixture.facade.getAlerts().some((alert: any) => alert.alertType === AlertType.DUPLICATE_CLAIM)).toBe(true);
@@ -104,11 +102,10 @@ describe('DistributionsModule', () => {
       authMode: AuthMode.SUPERVISOR_EXCEPTION,
       authResult: AuthResult.EXCEPTION_APPROVED,
       authTxnRefHash: 'auth-ref-exception',
-      dealerId: 'DEALER-001',
       approvedBy: 'SUPERVISOR-101',
       exceptionReason: 'Biometric failure',
       timestamp: '2026-06-09T10:10:00.000Z'
-    });
+    }, asFpsRequest());
 
     expect(distribution.distributionId).toBe('DIST-MOD-EXCEPTION');
     expect(
@@ -116,5 +113,42 @@ describe('DistributionsModule', () => {
         .getAlerts()
         .some((alert: any) => alert.alertType === AlertType.UNAUTHORIZED_TRANSACTION && alert.entityId === 'DIST-MOD-EXCEPTION')
     ).toBe(true);
+  });
+
+  it('blocks the actual distribution path only while an effective eligibility decision is active', async () => {
+    fixture = await createDemoLedgerFixture();
+    prepareFpsStock(fixture.facade, 'ALLOC-DIST-ELIGIBILITY', 100);
+    controller = await createControllerWithFacade(DistributionsController, fixture.facade);
+    setEligibilityGate('demo-ration-card-hash', {
+      blocked: true, rcmsStatus: 'CANCELLED', caseId: 'ELIG-CASE-DISTRIBUTION'
+    });
+    try {
+      await expect(controller.distribute({
+        distributionId: 'DIST-ELIGIBILITY-BLOCKED',
+        fpsId: 'FPS-101',
+        rationCardHash: 'demo-ration-card-hash',
+        beneficiaryRefHash: 'beneficiary-hash',
+        commodity: 'Rice',
+        deliveredKg: 1,
+        authMode: AuthMode.MOCK_OTP,
+        authResult: AuthResult.SUCCESS,
+        authTxnRefHash: 'auth-ref-eligibility',
+        timestamp: '2026-06-09T10:10:00.000Z'
+      }, asFpsRequest())).rejects.toThrow(/effective RCMS eligibility decision/);
+    } finally {
+      removeEligibilityGate('demo-ration-card-hash');
+    }
+    await expect(controller.distribute({
+      distributionId: 'DIST-ELIGIBILITY-RESTORED',
+      fpsId: 'FPS-101',
+      rationCardHash: 'demo-ration-card-hash',
+      beneficiaryRefHash: 'beneficiary-hash',
+      commodity: 'Rice',
+      deliveredKg: 1,
+      authMode: AuthMode.MOCK_OTP,
+      authResult: AuthResult.SUCCESS,
+      authTxnRefHash: 'auth-ref-eligibility-restored',
+      timestamp: '2026-06-09T10:11:00.000Z'
+    }, asFpsRequest())).resolves.toMatchObject({ distributionId: 'DIST-ELIGIBILITY-RESTORED' });
   });
 });

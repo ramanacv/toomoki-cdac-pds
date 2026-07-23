@@ -24,6 +24,11 @@ const demoEnvKeys = [
   'PDS_AUTH_MODE',
   'PDS_TEST_AUTH_TOKEN',
   'PDS_TEST_AUTH_ROLE',
+  'PDS_TEST_AUTH_STAKEHOLDER',
+  'PDS_TEST_INTEGRATION_SOURCES',
+  'PDS_TEST_INTEGRATION_FAMILIES',
+  'PDS_TEST_INTEGRATION_EVENT_TYPES',
+  'PDS_AUTHORIZATION_MODE',
   'PDS_CORS_ORIGINS',
   'PDS_ALLOW_RESET'
 ] as const;
@@ -45,6 +50,10 @@ export const createDemoHttpApp = async (): Promise<DemoHttpAppFixture> => {
   process.env.PDS_AUTH_MODE = 'test';
   process.env.PDS_TEST_AUTH_TOKEN = 'test-token';
   process.env.PDS_TEST_AUTH_ROLE = 'department';
+  process.env.PDS_TEST_INTEGRATION_SOURCES = 'SMARTPDS_RCMS,STATE_SCM,AEPDS_EPOS';
+  process.env.PDS_TEST_INTEGRATION_FAMILIES = 'smartpds,scm,epos';
+  process.env.PDS_TEST_INTEGRATION_EVENT_TYPES = 'MASTER_REFERENCE,ALLOCATION,MOVEMENT,DISTRIBUTION';
+  process.env.PDS_AUTHORIZATION_MODE = 'claims';
   process.env.PDS_CORS_ORIGINS = 'http://jury.test';
   process.env.PDS_ALLOW_RESET = 'false';
 

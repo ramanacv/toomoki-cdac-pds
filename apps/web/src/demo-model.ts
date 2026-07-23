@@ -48,6 +48,7 @@ export type DemoScreen =
   | 'allocations'
   | 'distribution'
   | 'audit-alerts'
+  | 'eligibility-review'
   | 'verify';
 export type WorkflowState = 'complete' | 'active' | 'blocked' | 'pending';
 
@@ -121,9 +122,9 @@ export const roleProfiles: Record<DemoRole, RoleProfile> = {
     modules: ['Receipt confirmation', 'Shortage alerts', 'Stock reconciliation']
   },
   FPS: {
-    title: 'Fair Price Shop',
-    summary: 'Receive allocations, authenticate beneficiaries, and distribute rations.',
-    modules: ['FPS stock', 'Auth checks', 'Citizen receipt']
+    title: 'Fair Price Shop Demo',
+    summary: 'Confirm assigned-shop receipts and simulate non-sensitive AePDS/ePoS authentication and distribution events.',
+    modules: ['Assigned FPS stock', 'Simulated ePoS events', 'Proof status']
   },
   AUDITOR: {
     title: 'Audit Authority',
@@ -141,18 +142,19 @@ export const screenDefinitions: ScreenDefinition[] = [
   { id: 'allocations', label: 'Allocations', description: 'FPS allocation and receipt tracking.' },
   { id: 'distribution', label: 'Distribution', description: 'Beneficiary issue and receipt proof.' },
   { id: 'audit-alerts', label: 'Audit alerts', description: 'Exceptions, severity, and resolution.' },
+  { id: 'eligibility-review', label: 'Eligibility review', description: 'Synthetic external screening and guided RCMS review.' },
   { id: 'verify', label: 'Verify', description: 'Trace and receipt lookup views.' }
 ];
 
 export const roleScreens: Record<DemoRole, DemoScreen[]> = {
-  MANAGEMENT: ['dashboard', 'workbench', 'stakeholders', 'transfers', 'distribution', 'audit-alerts', 'verify'],
-  CONTROL_OFFICE: ['dashboard', 'workbench', 'transfers', 'audit-alerts', 'verify'],
+  MANAGEMENT: ['dashboard', 'workbench', 'stakeholders', 'transfers', 'distribution', 'audit-alerts', 'eligibility-review', 'verify'],
+  CONTROL_OFFICE: ['dashboard', 'workbench', 'transfers', 'audit-alerts', 'eligibility-review', 'verify'],
   FCI_DEPOT: ['dashboard', 'workbench', 'lots', 'transfers', 'verify'],
   DEPOT: ['dashboard', 'workbench', 'lots', 'transfers', 'allocations', 'verify'],
   PROCUREMENT: ['dashboard', 'workbench', 'stakeholders', 'lots', 'transfers', 'verify'],
   GODOWN: ['dashboard', 'workbench', 'lots', 'transfers', 'allocations', 'audit-alerts', 'verify'],
   FPS: ['dashboard', 'workbench', 'allocations', 'distribution', 'verify'],
-  AUDITOR: ['dashboard', 'stakeholders', 'lots', 'transfers', 'allocations', 'distribution', 'audit-alerts', 'verify']
+  AUDITOR: ['dashboard', 'stakeholders', 'lots', 'transfers', 'allocations', 'distribution', 'audit-alerts', 'eligibility-review', 'verify']
 };
 
 export const getRoleScreens = (role: DemoRole): DemoScreen[] => roleScreens[role];
@@ -185,7 +187,7 @@ const baseWorkflow: WorkflowStep[] = [
   {
     id: 'fps-receipt',
     title: 'FPS receipt',
-    detail: 'The fair price shop confirms the allocated stock before beneficiary issue.',
+    detail: 'The assigned fair price shop confirms an imported/simulated state-SCM allocation.',
     state: 'complete'
   },
   {
@@ -197,13 +199,13 @@ const baseWorkflow: WorkflowStep[] = [
   {
     id: 'authentication',
     title: 'Beneficiary authentication',
-    detail: 'Mock OTP or supervised exception approval validates the claim.',
+    detail: 'A clearly labelled fixture simulates the non-sensitive outcome of authoritative AePDS/ePoS authentication.',
     state: 'complete'
   },
   {
     id: 'distribution',
     title: 'Commodity delivery',
-    detail: 'Entitlement is checked and ration is issued.',
+    detail: 'A simulated AePDS/ePoS distribution event is correlated; ViksitPDS is not the ration-sale terminal.',
     state: 'complete'
   }
 ];
