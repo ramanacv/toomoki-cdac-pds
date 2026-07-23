@@ -177,6 +177,11 @@ PDS_ELIGIBILITY_SERVICE_TOKEN='<local-secret>' \
 docker compose --profile eligibility up -d --build eligibility-mock api web
 ```
 
+The `api` service depends on the one-shot `schema-migrate` service. It applies
+the rerunnable `infra/postgres/schema.sql` in a single transaction before the
+API starts, including when the PostgreSQL data volume already exists. A schema
+error prevents API startup instead of leaving a partially applied update.
+
 The mock service listens on port `3010`. Its health endpoint is public, while
 `POST /v1/screenings` requires the bearer service token. Leaving the profile
 disabled preserves the existing Compose startup path; the Eligibility review

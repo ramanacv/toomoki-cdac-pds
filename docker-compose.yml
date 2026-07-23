@@ -20,6 +20,32 @@ services:
       - ./infra/postgres/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
       - ./infra/postgres/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
 
+  schema-migrate:
+    image: postgres:16-alpine
+    restart: 'no'
+    environment:
+      PGPASSWORD: pds
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command:
+      [
+        'psql',
+        '-h',
+        'postgres',
+        '-U',
+        'pds',
+        '-d',
+        'pds_chain',
+        '-v',
+        'ON_ERROR_STOP=1',
+        '--single-transaction',
+        '-f',
+        '/schema/schema.sql'
+      ]
+    volumes:
+      - ./infra/postgres/schema.sql:/schema/schema.sql:ro
+
   api:
     build:
       context: .
@@ -71,6 +97,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      schema-migrate:
+        condition: service_completed_successfully
     volumes:
       - ./blockchain/fabric-network/crypto:/app/blockchain/fabric-network/crypto:ro
     networks:

@@ -15,10 +15,18 @@ describe('infrastructure contracts', () => {
   it('defines compose services for postgres api and web', () => {
     const compose = readFileSync(resolve(process.cwd(), '../../docker-compose.yml'), 'utf8');
     expect(compose).toContain('postgres:');
+    expect(compose).toContain('schema-migrate:');
     expect(compose).toContain('api:');
     expect(compose).toContain('web:');
     expect(compose).toContain('PDS_PERSISTENCE_BACKEND: postgres');
     expect(compose).toContain('PDS_POSTGRES_DSN:');
+  });
+
+  it('applies the rerunnable schema before starting the API', () => {
+    const compose = readFileSync(resolve(process.cwd(), '../../docker-compose.yml'), 'utf8');
+    expect(compose).toMatch(/schema-migrate:[\s\S]*ON_ERROR_STOP=1[\s\S]*--single-transaction/);
+    expect(compose).toMatch(/schema-migrate:[\s\S]*\.\/infra\/postgres\/schema\.sql:\/schema\/schema\.sql:ro/);
+    expect(compose).toMatch(/api:[\s\S]*schema-migrate:[\s\S]*condition: service_completed_successfully/);
   });
 
   it('exposes seed and reset scripts at the repo root', () => {
