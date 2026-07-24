@@ -99,6 +99,11 @@ services:
       KC_HEALTH_ENABLED: 'true'
       KC_METRICS_ENABLED: 'true'
       KC_HOSTNAME_STRICT: 'false'
+      KC_HTTP_ENABLED: ${KC_HTTP_ENABLED:-true}
+      KC_PROXY_HEADERS: ${KC_PROXY_HEADERS:-}
+      KC_HOSTNAME: ${KC_HOSTNAME:-}
+      KC_HOSTNAME_URL: ${KC_HOSTNAME_URL:-}
+      KC_HOSTNAME_ADMIN_URL: ${KC_HOSTNAME_ADMIN_URL:-}
     ports:
       - '8080:8080'
       - '9000:9000'
@@ -111,6 +116,25 @@ services:
     volumes:
       - keycloak_data:/opt/keycloak/data
       - ./infra/keycloak/viksitpds-realm.json:/opt/keycloak/data/import/viksitpds-realm.json:ro
+
+  caddy:
+    profiles: [edge]
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    environment:
+      PDS_WEB_HOST: ${PDS_WEB_HOST:?Set PDS_WEB_HOST for --profile edge}
+      PDS_AUTH_HOST: ${PDS_AUTH_HOST:?Set PDS_AUTH_HOST for --profile edge}
+      PDS_ACME_EMAIL: ${PDS_ACME_EMAIL:?Set PDS_ACME_EMAIL for Let's Encrypt}
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - web
+      - keycloak
 
   orderer.pds.example.com:
     profiles: [fabric]
@@ -157,6 +181,8 @@ services:
 volumes:
   postgres_data:
   keycloak_data:
+  caddy_data:
+  caddy_config:
 
 networks:
   default:

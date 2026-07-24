@@ -25,6 +25,8 @@
     "test": "npm run test --workspaces --if-present",
     "test:demo-http": "npm run test:http --workspace=@pds/api",
     "iam:bootstrap": "scripts/iam/bootstrap-keycloak.sh",
+    "iam:configure-public-web": "scripts/iam/configure-public-web-client.sh",
+    "edge:https-env": "scripts/edge/configure-https-demo-env.sh",
     "benchmark:competition": "node scripts/benchmark-competition.mjs",
     "security:evidence": "scripts/generate-security-evidence.sh",
     "typecheck": "npm run typecheck --workspaces --if-present"

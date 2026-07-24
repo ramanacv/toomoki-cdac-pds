@@ -430,6 +430,13 @@ Example:
 curl -H "Authorization: Bearer $PDS_E2E_ACCESS_TOKEN" http://localhost:3000/admin/overview
 ```
 
+## Public HTTPS demo (EC2)
+
+Browser OIDC PKCE requires a secure context. For a public controlled demo on EC2,
+terminate TLS with Compose `--profile edge` (Caddy) and follow
+[docs/implementation/aws-ec2-https-demo.md](docs/implementation/aws-ec2-https-demo.md).
+Do not use plain `http://<public-ip>:4173` for Sign in with Keycloak.
+
 ## Security Notes (MVP)
 
 ### OIDC and RBAC
