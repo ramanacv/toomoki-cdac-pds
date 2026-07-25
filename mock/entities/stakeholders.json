@@ -1,14 +1,5 @@
 [
   {
-    "stakeholderId": "PROC-001",
-    "stakeholderType": "PROCUREMENT_CENTER",
-    "name": "Procurement Centre 01",
-    "district": "Demo District",
-    "licenseNo": "PROC-LIC-001",
-    "status": "ACTIVE",
-    "jurisdiction": "STATE"
-  },
-  {
     "stakeholderId": "FCI-001",
     "stakeholderType": "FCI",
     "name": "Food Corporation of India",
@@ -27,6 +18,15 @@
     "jurisdiction": "STATE"
   },
   {
+    "stakeholderId": "BSO-001",
+    "stakeholderType": "BLOCK_SUPPLY_OFFICE",
+    "name": "Block Supply Office 01",
+    "district": "Demo District",
+    "licenseNo": "BSO-LIC-001",
+    "status": "ACTIVE",
+    "jurisdiction": "STATE"
+  },
+  {
     "stakeholderId": "GODOWN-S-001",
     "stakeholderType": "STATE_GODOWN",
     "name": "State Government Depot 01",
@@ -37,11 +37,11 @@
     "capacityKg": 25000
   },
   {
-    "stakeholderId": "ISSUE-001",
-    "stakeholderType": "ISSUE_POINT",
-    "name": "Issue Point 01",
+    "stakeholderId": "GODOWN-B-001",
+    "stakeholderType": "BLOCK_GODOWN",
+    "name": "Block Godown 01",
     "district": "Demo District",
-    "licenseNo": "ISSUE-LIC-001",
+    "licenseNo": "BG-LIC-001",
     "status": "ACTIVE",
     "jurisdiction": "STATE",
     "capacityKg": 5000

@@ -10,8 +10,10 @@
 - Single-node components are accepted locally. Backup and recovery are limited to the documented reset/reseed procedure.
 - Operational completion and proof completion are distinct UI/API states. Expected Fabric delay must not block normal workflow.
 - Proof payloads contain hashes and non-sensitive evidence only; raw beneficiary identity, OTP, biometric, mobile number and full ration-card values are prohibited.
-- `demo-fps` is assigned to `FPS-101`; the API derives the shop and opaque
-  operator reference and filters all FPS-facing reads.
+- `demo-fps` is assigned to `FPS-101` in the durable authorization tables; the
+  API derives the shop and opaque operator reference from that active
+  subject-scope assignment and filters all FPS-facing reads. If an optional
+  token shop claim is present, it must match the durable assignment.
 - SMART-PDS/RCMS, state-SCM, and AePDS/ePoS records used in the demo are
   provisional fixtures submitted through the canonical integration boundary.
   They are not evidence of a live government integration.

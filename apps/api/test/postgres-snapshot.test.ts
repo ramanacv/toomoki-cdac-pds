@@ -46,9 +46,9 @@ describe('postgres snapshot mapper', () => {
 
   it('hydrates stock positions from postgres-shaped rows', () => {
     const state = hydratePdsState({
-      stock: [['PROC-001:Rice', 10000]]
+      stock: [['FCI-001:Rice', 10000]]
     });
 
-    expect(state.stock).toEqual([['PROC-001:Rice', 10000]]);
+    expect(state.stock).toEqual([['FCI-001:Rice', 10000]]);
   });
 });

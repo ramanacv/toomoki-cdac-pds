@@ -15,7 +15,10 @@ import type { Pool, PoolClient } from 'pg';
 import type { AuthenticatedRequest } from '../auth/identity-provider.js';
 import { canonicalJson, assertPrivacySafe } from '../fabric/ledger-proof.js';
 import { PdsLedgerFacade } from '../core/pds-ledger.facade.js';
-import { DurableAuthorizationService } from '../auth/durable-authorization.service.js';
+import {
+  databaseAuthorizationEnabled,
+  DurableAuthorizationService
+} from '../auth/durable-authorization.service.js';
 
 type StoredIntegrationEvent = IntegrationEventResult & {
   envelope: SourceEventEnvelope;
@@ -303,13 +306,19 @@ export class IntegrationEventsService {
     if (!identity?.roles.includes('integration-service')) {
       throw new ForbiddenException('Integration service identity is required');
     }
+    if (databaseAuthorizationEnabled()) {
+      if (!this.durableAuthorization) {
+        throw new ForbiddenException('Database integration authorization is unavailable');
+      }
+      await this.durableAuthorization.assertIntegrationContract(identity, sourceSystem, endpointFamily, eventType);
+      return;
+    }
     const sources = stringArrayClaim(identity.claims.pds_source_systems);
     const families = stringArrayClaim(identity.claims.pds_endpoint_families);
     const eventTypes = stringArrayClaim(identity.claims.pds_event_types);
     if (!sources.includes(sourceSystem) || !families.includes(endpointFamily) || !eventTypes.includes(eventType)) {
       throw new ForbiddenException('Integration identity is not assigned to this source contract');
     }
-    await this.durableAuthorization?.assertIntegrationContract(identity, sourceSystem, endpointFamily, eventType);
   }
 
   private buildStored(

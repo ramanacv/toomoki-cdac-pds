@@ -45,7 +45,7 @@
       "payload": {
         "entityType": "movement",
         "entityId": "TR-SEED-ISSUE-FPS",
-        "fromFacilityRef": "ISSUE-001",
+        "fromFacilityRef": "GODOWN-B-001",
         "toFpsRef": "FPS-101",
         "commodityCode": "RICE",
         "quantityKg": 1000

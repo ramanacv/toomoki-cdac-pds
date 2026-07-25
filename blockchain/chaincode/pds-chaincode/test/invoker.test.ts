@@ -23,9 +23,9 @@ describe('PdsChaincodeInvoker', () => {
           season: 'Kharif 2026',
           quantityKg: 1000,
           qualityGrade: 'A',
-          source: 'Procurement Centre 01',
-          currentOwner: 'PROC-001',
-          currentLocation: 'Procurement Yard',
+          source: 'FCI Central Depot',
+          currentOwner: 'FCI-001',
+          currentLocation: 'FCI Depot',
           status: 'CREATED'
         },
         timestamp: '2026-06-09T10:00:00.000Z'

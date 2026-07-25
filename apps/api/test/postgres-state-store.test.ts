@@ -23,9 +23,9 @@ describe('postgres state store', () => {
     adapter.seed({
       stakeholders: [
         {
-          stakeholderId: 'PROC-001',
-          stakeholderType: StakeholderType.PROCUREMENT_CENTER,
-          name: 'Procurement Centre 01',
+          stakeholderId: 'FCI-001',
+          stakeholderType: StakeholderType.FCI,
+          name: 'FCI Central Depot',
           district: 'Demo District',
           licenseNo: 'PROC-LIC-001',
           status: StakeholderStatus.ACTIVE
@@ -37,6 +37,6 @@ describe('postgres state store', () => {
     const state = await store.load();
 
     expect(state?.stakeholders).toHaveLength(1);
-    expect(state?.stakeholders[0]?.stakeholderId).toBe('PROC-001');
+    expect(state?.stakeholders[0]?.stakeholderId).toBe('FCI-001');
   });
 });

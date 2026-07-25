@@ -75,7 +75,7 @@ describe('PdsControlContract / PdsDataContract authorization (T1.5)', () => {
     const data = new PdsDataContract();
 
     // Department registers the procurement center stakeholder.
-    await control.RegisterStakeholder(ctx, JSON.stringify(stakeholder('PROC-001', 'PROCUREMENT_CENTER')));
+    await control.RegisterStakeholder(ctx, JSON.stringify(stakeholder('FCI-001', 'FCI')));
 
     // Procurement creates a lot.
     msp.mspId = 'ProcurementMillerMSP';
@@ -85,9 +85,9 @@ describe('PdsControlContract / PdsDataContract authorization (T1.5)', () => {
       season: 'Kharif 2026',
       quantityKg: 100,
       qualityGrade: 'A',
-      source: 'Procurement Centre 01',
-      currentOwner: 'PROC-001',
-      currentLocation: 'Procurement Yard'
+      source: 'FCI Central Depot',
+      currentOwner: 'FCI-001',
+      currentLocation: 'FCI Depot'
     };
     await expect(data.CreateCommodityLot(ctx, JSON.stringify(lotPayload))).resolves.toBeDefined();
 
@@ -102,7 +102,7 @@ describe('PdsControlContract / PdsDataContract authorization (T1.5)', () => {
     const msp = { mspId: 'FoodAndCivilSuppliesMSP' };
     const ctx = makeContext(msp);
     const control = new PdsControlContract();
-    const payload = stakeholder('PROC-001', 'PROCUREMENT_CENTER');
+    const payload = stakeholder('FCI-001', 'FCI');
 
     await expect(control.RegisterStakeholder(ctx, JSON.stringify(payload))).resolves.toBeDefined();
     await expect(control.RegisterStakeholder(ctx, JSON.stringify(payload))).resolves.toBeDefined();
@@ -289,7 +289,7 @@ describe('PdsControlContract / PdsDataContract Fabric-native primitives (Tier 1)
         rationCards: [], grievances: [], entitlementRules: [], seriesId: 'POC'
       });
       engine.registerStakeholder(
-        stakeholder('PROC-DET', 'PROCUREMENT_CENTER') as Parameters<PdsLedgerEngine['registerStakeholder']>[0]
+        stakeholder('PROC-DET', 'FCI') as Parameters<PdsLedgerEngine['registerStakeholder']>[0]
       );
       engine.createCommodityLot({
         lotId: 'LOT-DET-001', commodity: 'Rice', season: 'Kharif 2026', quantityKg: 100,

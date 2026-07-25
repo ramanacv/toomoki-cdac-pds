@@ -17,7 +17,8 @@ ViksitPDS provides a blockchain-enabled trust layer for PDS transactions so gove
 ## Personas
 
 - Department Admin: manages stakeholders, allocations, and high-level monitoring.
-- Procurement User: creates commodity lots and dispatches stock.
+- FCI Depot User: creates commodity lots and dispatches Stage-I stock.
+- Block Supply Office: approves FPS allotments and monitors block stock.
 - Godown Operator: receives, stores, and dispatches stock.
 - FPS Dealer: receives allocated stock and records beneficiary distribution.
 - Beneficiary: receives entitled commodity after authentication.
@@ -31,11 +32,11 @@ ViksitPDS provides a blockchain-enabled trust layer for PDS transactions so gove
 
 ### Stakeholder Onboarding
 
-An admin registers procurement centre, FCI, state godown, issue point, FPS dealer, transporter, DSO, and auditor. Each stakeholder receives an active status and role-appropriate permissions.
+An admin registers FCI, state godown, block godown, FPS dealer, transporter, DSO, BSO, and auditor. Each stakeholder receives an active status and role-appropriate permissions.
 
 ### Commodity Lot Creation
 
-A procurement user creates a rice lot with quantity, grade, source, owner, location, and timestamp. The system stores operational state and writes a lot creation proof to the ledger.
+A FCI user creates a rice lot with quantity, grade, source, owner, location, and timestamp. The system stores operational state and writes a lot creation proof to the ledger.
 
 ### Custody Transfer
 
@@ -71,7 +72,7 @@ An auditor views lot history, distribution receipts, pending receipts, duplicate
 ### Stakeholder Registry
 
 - Register stakeholders with ID, type, name, location, license/reference number, and status.
-- Support stakeholder types for procurement centre, FCI, transporter, state godown, issue point, FPS, DSO, and auditor.
+- Support stakeholder types for FCI, transporter, state godown, block godown, FPS, DSO, BSO, and auditor.
 - Block inactive stakeholders from performing transactions.
 
 ### Commodity Lot Management
@@ -91,7 +92,7 @@ An auditor views lot history, distribution receipts, pending receipts, duplicate
 
 ### FPS Allocation
 
-- Allocate commodity stock from issue point to FPS.
+- Allocate commodity stock from block godown to FPS.
 - Prevent allocation above available stock.
 - Confirm FPS receipt.
 - Track FPS opening, received, distributed, and closing stock.
@@ -180,7 +181,7 @@ An auditor views lot history, distribution receipts, pending receipts, duplicate
 
 ## Acceptance Criteria
 
-- A seeded demo can execute the full rice journey from procurement to delivery.
+- A seeded demo can execute the full rice journey from FCI to delivery.
 - Every accepted proof-bearing operation has a traceable operation/event ID and
   queryable outbox state; `COMMITTED` additionally carries the real Fabric
   transaction ID.

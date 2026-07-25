@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { join } from 'node:path';
 import { CanonicalSourceEventType, SourceSystem, type SourceEventEnvelope } from '@pds/shared-types';
 import { IntegrationEventsService } from '../src/modules/integrations/integration-events.service.js';
@@ -146,6 +146,43 @@ describe('canonical integration events', () => {
       },
       integrationRequest('SMARTPDS_RCMS')
     )).rejects.toThrow(/not assigned/);
+  });
+
+  it('uses the durable source contract in database authorization mode without optional token contract claims', async () => {
+    const previousMode = process.env.PDS_AUTHORIZATION_MODE;
+    process.env.PDS_AUTHORIZATION_MODE = 'database';
+    const assertIntegrationContract = vi.fn().mockResolvedValue(undefined);
+    try {
+      const databaseAuthorized = new IntegrationEventsService(
+        fixture.facade,
+        { assertIntegrationContract } as never
+      );
+      const request: AuthenticatedRequest = {
+        headers: {},
+        user: {
+          subject: 'service-account-maharashtra',
+          roles: ['integration-service'],
+          claims: { azp: 'pds-integration-maharashtra' }
+        }
+      };
+      const contract = {
+        sourceSystem: SourceSystem.STATE_SCM,
+        eventType: CanonicalSourceEventType.ALLOCATION,
+        endpointFamily: 'scm'
+      };
+
+      await expect(databaseAuthorized.ingest(envelope('SCM-DATABASE-AUTH'), contract, request))
+        .resolves.toMatchObject({ disposition: 'NEW' });
+      expect(assertIntegrationContract).toHaveBeenCalledWith(
+        request.user,
+        SourceSystem.STATE_SCM,
+        'scm',
+        CanonicalSourceEventType.ALLOCATION
+      );
+    } finally {
+      if (previousMode === undefined) delete process.env.PDS_AUTHORIZATION_MODE;
+      else process.env.PDS_AUTHORIZATION_MODE = previousMode;
+    }
   });
 
   it('serializes simultaneous replay and reports attempt, schema, lag, and quarantine health', async () => {

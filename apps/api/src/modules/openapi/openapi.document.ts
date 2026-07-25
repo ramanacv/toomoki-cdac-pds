@@ -1,4 +1,4 @@
-const operationalRoles = ['management', 'department', 'procurement', 'fci', 'godown', 'fps', 'auditor'] as const;
+const operationalRoles = ['management', 'department', 'procurement', 'fci', 'godown', 'block-office', 'fps', 'auditor'] as const;
 const secured = (summary: string, roles: readonly string[] = operationalRoles) => ({
   summary,
   'x-required-roles': roles,
@@ -29,8 +29,8 @@ export const OPENAPI_SPEC = {
     }
   },
   'x-role-policy': {
-    stakeholderCreate: ['department'], lotCreate: ['procurement'], dispatch: ['procurement', 'fci', 'godown'],
-    transferReceipt: ['fci', 'godown'], stageTwoAuthorization: ['department'], allocation: ['department', 'godown'],
+    stakeholderCreate: ['department'], lotCreate: ['fci'], dispatch: ['fci', 'godown'],
+    transferReceipt: ['fci', 'godown'], stageTwoAuthorization: ['department'], allocation: ['department', 'block-office'],
     fpsReceipt: ['fps'], authentication: ['fps'], distribution: ['fps'], entitlementWrite: ['department'],
     entitlementValidation: ['department', 'fps'], reconciliation: ['auditor'], admin: ['platform-admin'],
     metrics: ['metrics-reader', 'platform-admin'], reset: ['demo-reset'],
@@ -53,13 +53,13 @@ export const OPENAPI_SPEC = {
     },
     '/lots': {
       get: secured('List commodity lots'),
-      post: secured('Create commodity lot', ['procurement'])
+      post: secured('Create commodity lot', ['fci'])
     },
     '/lots/{lotId}': { get: secured('Get commodity lot') },
     '/lots/{lotId}/history': { get: secured('Get lot history') },
     '/transfers': {
       get: secured('List transfers'),
-      post: secured('Dispatch stock', ['procurement', 'fci', 'godown'])
+      post: secured('Dispatch stock', ['fci', 'godown'])
     },
     '/transfers/{transferId}': { get: secured('Get transfer order') },
     '/transfers/{transferId}/authorize': { post: secured('Authorize Stage-II movement', ['department']) },
@@ -67,7 +67,7 @@ export const OPENAPI_SPEC = {
     '/ledger-events': { get: secured('List ledger evidence events') },
     '/fps-allocations': {
       get: secured('List allocations'),
-      post: secured('Allocate stock to FPS', ['department', 'godown'])
+      post: secured('Allocate stock to FPS', ['department', 'block-office'])
     },
     '/fps-allocations/{allocationId}': { get: secured('Get FPS allocation') },
     '/fps-allocations/{allocationId}/receipt': { post: secured('Confirm FPS receipt', ['fps']) },

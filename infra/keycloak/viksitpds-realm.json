@@ -27,14 +27,15 @@
   "refreshTokenMaxReuse": 0,
   "roles": {
     "realm": [
-      { "name": "management", "description": "Read-only operational dashboards" },
-      { "name": "department", "description": "Department administration and movement authorization" },
-      { "name": "procurement", "description": "Procurement lot and dispatch operations" },
-      { "name": "fci", "description": "FCI receipt and onward dispatch operations" },
-      { "name": "godown", "description": "Godown receipt, dispatch and allocation operations" },
-      { "name": "fps", "description": "FPS receipt, simulated authentication and distribution" },
-      { "name": "auditor", "description": "Trace, reconciliation, proof and alert review" },
-      { "name": "platform-admin", "description": "Application administration views" },
+      { "name": "management", "description": "Management — read-only operational dashboards" },
+      { "name": "department", "description": "District Supply Officer (DSO) — Stage-II Release Order authorization" },
+      { "name": "procurement", "description": "Procurement lot and dispatch operations (compatibility role)" },
+      { "name": "fci", "description": "FCI Depot Officer — Stage-I origin and dispatch to state godown" },
+      { "name": "godown", "description": "Godown Operator — state and block godown receipt and dispatch" },
+      { "name": "block-office", "description": "Block Supply Officer (BSO) — FPS allotment and block monitoring" },
+      { "name": "fps", "description": "FPS Dealer — shop receipt and simulated AePDS/ePoS distribution" },
+      { "name": "auditor", "description": "Auditor — trace, reconciliation, proof and alert review" },
+      { "name": "platform-admin", "description": "Platform administrator — application administration views" },
       { "name": "metrics-reader", "description": "Prometheus metrics access" },
       { "name": "demo-reset", "description": "Controlled destructive demo reset" },
       { "name": "integration-service", "description": "Restricted inbound source-event ingestion" }

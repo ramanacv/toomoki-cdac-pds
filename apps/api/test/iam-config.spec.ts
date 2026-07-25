@@ -24,16 +24,25 @@ describe('IAM assignments for FPS and source integrations', () => {
     ]));
   });
 
-  it('idempotently assigns demo-fps to FPS-101 and limits the integration account by contract claims', () => {
-    expect(bootstrap).toContain('ensure_user "demo-fps" "fps" "FPS-101" "FPS-101"');
+  it('idempotently assigns demo-fps to FPS-101 and limits the integration account by durable contracts', () => {
+    expect(bootstrap).toContain('ensure_user "demo-fps" "fps"');
     expect(bootstrap).toContain('service-account-pds-integration-maharashtra');
-    expect(bootstrap).toContain('SMARTPDS_RCMS,STATE_SCM,AEPDS_EPOS');
-    expect(bootstrap).toContain('smartpds,scm,epos');
-    expect(bootstrap).toContain('MASTER_REFERENCE,ALLOCATION,MOVEMENT,DISTRIBUTION');
+    expect(bootstrap).toContain('"SMARTPDS_RCMS|smartpds|MASTER_REFERENCE"');
+    expect(bootstrap).toContain('"STATE_SCM|scm|ALLOCATION"');
+    expect(bootstrap).toContain('"AEPDS_EPOS|epos|DISTRIBUTION"');
     expect(bootstrap).toContain('ensure_integration_client');
     expect(bootstrap).toContain('ensure_mapper "$integration_id" pds-source-systems');
     expect(bootstrap).toContain('integration_source_assignments');
     expect(bootstrap).toContain('integration_credentials');
+  });
+
+  it('reconciles claim mappers and verifies every seeded demo identity', () => {
+    expect(bootstrap).toContain('"$operation" "$endpoint"');
+    expect(bootstrap).toContain('demo_roles=(management department procurement fci godown block-office fps auditor platform-admin demo-reset)');
+    expect(bootstrap).toContain('verify_demo_user "$role"');
+    expect(bootstrap).toContain('subject_role_assignments WHERE subject_id');
+    expect(bootstrap).toContain("scope_type = 'FPS'");
+    expect(bootstrap.match(/authenticate_keycloak/g)?.length).toBeGreaterThanOrEqual(4);
   });
 
   it('uses the same default public issuer host for service tokens and API validation', () => {

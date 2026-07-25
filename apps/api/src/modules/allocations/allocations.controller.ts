@@ -33,7 +33,7 @@ export class AllocationsController {
   }
 
   @Post('/fps-allocations')
-  @Roles('department', 'godown')
+  @Roles('department', 'block-office')
   allocate(@Body() body: AllocationDto) {
     return this.ledger.allocateToFpsPersisted(body as Required<AllocationDto>);
   }

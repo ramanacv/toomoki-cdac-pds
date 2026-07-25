@@ -27,11 +27,11 @@ const effectiveRoles = (controller: ControllerClass, method: string): PdsRole[] 
 describe('canonical endpoint authorization policy', () => {
   it.each([
     [StakeholdersController, 'registerStakeholder', ['department']],
-    [LotsController, 'createLot', ['procurement']],
-    [TransfersController, 'dispatch', ['procurement', 'fci', 'godown']],
+    [LotsController, 'createLot', ['fci']],
+    [TransfersController, 'dispatch', ['fci', 'godown']],
     [TransfersController, 'receive', ['fci', 'godown']],
     [TransfersController, 'authorize', ['department']],
-    [AllocationsController, 'allocate', ['department', 'godown']],
+    [AllocationsController, 'allocate', ['department', 'block-office']],
     [AllocationsController, 'fpsReceipt', ['fps']],
     [AuthController, 'authOtp', ['fps']],
     [AuthController, 'authBiometric', ['fps']],

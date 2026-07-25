@@ -10,11 +10,48 @@ export type QuickRoleLogin = {
 };
 
 export const quickRoleLogins: QuickRoleLogin[] = [
-  { title: 'Department', username: 'demo-department', description: 'View SMART-PDS/RCMS references and simulate authoritative department events.', returnUrl: '/workbench' },
-  { title: 'Supply-chain Operations', username: 'demo-godown', description: 'Simulate IAeSCM/state-SCM allocation, dispatch, custody, and receipt events.', returnUrl: '/workbench' },
-  { title: 'Fair Price Shop Demo', username: 'demo-fps', description: 'Shop-bound FPS-101 workspace. Authentication and ration issue are clearly simulated AePDS/ePoS events.', returnUrl: '/workbench' },
-  { title: 'Audit / Management', username: 'demo-auditor', description: 'Read-only reconciliation, traceability, operational status, and Fabric proof evidence.', returnUrl: '/dashboard' },
-  { title: 'Platform administrator', username: 'demo-platform-admin', description: 'Application administration and network evidence.', returnUrl: '/admin/overview' }
+  {
+    title: 'FCI Depot Officer',
+    username: 'demo-fci',
+    description: 'Originate central lots and dispatch Stage-I stock to the state godown.',
+    returnUrl: '/workbench'
+  },
+  {
+    title: 'Godown Operator',
+    username: 'demo-godown',
+    description: 'Receive and dispatch stock at state and block godowns.',
+    returnUrl: '/workbench'
+  },
+  {
+    title: 'District Supply Officer (DSO)',
+    username: 'demo-department',
+    description: 'Authorize Stage-II Release Orders from the state godown to the block godown.',
+    returnUrl: '/workbench'
+  },
+  {
+    title: 'Block Supply Officer (BSO)',
+    username: 'demo-block-office',
+    description: 'Allot block-godown stock to Fair Price Shops and monitor block supply.',
+    returnUrl: '/workbench'
+  },
+  {
+    title: 'FPS Dealer',
+    username: 'demo-fps',
+    description: 'Shop-bound FPS-101 workspace. Authentication and ration issue are clearly simulated AePDS/ePoS events.',
+    returnUrl: '/workbench'
+  },
+  {
+    title: 'Auditor',
+    username: 'demo-auditor',
+    description: 'Read-only reconciliation, traceability, operational status, and Fabric proof evidence.',
+    returnUrl: '/dashboard'
+  },
+  {
+    title: 'Platform administrator',
+    username: 'demo-platform-admin',
+    description: 'Application administration and network evidence.',
+    returnUrl: '/admin/overview'
+  }
 ];
 
 export function RoleLoginPage() {

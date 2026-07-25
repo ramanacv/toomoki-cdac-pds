@@ -4,6 +4,7 @@ export const PDS_ROLES = [
   'procurement',
   'fci',
   'godown',
+  'block-office',
   'fps',
   'auditor',
   'platform-admin',

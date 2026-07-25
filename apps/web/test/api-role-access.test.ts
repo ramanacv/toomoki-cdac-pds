@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { canReadWorkspaceCollection, type RestrictedWorkspaceCollection } from '../src/api.js';
+import { canReadWorkspaceCollection, readApiError, type RestrictedWorkspaceCollection } from '../src/api.js';
 import type { WebRole } from '../src/auth-token.js';
 
 describe('workspace collection role access', () => {
@@ -18,11 +18,13 @@ describe('workspace collection role access', () => {
       procurement: [],
       fci: [],
       godown: [],
+      'block-office': [],
       fps: ['authTransactions', 'entitlements', 'distributions'],
       auditor: ['authTransactions', 'entitlements', 'distributions', 'alerts'],
       'platform-admin': [],
       'metrics-reader': [],
-      'demo-reset': []
+      'demo-reset': [],
+      'integration-service': []
     };
 
     for (const [role, permitted] of Object.entries(expected) as Array<[WebRole, RestrictedWorkspaceCollection[]]>) {
@@ -30,5 +32,16 @@ describe('workspace collection role access', () => {
         expect(canReadWorkspaceCollection(collection, [role]), `${role} / ${collection}`).toBe(permitted.includes(collection));
       }
     }
+  });
+
+  it('reports the denied endpoint and server-side scope reason instead of an outage', async () => {
+    const response = new Response(
+      JSON.stringify({ message: 'FPS identity has no active shop assignment' }),
+      { status: 403, headers: { 'Content-Type': 'application/json' } }
+    );
+
+    await expect(readApiError(response, '/stock')).resolves.toBe(
+      'Access denied while loading /stock: FPS identity has no active shop assignment'
+    );
   });
 });

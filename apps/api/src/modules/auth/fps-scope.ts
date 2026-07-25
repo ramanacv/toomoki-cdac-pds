@@ -24,13 +24,35 @@ export const requireFpsAssignment = async (
   if (!identity?.roles.includes('fps')) {
     throw new ForbiddenException('An authenticated FPS assignment is required');
   }
-  if (!identity.stakeholderId) {
+  let stakeholderId = identity.stakeholderId;
+
+  if (databaseAuthorizationEnabled()) {
+    const pool = ledger.getOperationalPool();
+    if (!pool) throw new ForbiddenException('Database authorization is unavailable');
+    const scope = await pool.query(
+      `SELECT scope_id FROM subject_scope_assignments
+       WHERE subject_id = $1 AND scope_type = 'FPS'
+         AND active = TRUE AND valid_from <= NOW()
+         AND (valid_until IS NULL OR valid_until > NOW())
+       ORDER BY scope_id`,
+      [identity.subject]
+    );
+    if (scope.rowCount !== 1) {
+      throw new ForbiddenException('FPS identity must have exactly one active database shop assignment');
+    }
+    const databaseStakeholderId = String(scope.rows[0]?.scope_id ?? '');
+    if (stakeholderId && stakeholderId !== databaseStakeholderId) {
+      throw new ForbiddenException('FPS token shop assignment conflicts with the durable database assignment');
+    }
+    stakeholderId = databaseStakeholderId;
+  }
+  if (!stakeholderId) {
     throw new ForbiddenException('FPS identity has no active shop assignment');
   }
 
   let stakeholder;
   try {
-    stakeholder = await Promise.resolve(ledger.getStakeholder(identity.stakeholderId));
+    stakeholder = await Promise.resolve(ledger.getStakeholder(stakeholderId));
   } catch {
     throw new ForbiddenException('FPS identity has no active shop assignment');
   }
@@ -40,21 +62,9 @@ export const requireFpsAssignment = async (
   ) {
     throw new ForbiddenException('FPS identity has no active shop assignment');
   }
-  if (databaseAuthorizationEnabled()) {
-    const pool = ledger.getOperationalPool();
-    if (!pool) throw new ForbiddenException('Database authorization is unavailable');
-    const scope = await pool.query(
-      `SELECT 1 FROM subject_scope_assignments
-       WHERE subject_id = $1 AND scope_type = 'FPS' AND scope_id = $2
-         AND active = TRUE AND valid_from <= NOW()
-         AND (valid_until IS NULL OR valid_until > NOW())`,
-      [identity.subject, identity.stakeholderId]
-    );
-    if (!scope.rowCount) throw new ForbiddenException('FPS identity has no active database shop assignment');
-  }
 
   return {
-    fpsId: stakeholder.stakeholderId,
+    fpsId: stakeholderId,
     operatorRef: opaqueOperatorRef(identity.subject)
   };
 };

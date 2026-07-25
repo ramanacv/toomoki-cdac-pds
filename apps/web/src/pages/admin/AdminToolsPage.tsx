@@ -36,14 +36,14 @@ export function AdminToolsPage() {
   const { apiOnline, stakeholders, refresh } = useAdminContext();
   const roles = getCurrentIdentity()?.roles ?? [];
   const canReadOperationalData = hasOperationalRole(roles);
-  const canCreateStock = roles.includes('procurement');
+  const canCreateStock = roles.includes('fci');
   const canReset = roles.includes('demo-reset');
 
   const [stockCommodity, setStockCommodity] = useState('Rice');
   const [stockQuantityKg, setStockQuantityKg] = useState('10000');
   const [stockQualityGrade, setStockQualityGrade] = useState('A');
-  const [stockOwner, setStockOwner] = useState('PROC-001');
-  const [stockLocation, setStockLocation] = useState('Procurement Yard');
+  const [stockOwner, setStockOwner] = useState('FCI-001');
+  const [stockLocation, setStockLocation] = useState('FCI Depot');
   const [stockSubmitting, setStockSubmitting] = useState(false);
   const [stockMessage, setStockMessage] = useState<string | null>(null);
   const [stockError, setStockError] = useState<string | null>(null);
@@ -219,7 +219,7 @@ export function AdminToolsPage() {
             <p className="text-sm text-muted-foreground">Disabled while API is offline (Demo data mode).</p>
           )}
           {!canCreateStock && (
-            <p className="text-sm text-muted-foreground">The procurement role is required to create a lot.</p>
+            <p className="text-sm text-muted-foreground">The FCI role is required to create a lot.</p>
           )}
           {stockMessage && <p className="text-sm text-muted-foreground">{stockMessage}</p>}
         </div>

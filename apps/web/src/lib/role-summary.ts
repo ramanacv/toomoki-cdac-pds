@@ -29,10 +29,8 @@ export type RoleSummaryInput = {
 
 // Demo org identities operated by each role, mirroring the planned legs in workflow-actions.
 const roleOrgs: Partial<Record<DemoRole, string[]>> = {
-  PROCUREMENT: ['PROC-001'],
   FCI_DEPOT: ['FCI-001'],
-  DEPOT: ['GODOWN-S-001', 'ISSUE-001'],
-  GODOWN: ['GODOWN-S-001'],
+  GODOWN: ['GODOWN-S-001', 'GODOWN-B-001'],
   FPS: ['FPS-101']
 };
 
@@ -84,16 +82,15 @@ export function roleSummaryCards(
       ];
     }
 
-    case 'PROCUREMENT':
+    case 'BLOCK_OFFICE':
       return [
-        ['Queued actions', queued.toString()],
-        ['Registered lots', data.lots.length.toString()],
-        ['Dispatched', kg(dispatchedKg(data.transfers, orgs))],
-        ['Open alerts', openAlerts.length.toString()]
+        ['Queued allotments', queued.toString()],
+        ['FPS allocations', data.allocations.length.toString()],
+        ['Open alerts', openAlerts.length.toString()],
+        ['Stage-II movements', data.transfers.filter((t) => t.stage === 'II').length.toString()]
       ];
 
     case 'FCI_DEPOT':
-    case 'DEPOT':
       return [
         ['Queued actions', queued.toString()],
         ['Inbound pending', inboundPending(data.transfers, orgs).toString()],

@@ -5,7 +5,7 @@
     "season": "Kharif 2026",
     "quantityKg": 10000,
     "qualityGrade": "A",
-    "source": "Procurement Centre 01",
+    "source": "FCI Central Depot",
     "currentOwner": "FPS-101",
     "currentLocation": "FPS 101",
     "status": "RECEIVED"
@@ -16,9 +16,9 @@
     "season": "Rabi 2026",
     "quantityKg": 7000,
     "qualityGrade": "A",
-    "source": "Procurement Centre 01",
-    "currentOwner": "PROC-001",
-    "currentLocation": "Procurement Yard",
+    "source": "FCI Central Depot",
+    "currentOwner": "FCI-001",
+    "currentLocation": "FCI Depot",
     "status": "CREATED"
   },
   {
@@ -27,9 +27,9 @@
     "season": "Kharif 2026",
     "quantityKg": 2000,
     "qualityGrade": "A",
-    "source": "Procurement Centre 01",
-    "currentOwner": "PROC-001",
-    "currentLocation": "Procurement Yard",
+    "source": "FCI Central Depot",
+    "currentOwner": "FCI-001",
+    "currentLocation": "FCI Depot",
     "status": "CREATED"
   },
   {
@@ -38,9 +38,9 @@
     "season": "2026",
     "quantityKg": 2000,
     "qualityGrade": "A",
-    "source": "Procurement Centre 01",
-    "currentOwner": "PROC-001",
-    "currentLocation": "Procurement Yard",
+    "source": "FCI Central Depot",
+    "currentOwner": "FCI-001",
+    "currentLocation": "FCI Depot",
     "status": "CREATED"
   },
   {
@@ -49,9 +49,9 @@
     "season": "2026",
     "quantityKg": 1000,
     "qualityGrade": "A",
-    "source": "Procurement Centre 01",
-    "currentOwner": "PROC-001",
-    "currentLocation": "Procurement Yard",
+    "source": "FCI Central Depot",
+    "currentOwner": "FCI-001",
+    "currentLocation": "FCI Depot",
     "status": "CREATED"
   },
   {
@@ -60,9 +60,9 @@
     "season": "2026",
     "quantityKg": 1000,
     "qualityGrade": "A",
-    "source": "Procurement Centre 01",
-    "currentOwner": "PROC-001",
-    "currentLocation": "Procurement Yard",
+    "source": "FCI Central Depot",
+    "currentOwner": "FCI-001",
+    "currentLocation": "FCI Depot",
     "status": "CREATED"
   }
 ]

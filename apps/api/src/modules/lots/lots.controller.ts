@@ -21,7 +21,7 @@ export class LotsController {
   }
 
   @Post('/lots')
-  @Roles('procurement')
+  @Roles('fci')
   createLot(@Body() body: LotCreateDto) {
     return this.ledger.createCommodityLotPersisted(body);
   }

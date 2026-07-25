@@ -73,7 +73,7 @@ const mockWorkspace = (scenario: DemoScenario): WorkspaceData => ({
   stockPositions: []
 });
 
-async function readApiError(response: Response, path: string): Promise<string> {
+export async function readApiError(response: Response, path: string): Promise<string> {
   const text = await response.text();
   try {
     const body = JSON.parse(text) as { message?: string };
@@ -81,7 +81,8 @@ async function readApiError(response: Response, path: string): Promise<string> {
       return 'Your identity session is missing or expired. Sign in again.';
     }
     if (response.status === 403) {
-      return 'Your authenticated role is not permitted to perform this operation.';
+      const reason = body.message ?? 'Your authenticated role is not permitted to perform this operation.';
+      return `Access denied while loading ${path}: ${reason}`;
     }
     return body.message ?? text ?? `Request failed for ${path}`;
   } catch {
@@ -316,7 +317,7 @@ export const runShortReceiptDemo = async (): Promise<TransferOrder> => {
     transferId: 'TR-UI-SHORT-001',
     lotId: 'LOT-RICE-2026-001',
     fromOrg: 'GODOWN-S-001',
-    toOrg: 'ISSUE-001',
+    toOrg: 'GODOWN-B-001',
     dispatchedQtyKg: demoQuantities.shortReceiptDispatchKg,
     vehicleNo: 'KA01AB9001'
   });
