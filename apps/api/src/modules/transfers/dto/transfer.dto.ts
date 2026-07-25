@@ -36,9 +36,8 @@ export class DispatchDto {
   @IsString()
   authorizedBy?: string;
 
-  @IsOptional()
   @IsString()
-  transporterId?: string;
+  transporterId!: string;
 
   @IsOptional()
   @IsString()

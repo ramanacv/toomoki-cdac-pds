@@ -122,19 +122,19 @@ const lifecycle = async (index) => {
   const lotId = `LOT-${prefix}`;
   const quantityKg = 25;
   const post = (path, body) => request(path, { method: 'POST', body });
-  await post('/lots', { lotId, commodity: 'Rice', season: 'Benchmark', quantityKg, qualityGrade: 'A', source: 'Controlled benchmark', currentOwner: 'PROC-001', currentLocation: 'Benchmark yard' });
+  await post('/lots', { lotId, commodity: 'Rice', season: 'Benchmark', quantityKg, qualityGrade: 'A', source: 'Controlled benchmark', currentOwner: 'FCI-001', currentLocation: 'Benchmark yard' });
   await post('/entitlements', { rationCardHash: cardHash, commodity: 'Rice', month, monthlyEntitlementKg: quantityKg, alreadyLiftedKg: 0, availableBalanceKg: quantityKg, active: true });
   const transfers = [
-    [`TR-${prefix}-1`, 'PROC-001', 'FCI-001', 'I'],
+    [`TR-${prefix}-1`, 'FCI-001', 'FCI-001', 'I'],
     [`TR-${prefix}-2`, 'FCI-001', 'GODOWN-S-001', 'I'],
-    [`TR-${prefix}-3`, 'GODOWN-S-001', 'ISSUE-001', 'II']
+    [`TR-${prefix}-3`, 'GODOWN-S-001', 'GODOWN-B-001', 'II']
   ];
   for (const [transferId, fromOrg, toOrg, stage] of transfers) {
     await post('/transfers', { transferId, lotId, fromOrg, toOrg, dispatchedQtyKg: quantityKg, vehicleNo: `BENCH${index}V`, stage, transporterId: 'TRANS-001', ...(stage === 'II' ? { roRef: `RO-${prefix}`, authorizedBy: 'DSO-001' } : {}) });
     await post(`/transfers/${transferId}/receive`, { receivedQtyKg: quantityKg });
   }
   const allocationId = `ALLOC-${prefix}`;
-  await post('/fps-allocations', { allocationId, fpsId: 'FPS-101', commodity: 'Rice', allocatedQtyKg: quantityKg, month, sourceGodownId: 'ISSUE-001' });
+  await post('/fps-allocations', { allocationId, fpsId: 'FPS-101', commodity: 'Rice', allocatedQtyKg: quantityKg, month, sourceGodownId: 'GODOWN-B-001', transporterId: 'TRANS-001', vehicleNo: `BENCH${index}F` });
   await post(`/fps-allocations/${allocationId}/receipt`, { receivedQtyKg: quantityKg });
   const auth = await post('/auth/mock-otp', { authTxnId: `AUTH-${prefix}`, beneficiaryRefHash: beneficiaryHash, rationCardHash: cardHash, authMode: 'MOCK_OTP', authResult: 'SUCCESS' });
   await post('/distributions', { distributionId: `DIST-${prefix}`, rationCardHash: cardHash, beneficiaryRefHash: beneficiaryHash, commodity: 'Rice', deliveredKg: quantityKg, authMode: auth.authMode, authResult: auth.authResult, authTxnRefHash: auth.authTxnRefHash, timestamp: `${month}-15T10:00:00.000Z` });

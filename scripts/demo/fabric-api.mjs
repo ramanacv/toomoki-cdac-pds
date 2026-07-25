@@ -50,7 +50,9 @@ export const runHappyPathFabric = async ({ apiBase, token }) => {
       commodity: 'Rice',
       allocatedQtyKg: demoQuantities.fpsAllocationKg,
       month: '2026-06',
-      sourceGodownId: 'ISSUE-001'
+      sourceGodownId: 'GODOWN-B-001',
+      transporterId: 'TRANS-001',
+      vehicleNo: 'KA01AB9999'
     })
   });
 
@@ -115,10 +117,11 @@ export const runExceptionPathFabric = async ({ apiBase, token }) => {
     body: JSON.stringify({
       transferId: `${prefix}-TR`,
       lotId: 'LOT-RICE-2026-001',
-      fromOrg: 'PROC-001',
-      toOrg: 'FCI-001',
+      fromOrg: 'FCI-001',
+      toOrg: 'GODOWN-S-001',
       dispatchedQtyKg: demoQuantities.shortReceiptDispatchKg,
-      vehicleNo: 'KA01AB3001'
+      vehicleNo: 'KA01AB3001',
+      transporterId: 'TRANS-001'
     })
   });
 
@@ -138,7 +141,9 @@ export const runExceptionPathFabric = async ({ apiBase, token }) => {
       commodity: 'Rice',
       allocatedQtyKg: demoQuantities.fpsAllocationKg,
       month: '2026-06',
-      sourceGodownId: 'ISSUE-001'
+      sourceGodownId: 'GODOWN-B-001',
+      transporterId: 'TRANS-001',
+      vehicleNo: 'KA01AB9999'
     })
   });
 

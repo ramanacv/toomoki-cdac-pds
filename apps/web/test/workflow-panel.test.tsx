@@ -26,7 +26,9 @@ const receivedTransfer = (transferId: string, fromOrg: string, toOrg: string, lo
   vehicleNo: 'KA01AB1000',
   status: TransferStatus.RECEIVED,
   dispatchTimestamp: '2026-06-30T10:00:00.000Z',
-  receiveTimestamp: '2026-06-30T10:05:00.000Z'
+  receiveTimestamp: '2026-06-30T10:05:00.000Z',
+  transporterId: 'TRANS-001',
+  transporterName: 'Transport Contractor 01'
 });
 
 const baseProps = {
@@ -46,7 +48,6 @@ const baseProps = {
 
 const depotReady = {
   transfers: [
-    receivedTransfer('TR-POC-RICE-PROC-FCI', 'PROC-001', 'FCI-001'),
     receivedTransfer('TR-POC-RICE-FCI-DEPOT', 'FCI-001', 'GODOWN-S-001')
   ]
 };
@@ -54,13 +55,13 @@ const depotReady = {
 const issueReady = {
   transfers: [
     ...depotReady.transfers,
-    receivedTransfer('TR-POC-RICE-DEPOT-ISSUE', 'GODOWN-S-001', 'ISSUE-001')
+    receivedTransfer('TR-POC-RICE-DEPOT-BLOCK', 'GODOWN-S-001', 'GODOWN-B-001')
   ],
   ledgerEvents: [
     {
       ledgerTxId: 'TX-RO',
       entityType: 'workflow' as const,
-      entityId: 'TR-POC-RICE-DEPOT-ISSUE',
+      entityId: 'TR-POC-RICE-DEPOT-BLOCK',
       eventType: 'RO_LITE_APPROVED',
       payload: {},
       timestamp: '2026-06-30T10:00:00.000Z'
@@ -74,12 +75,12 @@ beforeEach(() => {
 });
 
 describe('WorkflowActionPanel', () => {
-  it('renders procurement dispatch as the first action', () => {
-    render(<WorkflowActionPanel {...baseProps} apiOnline={false} role="PROCUREMENT" />);
+  it('renders FCI Stage-I dispatch as the first action', () => {
+    render(<WorkflowActionPanel {...baseProps} apiOnline={false} role="FCI_DEPOT" />);
 
     const riceGroup = within(screen.getByTestId('commodity-group-Rice'));
     expect(screen.getByText('Mock workflow')).toBeInTheDocument();
-    expect(riceGroup.getByText('Dispatch procurement stock to FCI')).toBeInTheDocument();
+    expect(riceGroup.getByText('Stage-I: FCI dispatch to state godown')).toBeInTheDocument();
     expect(riceGroup.getByText('Available stock')).toBeInTheDocument();
     expect(riceGroup.getByText('Dispatch qty')).toBeInTheDocument();
     expect(riceGroup.queryByText('Required')).not.toBeInTheDocument();
@@ -97,8 +98,8 @@ describe('WorkflowActionPanel', () => {
     );
 
     const riceGroup = within(screen.getByTestId('commodity-group-Rice'));
-    expect(riceGroup.getByText(/Approve: Stage-II state depot dispatch to issue point/)).toBeInTheDocument();
-    expect(riceGroup.getByText('TR-POC-RICE-DEPOT-ISSUE')).toBeInTheDocument();
+    expect(riceGroup.getByText(/DSO approve Release Order: Stage-II: state godown dispatch to block godown/)).toBeInTheDocument();
+    expect(riceGroup.getByText('TR-POC-RICE-DEPOT-BLOCK')).toBeInTheDocument();
   });
 
   it('runs mock approval actions and returns ledger evidence to the parent', async () => {
@@ -150,29 +151,29 @@ describe('WorkflowActionPanel', () => {
     );
 
     const riceGroup = within(screen.getByTestId('commodity-group-Rice'));
-    expect(riceGroup.getByText('Allocate Rice stock to FPS')).toBeInTheDocument();
-    expect(riceGroup.getByRole('button', { name: 'Waiting for Depot / Issue Point' })).toBeDisabled();
+    expect(riceGroup.getByText('BSO allot Rice to FPS')).toBeInTheDocument();
+    expect(riceGroup.getByRole('button', { name: 'Waiting for Block Supply Officer (BSO)' })).toBeDisabled();
   });
 
-  it('lets the depot create the FPS allocation', () => {
+  it('lets the block office create the FPS allocation', () => {
     render(
       <WorkflowActionPanel
         {...baseProps}
         {...issueReady}
         apiOnline={false}
-        role="DEPOT"
+        role="BLOCK_OFFICE"
       />
     );
 
-    expect(screen.getByText('Allocate Rice stock to FPS')).toBeInTheDocument();
+    expect(screen.getByText('BSO allot Rice to FPS')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Run action' })).toBeEnabled();
   });
 
-  it('distinguishes depot sender context from issue-point receipt context', () => {
+  it('distinguishes depot sender context from block-godown receipt context', () => {
     const roEvent = {
       ledgerTxId: 'TX-RO',
       entityType: 'workflow' as const,
-      entityId: 'TR-POC-RICE-DEPOT-ISSUE',
+      entityId: 'TR-POC-RICE-DEPOT-BLOCK',
       eventType: 'RO_LITE_APPROVED',
       payload: {},
       timestamp: '2026-06-30T10:00:00.000Z'
@@ -183,16 +184,16 @@ describe('WorkflowActionPanel', () => {
         {...depotReady}
         ledgerEvents={[roEvent]}
         apiOnline={false}
-        role="DEPOT"
+        role="GODOWN"
       />
     );
 
     let riceGroup = within(screen.getByTestId('commodity-group-Rice'));
-    expect(riceGroup.getByText('Stage-II state depot dispatch to issue point')).toBeInTheDocument();
+    expect(riceGroup.getByText('Stage-II: state godown dispatch to block godown')).toBeInTheDocument();
     expect(riceGroup.getByText('Acting as')).toBeInTheDocument();
     expect(riceGroup.getByText('GODOWN-S-001')).toBeInTheDocument();
     expect(riceGroup.getByText('Destination')).toBeInTheDocument();
-    expect(riceGroup.getByText('ISSUE-001')).toBeInTheDocument();
+    expect(riceGroup.getByText('GODOWN-B-001')).toBeInTheDocument();
 
     rerender(
       <WorkflowActionPanel
@@ -200,10 +201,10 @@ describe('WorkflowActionPanel', () => {
         transfers={[
           ...depotReady.transfers,
           {
-            transferId: 'TR-POC-RICE-DEPOT-ISSUE',
+            transferId: 'TR-POC-RICE-DEPOT-BLOCK',
             lotId: 'LOT-RICE-2026-001',
             fromOrg: 'GODOWN-S-001',
-            toOrg: 'ISSUE-001',
+            toOrg: 'GODOWN-B-001',
             dispatchedQtyKg: demoQuantities.stageOneTransferKg,
             vehicleNo: 'KA01AB1000',
             status: TransferStatus.DISPATCHED,
@@ -216,14 +217,14 @@ describe('WorkflowActionPanel', () => {
         ]}
         ledgerEvents={[roEvent]}
         apiOnline={false}
-        role="DEPOT"
+        role="GODOWN"
       />
     );
 
     riceGroup = within(screen.getByTestId('commodity-group-Rice'));
-    expect(riceGroup.getByText('Confirm receipt at ISSUE-001')).toBeInTheDocument();
+    expect(riceGroup.getByText('Confirm receipt at block godown')).toBeInTheDocument();
     expect(riceGroup.getByText('Acting as')).toBeInTheDocument();
-    expect(riceGroup.getByText('ISSUE-001')).toBeInTheDocument();
+    expect(riceGroup.getByText('GODOWN-B-001')).toBeInTheDocument();
     expect(riceGroup.getByText('Receiving from')).toBeInTheDocument();
     expect(riceGroup.getByText('GODOWN-S-001')).toBeInTheDocument();
   });
@@ -240,7 +241,7 @@ describe('WorkflowActionPanel', () => {
             commodity: 'Rice',
             allocatedQtyKg: demoQuantities.fpsAllocationKg,
             month: '2026-06',
-            sourceGodownId: 'ISSUE-001',
+            sourceGodownId: 'GODOWN-B-001',
             status: 'ALLOCATED'
           }
         ]}
@@ -264,7 +265,7 @@ describe('WorkflowActionPanel', () => {
   });
 
   it('renders multiple commodity groups for operational review', () => {
-    render(<WorkflowActionPanel {...baseProps} apiOnline={false} role="PROCUREMENT" />);
+    render(<WorkflowActionPanel {...baseProps} apiOnline={false} role="FCI_DEPOT" />);
 
     expect(screen.getByTestId('commodity-group-Rice')).toBeInTheDocument();
     expect(screen.getByTestId('commodity-group-Wheat')).toBeInTheDocument();

@@ -226,8 +226,11 @@ export function TransfersPanel({
             <TableHead scope="col">Transfer ID</TableHead>
             <TableHead scope="col">Commodity</TableHead>
             <TableHead scope="col">Route</TableHead>
+            <TableHead scope="col">Transporter</TableHead>
+            <TableHead scope="col">Vehicle</TableHead>
             <TableHead scope="col">Dispatched</TableHead>
             <TableHead scope="col">Received</TableHead>
+            <TableHead scope="col">Shortage</TableHead>
             <TableHead scope="col">Dispatch time</TableHead>
             <TableHead scope="col">Receive time</TableHead>
             <TableHead scope="col">Status</TableHead>
@@ -241,9 +244,19 @@ export function TransfersPanel({
               <TableCell className="text-muted-foreground">
                 {transfer.fromOrg} → {transfer.toOrg}
               </TableCell>
+              <TableCell>
+                <div className="font-medium">{transfer.transporterName}</div>
+                <div className="text-xs text-muted-foreground">{transfer.transporterId}</div>
+              </TableCell>
+              <TableCell>{transfer.vehicleNo}</TableCell>
               <TableCell>{transfer.dispatchedQtyKg} kg</TableCell>
               <TableCell>
                 {transfer.receivedQtyKg == null ? 'Pending' : `${transfer.receivedQtyKg} kg`}
+              </TableCell>
+              <TableCell>
+                {transfer.shortageQtyKg == null || transfer.shortageQtyKg === 0
+                  ? '—'
+                  : `${transfer.shortageQtyKg} kg`}
               </TableCell>
               <TableCell>{formatDateTime(transfer.dispatchTimestamp)}</TableCell>
               <TableCell>{formatDateTime(transfer.receiveTimestamp)}</TableCell>
@@ -263,7 +276,7 @@ export function TransfersPanel({
           ))}
           {visibleTransfers.length === 0 && (
             <TableRow>
-              <TableCell colSpan={8} className="text-center text-muted-foreground">
+              <TableCell colSpan={11} className="text-center text-muted-foreground">
                 No transfers match this filter.
               </TableCell>
             </TableRow>
@@ -317,8 +330,22 @@ export function AllocationPanel({ allocations }: { allocations: FPSAllocation[] 
             </p>
             <DefinitionList
               entries={[
-                { label: 'Allocated', value: `${allocation.allocatedQtyKg} kg` },
-                { label: 'Received', value: `${allocation.receivedQtyKg ?? 'Pending'} kg` }
+                { label: 'Shipped', value: `${allocation.allocatedQtyKg} kg` },
+                { label: 'Received', value: `${allocation.receivedQtyKg ?? 'Pending'} kg` },
+                {
+                  label: 'Shortage',
+                  value:
+                    allocation.shortageQtyKg == null || allocation.shortageQtyKg === 0
+                      ? '—'
+                      : `${allocation.shortageQtyKg} kg`
+                },
+                {
+                  label: 'Transporter',
+                  value: `${allocation.transporterName} (${allocation.transporterId})`
+                },
+                { label: 'Vehicle', value: allocation.vehicleNo },
+                { label: 'Dispatch time', value: formatDateTime(allocation.dispatchTimestamp) },
+                { label: 'Receive time', value: formatDateTime(allocation.receiveTimestamp) }
               ]}
             />
             <ProvenanceBadges provenance={allocation.provenance} />

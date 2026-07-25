@@ -81,10 +81,10 @@ describe('PdsRuntime', () => {
     try {
       expect(service.getLot('LOT-RICE-2026-001').lotId).toBe('LOT-RICE-2026-001');
       expect(() => service.getTransfer('TR-000')).toThrow();
-      service.dispatchLot({ transferId: 'TR-LOOKUP-001', lotId: 'LOT-RICE-2026-001', fromOrg: 'PROC-001', toOrg: 'FCI-001', dispatchedQtyKg: 100, vehicleNo: 'KA01AB0004' });
+      service.dispatchLot({ transferId: 'TR-LOOKUP-001', lotId: 'LOT-RICE-2026-001', fromOrg: 'FCI-001', toOrg: 'GODOWN-S-001', dispatchedQtyKg: 100, vehicleNo: 'KA01AB0004', transporterId: 'TRANS-001' });
       service.receiveLot({ transferId: 'TR-LOOKUP-001', receivedQtyKg: 100 });
-      service.addStockForTest('ISSUE-001', 'Rice', 100);
-      service.allocateToFps({ allocationId: 'ALLOC-LOOKUP-001', fpsId: 'FPS-101', commodity: 'Rice', allocatedQtyKg: 50, month: '2026-06', sourceGodownId: 'ISSUE-001' });
+      service.addStockForTest('GODOWN-B-001', 'Rice', 100);
+      service.allocateToFps({ allocationId: 'ALLOC-LOOKUP-001', fpsId: 'FPS-101', commodity: 'Rice', allocatedQtyKg: 50, month: '2026-06', sourceGodownId: 'GODOWN-B-001', transporterId: 'TRANS-001', vehicleNo: 'KA01AB9999' });
       const auth = service.simulateAuthentication({ authTxnId: 'AUTH-LOOKUP-001', beneficiaryRefHash: 'beneficiary-hash', rationCardHash: 'demo-ration-card-hash', authMode: AuthMode.MOCK_OTP, authResult: AuthResult.SUCCESS });
 
       expect(service.getTransfer('TR-LOOKUP-001').transferId).toBe('TR-LOOKUP-001');
@@ -100,8 +100,8 @@ describe('PdsRuntime', () => {
     const statePath = createStatePath();
     const service = await boot(true, statePath);
     try {
-      service.addStockForTest('ISSUE-001', 'Rice', demoQuantities.fpsAllocationKg);
-      service.allocateToFps({ allocationId: 'ALLOC-API-001', fpsId: 'FPS-101', commodity: 'Rice', allocatedQtyKg: demoQuantities.fpsAllocationKg, month: '2026-06', sourceGodownId: 'ISSUE-001' });
+      service.addStockForTest('GODOWN-B-001', 'Rice', demoQuantities.fpsAllocationKg);
+      service.allocateToFps({ allocationId: 'ALLOC-API-001', fpsId: 'FPS-101', commodity: 'Rice', allocatedQtyKg: demoQuantities.fpsAllocationKg, month: '2026-06', sourceGodownId: 'GODOWN-B-001', transporterId: 'TRANS-001', vehicleNo: 'KA01AB9999' });
       service.recordFpsReceipt({ allocationId: 'ALLOC-API-001', receivedQtyKg: demoQuantities.fpsReceiptKg });
       const auth = service.simulateAuthentication({ authTxnId: 'AUTH-API-001', beneficiaryRefHash: 'beneficiary-hash', rationCardHash: 'demo-ration-card-hash', authMode: AuthMode.MOCK_OTP, authResult: AuthResult.SUCCESS });
       const distribution = service.recordDistribution({
@@ -130,7 +130,6 @@ describe('PdsRuntime', () => {
     const service = await boot(true, statePath);
     try {
       const legs = [
-        ['TR-POC-RICE-PROC-FCI', 'LOT-RICE-2026-001', 'PROC-001', 'FCI-001', demoQuantities.stageOneTransferKg, 'KA01AB1999'],
         ['TR-POC-RICE-FCI-DEPOT', 'LOT-RICE-2026-001', 'FCI-001', 'GODOWN-S-001', demoQuantities.stageOneTransferKg, 'FCI01AB2001']
       ] as const;
 
@@ -140,24 +139,24 @@ describe('PdsRuntime', () => {
       }
 
       const issueApproval = service.authorizeMovement({
-        transferId: 'TR-POC-RICE-DEPOT-ISSUE',
+        transferId: 'TR-POC-RICE-DEPOT-BLOCK',
         authorizedBy: 'DSO-001',
         roRef: 'RO-DSO-POC-001'
       });
       expect(issueApproval.ledgerTxId).toBeDefined();
 
       service.dispatchLot({
-        transferId: 'TR-POC-RICE-DEPOT-ISSUE',
+        transferId: 'TR-POC-RICE-DEPOT-BLOCK',
         lotId: 'LOT-RICE-2026-001',
         fromOrg: 'GODOWN-S-001',
-        toOrg: 'ISSUE-001',
+        toOrg: 'GODOWN-B-001',
         dispatchedQtyKg: demoQuantities.stageOneTransferKg,
         vehicleNo: 'KA01AB2002',
         stage: 'II',
         roRef: 'RO-DSO-POC-001',
         transporterId: 'TRANS-001'
       });
-      service.receiveLot({ transferId: 'TR-POC-RICE-DEPOT-ISSUE', receivedQtyKg: demoQuantities.stageOneTransferKg });
+      service.receiveLot({ transferId: 'TR-POC-RICE-DEPOT-BLOCK', receivedQtyKg: demoQuantities.stageOneTransferKg });
 
       service.allocateToFps({
         allocationId: 'ALLOC-POC-RICE-FPS',
@@ -165,7 +164,9 @@ describe('PdsRuntime', () => {
         commodity: 'Rice',
         allocatedQtyKg: demoQuantities.fpsAllocationKg,
         month: '2026-06',
-        sourceGodownId: 'ISSUE-001'
+        sourceGodownId: 'GODOWN-B-001',
+        transporterId: 'TRANS-001',
+        vehicleNo: 'KA01AB9999'
       });
       service.recordFpsReceipt({
         allocationId: 'ALLOC-POC-RICE-FPS',
@@ -297,7 +298,9 @@ describe('PdsRuntime', () => {
           commodity: commodity.name,
           allocatedQtyKg: transferQtyKg,
           month,
-          sourceGodownId: route!.fpsDelivery!.sourceGodownId
+          sourceGodownId: route!.fpsDelivery!.sourceGodownId,
+          transporterId: 'TRANS-001',
+          vehicleNo: 'KA01AB9999'
         });
         expect(allocation.allocatedQtyKg).toBe(transferQtyKg);
 
@@ -351,7 +354,15 @@ describe('PdsRuntime', () => {
     const statePath = createStatePath();
     const service = await boot(true, statePath);
     try {
-      service.dispatchLot({ transferId: 'TR-ALERT-001', lotId: 'LOT-RICE-2026-001', fromOrg: 'PROC-001', toOrg: 'FCI-001', dispatchedQtyKg: demoQuantities.shortReceiptDispatchKg, vehicleNo: 'KA01AB9999' });
+      service.dispatchLot({
+        transferId: 'TR-ALERT-001',
+        lotId: 'LOT-RICE-2026-001',
+        fromOrg: 'FCI-001',
+        toOrg: 'GODOWN-S-001',
+        dispatchedQtyKg: demoQuantities.shortReceiptDispatchKg,
+        vehicleNo: 'KA01AB9999',
+        transporterId: 'TRANS-001'
+      });
       service.receiveLot({ transferId: 'TR-ALERT-001', receivedQtyKg: demoQuantities.shortReceiptReceivedKg });
       const alert = service.getAlerts().find((item: any) => item.alertType === 'SHORT_RECEIPT');
       expect(alert).toBeDefined();

@@ -421,8 +421,8 @@ export class PdsRuntime extends PdsLedgerEngine {
 
     for (const transfer of state.transfers) {
       await client.query(
-        `INSERT INTO transfer_orders (transfer_id, lot_id, from_org, to_org, dispatched_qty_kg, received_qty_kg, shortage_qty_kg, vehicle_no, status, dispatch_timestamp, receive_timestamp, stage, ro_ref, authorized_by, authorized_at, approval_status, transporter_id, transformed_from_lot_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+        `INSERT INTO transfer_orders (transfer_id, lot_id, from_org, to_org, dispatched_qty_kg, received_qty_kg, shortage_qty_kg, vehicle_no, status, dispatch_timestamp, receive_timestamp, stage, ro_ref, authorized_by, authorized_at, approval_status, transporter_id, transporter_name, transformed_from_lot_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
          ON CONFLICT (transfer_id) DO UPDATE SET
            lot_id = EXCLUDED.lot_id,
            from_org = EXCLUDED.from_org,
@@ -440,6 +440,7 @@ export class PdsRuntime extends PdsLedgerEngine {
            authorized_at = EXCLUDED.authorized_at,
            approval_status = EXCLUDED.approval_status,
            transporter_id = EXCLUDED.transporter_id,
+           transporter_name = EXCLUDED.transporter_name,
            transformed_from_lot_id = EXCLUDED.transformed_from_lot_id`,
         [
           transfer.transferId, transfer.lotId, transfer.fromOrg, transfer.toOrg,
@@ -447,15 +448,15 @@ export class PdsRuntime extends PdsLedgerEngine {
           transfer.vehicleNo, transfer.status, transfer.dispatchTimestamp, transfer.receiveTimestamp ?? null,
           transfer.stage ?? null, transfer.roRef ?? null, transfer.authorizedBy ?? null,
           transfer.authorizedAt ?? null, transfer.approvalStatus ?? null,
-          transfer.transporterId ?? null, transfer.transformedFromLotId ?? null
+          transfer.transporterId, transfer.transporterName, transfer.transformedFromLotId ?? null
         ]
       );
     }
 
     for (const allocation of state.allocations) {
       await client.query(
-        `INSERT INTO fps_allocations (allocation_id, fps_id, commodity, allocated_qty_kg, received_qty_kg, shortage_qty_kg, month, source_godown_id, status)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        `INSERT INTO fps_allocations (allocation_id, fps_id, commodity, allocated_qty_kg, received_qty_kg, shortage_qty_kg, month, source_godown_id, status, transporter_id, transporter_name, vehicle_no, dispatch_timestamp, receive_timestamp)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
          ON CONFLICT (allocation_id) DO UPDATE SET
            fps_id = EXCLUDED.fps_id,
            commodity = EXCLUDED.commodity,
@@ -464,11 +465,17 @@ export class PdsRuntime extends PdsLedgerEngine {
            shortage_qty_kg = EXCLUDED.shortage_qty_kg,
            month = EXCLUDED.month,
            source_godown_id = EXCLUDED.source_godown_id,
-           status = EXCLUDED.status`,
+           status = EXCLUDED.status,
+           transporter_id = EXCLUDED.transporter_id,
+           transporter_name = EXCLUDED.transporter_name,
+           vehicle_no = EXCLUDED.vehicle_no,
+           dispatch_timestamp = EXCLUDED.dispatch_timestamp,
+           receive_timestamp = EXCLUDED.receive_timestamp`,
         [
           allocation.allocationId, allocation.fpsId, allocation.commodity, allocation.allocatedQtyKg,
           allocation.receivedQtyKg ?? null, allocation.shortageQtyKg ?? null, allocation.month,
-          allocation.sourceGodownId, allocation.status
+          allocation.sourceGodownId, allocation.status, allocation.transporterId, allocation.transporterName,
+          allocation.vehicleNo, allocation.dispatchTimestamp, allocation.receiveTimestamp ?? null
         ]
       );
     }

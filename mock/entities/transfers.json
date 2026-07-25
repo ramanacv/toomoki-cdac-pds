@@ -1,19 +1,5 @@
 [
   {
-    "transferId": "TR-SEED-PROC-FCI",
-    "lotId": "LOT-RICE-2026-001",
-    "fromOrg": "PROC-001",
-    "toOrg": "FCI-001",
-    "dispatchedQtyKg": 10000,
-    "receivedQtyKg": 10000,
-    "vehicleNo": "KA01AB1201",
-    "status": "RECEIVED",
-    "dispatchTimestamp": "2026-06-09T05:00:00.000Z",
-    "receiveTimestamp": "2026-06-09T06:00:00.000Z",
-    "stage": "I",
-    "transporterId": "TRANS-001"
-  },
-  {
     "transferId": "TR-SEED-FCI-SG",
     "lotId": "LOT-RICE-2026-001",
     "fromOrg": "FCI-001",
@@ -25,13 +11,14 @@
     "dispatchTimestamp": "2026-06-09T07:00:00.000Z",
     "receiveTimestamp": "2026-06-09T08:00:00.000Z",
     "stage": "I",
-    "transporterId": "TRANS-001"
+    "transporterId": "TRANS-001",
+    "transporterName": "Transport Contractor 01"
   },
   {
-    "transferId": "TR-SEED-SG-ISSUE",
+    "transferId": "TR-SEED-SG-BLOCK",
     "lotId": "LOT-RICE-2026-001",
     "fromOrg": "GODOWN-S-001",
-    "toOrg": "ISSUE-001",
+    "toOrg": "GODOWN-B-001",
     "dispatchedQtyKg": 1800,
     "receivedQtyKg": 1800,
     "vehicleNo": "KA01AB1203",
@@ -43,6 +30,7 @@
     "authorizedAt": "2026-06-09T12:45:00.000Z",
     "approvalStatus": "APPROVED",
     "roRef": "RO-DSO-2026-06-001",
-    "transporterId": "TRANS-001"
+    "transporterId": "TRANS-001",
+    "transporterName": "Transport Contractor 01"
   }
 ]

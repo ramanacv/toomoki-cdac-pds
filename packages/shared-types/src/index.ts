@@ -97,18 +97,11 @@ const canonicalFpsRoute = (
   requiresTransformation: false,
   fpsDelivery: {
     allocationId: `ALLOC-POC-${slug}-FPS`,
-    sourceGodownId: 'ISSUE-001',
+    sourceGodownId: 'GODOWN-B-001',
     fpsId: 'FPS-101',
     allocatedQtyKg: FPS_ALLOCATION_KG
   },
   legs: [
-    {
-      id: `TR-POC-${slug}-PROC-FCI`,
-      fromOrg: 'PROC-001',
-      toOrg: 'FCI-001',
-      stage: 'I',
-      lot: 'source'
-    },
     {
       id: `TR-POC-${slug}-FCI-DEPOT`,
       fromOrg: 'FCI-001',
@@ -117,9 +110,9 @@ const canonicalFpsRoute = (
       lot: 'source'
     },
     {
-      id: `TR-POC-${slug}-DEPOT-ISSUE`,
+      id: `TR-POC-${slug}-DEPOT-BLOCK`,
       fromOrg: 'GODOWN-S-001',
-      toOrg: 'ISSUE-001',
+      toOrg: 'GODOWN-B-001',
       stage: 'II',
       lot: 'source',
       requiresAuthorization: true
@@ -183,7 +176,7 @@ export const createdAtFromLotId = (lotId: string): string | undefined => {
   return `${match[1]}-${match[2]}-${match[3]}T${match[4]}:${match[5]}:${match[6]}.000Z`;
 };
 
-export type TransferLegSuffix = 'PROC-FCI' | 'FCI-DEPOT' | 'DEPOT-ISSUE';
+export type TransferLegSuffix = 'FCI-DEPOT' | 'DEPOT-BLOCK';
 
 export const buildTransferId = (seriesId: string, slug: string, leg: TransferLegSuffix): string =>
   `TR-${seriesToken(seriesId)}-${slug}-${leg}`;
@@ -230,9 +223,8 @@ export const buildCommodityRouteForSeries = (
   const slug = definition.slug;
   const lotId = sourceLotId ?? buildSeedLotId(slug, seriesId);
   const legSuffix = (legId: string): TransferLegSuffix => {
-    if (legId.endsWith('PROC-FCI')) return 'PROC-FCI';
     if (legId.endsWith('FCI-DEPOT')) return 'FCI-DEPOT';
-    return 'DEPOT-ISSUE';
+    return 'DEPOT-BLOCK';
   };
   return {
     ...base,
@@ -270,12 +262,12 @@ export const isCommodityRouteEdgeAllowed = (
 
 export enum StakeholderType {
   FCI = 'FCI',
-  PROCUREMENT_CENTER = 'PROCUREMENT_CENTER',
   TRANSPORTER = 'TRANSPORTER',
   STATE_GODOWN = 'STATE_GODOWN',
-  ISSUE_POINT = 'ISSUE_POINT',
+  BLOCK_GODOWN = 'BLOCK_GODOWN',
   FAIR_PRICE_SHOP = 'FAIR_PRICE_SHOP',
   DISTRICT_SUPPLY_OFFICE = 'DISTRICT_SUPPLY_OFFICE',
+  BLOCK_SUPPLY_OFFICE = 'BLOCK_SUPPLY_OFFICE',
   AUDITOR = 'AUDITOR'
 }
 
@@ -490,7 +482,10 @@ export type TransferOrder = {
   authorizedAt?: string;
   approvalStatus?: 'PENDING' | 'APPROVED' | 'REJECTED' | 'BLOCKED';
   roRef?: string;
-  transporterId?: string;
+  /** Active TRANSPORTER stakeholder id bound at dispatch. */
+  transporterId: string;
+  /** Transporter display name snapshotted at dispatch for audit immutability. */
+  transporterName: string;
   transformedFromLotId?: string;
   provenance?: SourceProvenance;
 };
@@ -505,6 +500,14 @@ export type FPSAllocation = {
   month: string;
   sourceGodownId: string;
   status: 'ALLOCATED' | 'RECEIVED' | 'RECEIVED_WITH_SHORTAGE';
+  /** Active TRANSPORTER stakeholder id bound at allotment (doorstep ship). */
+  transporterId: string;
+  /** Transporter display name snapshotted at allotment. */
+  transporterName: string;
+  vehicleNo: string;
+  /** Doorstep ship time (allotment / dispatch). */
+  dispatchTimestamp: string;
+  receiveTimestamp?: string;
   provenance?: SourceProvenance;
 };
 

@@ -16,10 +16,12 @@ describe('AuditModule', () => {
     fixture.facade.dispatchLot({
       transferId: 'TR-AUDIT-001',
       lotId: 'LOT-RICE-2026-001',
-      fromOrg: 'PROC-001',
-      toOrg: 'FCI-001',
+      fromOrg: 'FCI-001',
+      toOrg: 'GODOWN-S-001',
       dispatchedQtyKg: 500,
-      vehicleNo: 'KA01AU0001'
+      vehicleNo: 'KA01AU0001',
+      transporterId: 'TRANS-001'
+    
     });
     fixture.facade.receiveLot({ transferId: 'TR-AUDIT-001', receivedQtyKg: 400 });
 

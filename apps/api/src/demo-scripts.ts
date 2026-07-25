@@ -52,14 +52,16 @@ export const runHappyPathDemo = async (): Promise<DemoFlowResult> => {
   const service = await createRuntime(true, statePath);
 
   try {
-    service.addStockForTest('ISSUE-001', 'Rice', demoQuantities.fpsAllocationKg);
+    service.addStockForTest('GODOWN-B-001', 'Rice', demoQuantities.fpsAllocationKg);
     service.allocateToFps({
       allocationId: 'ALLOC-DEMO-001',
       fpsId: 'FPS-101',
       commodity: 'Rice',
       allocatedQtyKg: demoQuantities.fpsAllocationKg,
       month: '2026-06',
-      sourceGodownId: 'ISSUE-001'
+      sourceGodownId: 'GODOWN-B-001',
+      transporterId: 'TRANS-001',
+      vehicleNo: 'KA01AB9999'
     });
     service.recordFpsReceipt({
       allocationId: 'ALLOC-DEMO-001',
@@ -109,10 +111,11 @@ export const runExceptionDemo = async (): Promise<DemoExceptionResult> => {
     service.dispatchLot({
       transferId: 'TR-EXC-001',
       lotId: 'LOT-RICE-2026-001',
-      fromOrg: 'PROC-001',
-      toOrg: 'FCI-001',
+      fromOrg: 'FCI-001',
+      toOrg: 'GODOWN-S-001',
       dispatchedQtyKg: demoQuantities.shortReceiptDispatchKg,
-      vehicleNo: 'KA01AB3001'
+      vehicleNo: 'KA01AB3001',
+      transporterId: 'TRANS-001'
     });
     const transfer = service.receiveLot({
       transferId: 'TR-EXC-001',
@@ -131,14 +134,16 @@ export const runExceptionDemo = async (): Promise<DemoExceptionResult> => {
         }
       });
 
-    service.addStockForTest('ISSUE-001', 'Rice', demoQuantities.fpsAllocationKg);
+    service.addStockForTest('GODOWN-B-001', 'Rice', demoQuantities.fpsAllocationKg);
     service.allocateToFps({
       allocationId: 'ALLOC-EXC-001',
       fpsId: 'FPS-101',
       commodity: 'Rice',
       allocatedQtyKg: demoQuantities.fpsAllocationKg,
       month: '2026-06',
-      sourceGodownId: 'ISSUE-001'
+      sourceGodownId: 'GODOWN-B-001',
+      transporterId: 'TRANS-001',
+      vehicleNo: 'KA01AB9999'
     });
     service.recordFpsReceipt({
       allocationId: 'ALLOC-EXC-001',

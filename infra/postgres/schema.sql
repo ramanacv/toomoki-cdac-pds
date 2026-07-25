@@ -142,6 +142,7 @@ CREATE TABLE IF NOT EXISTS transfer_orders (
   authorized_at TIMESTAMPTZ,
   approval_status TEXT CHECK (approval_status IN ('PENDING', 'APPROVED', 'REJECTED', 'BLOCKED')),
   transporter_id TEXT REFERENCES stakeholders(stakeholder_id) ON DELETE RESTRICT,
+  transporter_name TEXT,
   transformed_from_lot_id TEXT REFERENCES commodity_lots(lot_id) ON DELETE RESTRICT
 );
 
@@ -151,6 +152,7 @@ ALTER TABLE transfer_orders ADD COLUMN IF NOT EXISTS authorized_by TEXT REFERENC
 ALTER TABLE transfer_orders ADD COLUMN IF NOT EXISTS authorized_at TIMESTAMPTZ;
 ALTER TABLE transfer_orders ADD COLUMN IF NOT EXISTS approval_status TEXT CHECK (approval_status IN ('PENDING', 'APPROVED', 'REJECTED', 'BLOCKED'));
 ALTER TABLE transfer_orders ADD COLUMN IF NOT EXISTS transporter_id TEXT REFERENCES stakeholders(stakeholder_id) ON DELETE RESTRICT;
+ALTER TABLE transfer_orders ADD COLUMN IF NOT EXISTS transporter_name TEXT;
 ALTER TABLE transfer_orders ADD COLUMN IF NOT EXISTS transformed_from_lot_id TEXT REFERENCES commodity_lots(lot_id) ON DELETE RESTRICT;
 
 CREATE INDEX IF NOT EXISTS idx_transfer_orders_status ON transfer_orders (status);
@@ -169,8 +171,19 @@ CREATE TABLE IF NOT EXISTS fps_allocations (
   month TEXT NOT NULL,
   source_godown_id TEXT NOT NULL REFERENCES stakeholders(stakeholder_id) ON DELETE RESTRICT,
   status TEXT NOT NULL,
+  transporter_id TEXT REFERENCES stakeholders(stakeholder_id) ON DELETE RESTRICT,
+  transporter_name TEXT,
+  vehicle_no TEXT,
+  dispatch_timestamp TIMESTAMPTZ,
+  receive_timestamp TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE fps_allocations ADD COLUMN IF NOT EXISTS transporter_id TEXT REFERENCES stakeholders(stakeholder_id) ON DELETE RESTRICT;
+ALTER TABLE fps_allocations ADD COLUMN IF NOT EXISTS transporter_name TEXT;
+ALTER TABLE fps_allocations ADD COLUMN IF NOT EXISTS vehicle_no TEXT;
+ALTER TABLE fps_allocations ADD COLUMN IF NOT EXISTS dispatch_timestamp TIMESTAMPTZ;
+ALTER TABLE fps_allocations ADD COLUMN IF NOT EXISTS receive_timestamp TIMESTAMPTZ;
 
 CREATE INDEX IF NOT EXISTS idx_fps_allocations_status ON fps_allocations (status);
 CREATE INDEX IF NOT EXISTS idx_fps_allocations_fps_month ON fps_allocations (fps_id, month);

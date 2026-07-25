@@ -76,19 +76,20 @@ Purpose: Record stock movement from sender to receiver.
 
 Primary actors: Procurement User, FCI Operator, Godown Operator, DSO.
 
-Inputs: `transferId`, `lotId`, `fromOrg`, `toOrg`, `dispatchedQtyKg`, `vehicleNo`, `dispatchTimestamp`.
+Inputs: `transferId`, `lotId`, `fromOrg`, `toOrg`, `dispatchedQtyKg`, `vehicleNo`, `transporterId`, `dispatchTimestamp`.
 
 Preconditions:
 
 - Sender owns or controls sufficient stock.
 - Receiver is active.
 - Quantity is positive.
+- `transporterId` identifies an active `TRANSPORTER` stakeholder.
 
 Main flow:
 
-1. Sender creates dispatch.
-2. System validates stock availability.
-3. System marks quantity as in transit.
+1. Sender creates dispatch with transporter and vehicle evidence.
+2. System validates stock availability and resolves transporter name from the stakeholder directory.
+3. System marks quantity as in transit (`DISPATCHED`) and snapshots `transporterName`.
 4. System records the dispatch event and asynchronous proof intent.
 5. System returns transfer with status `DISPATCHED`.
 
@@ -97,11 +98,12 @@ Error cases:
 - Insufficient stock.
 - Invalid receiver.
 - Unauthorized sender.
+- Missing, inactive, or non-transporter `transporterId`.
 
 Acceptance criteria:
 
 - Sender available stock is reduced or reserved.
-- Transfer appears as pending receipt.
+- Transfer appears as pending receipt with shipped qty, send time, transporter ID, transporter name, and vehicle.
 
 ## Receive Stock
 
@@ -135,35 +137,38 @@ Acceptance criteria:
 
 ## FPS Allocation
 
-Purpose: Allocate stock from issue point to FPS.
+Purpose: Allocate stock from block godown to FPS and bind doorstep transport evidence.
 
-Primary actors: Department Admin, Issue Point Operator.
+Primary actors: Block Supply Office (BSO), Department Admin.
 
-Inputs: `allocationId`, `fpsId`, `commodity`, `allocatedQtyKg`, `month`, `sourceGodownId`.
+Inputs: `allocationId`, `fpsId`, `commodity`, `allocatedQtyKg`, `month`, `sourceGodownId`, `transporterId`, `vehicleNo`, optional `dispatchTimestamp`.
 
 Preconditions:
 
 - FPS is active.
-- Issue point has sufficient stock.
+- Source godown has sufficient stock.
+- `transporterId` identifies an active `TRANSPORTER` stakeholder.
 
 Main flow:
 
-1. Admin creates FPS allocation.
-2. System validates stock availability.
-3. System reserves or dispatches allocated stock.
+1. BSO creates FPS allotment with transporter and vehicle evidence.
+2. System validates stock availability and snapshots transporter name.
+3. System reserves allocated stock and sets doorstep ship time (`dispatchTimestamp`).
 4. System records the allocation event and asynchronous proof intent.
-5. System returns allocation status.
+5. System returns allocation status `ALLOCATED` (in transit to FPS).
 
 Error cases:
 
 - Allocation exceeds stock.
 - FPS inactive.
 - Duplicate allocation ID.
+- Missing transporter or vehicle evidence.
 
 Acceptance criteria:
 
-- Allocation cannot exceed issue point stock.
+- Allocation cannot exceed source-godown stock.
 - FPS stock is not distributable until FPS receipt is confirmed.
+- Allotment carries transporter ID, transporter name, vehicle, shipped qty, and dispatch time.
 
 ## FPS Receipt
 

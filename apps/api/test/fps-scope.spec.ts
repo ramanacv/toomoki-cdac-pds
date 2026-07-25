@@ -6,11 +6,12 @@ import { DashboardController } from '../src/modules/dashboard/dashboard.controll
 import { DistributionsController } from '../src/modules/distributions/distributions.controller.js';
 import { StockController } from '../src/modules/stock/stock.controller.js';
 import { TraceController } from '../src/modules/trace/trace.controller.js';
+import { requireFpsAssignment } from '../src/modules/auth/fps-scope.js';
 import {
   asFpsRequest,
   createControllerWithFacade,
   createDemoLedgerFixture,
-  moveLotToIssuePoint,
+  moveLotToBlockGodown,
   type DemoLedgerFixture
 } from './helpers/demo-ledger.js';
 
@@ -21,14 +22,16 @@ describe('FPS identity-to-shop authorization', () => {
 
   it('isolates allocation, authentication, distribution, stock, dashboard, and trace reads across two shops', async () => {
     fixture = await createDemoLedgerFixture();
-    moveLotToIssuePoint(fixture.facade, 200);
+    moveLotToBlockGodown(fixture.facade, 200);
     await fixture.facade.allocateToFpsPersisted({
       allocationId: 'ALLOC-FPS-101',
       fpsId: 'FPS-101',
       commodity: 'Rice',
       allocatedQtyKg: 100,
       month: '2026-06',
-      sourceGodownId: 'ISSUE-001'
+      sourceGodownId: 'GODOWN-B-001',
+      transporterId: 'TRANS-001',
+      vehicleNo: 'KA01AB9999'
     });
     await fixture.facade.allocateToFpsPersisted({
       allocationId: 'ALLOC-FPS-202',
@@ -36,7 +39,9 @@ describe('FPS identity-to-shop authorization', () => {
       commodity: 'Rice',
       allocatedQtyKg: 100,
       month: '2026-06',
-      sourceGodownId: 'ISSUE-001'
+      sourceGodownId: 'GODOWN-B-001',
+      transporterId: 'TRANS-001',
+      vehicleNo: 'KA01AB9998'
     });
     await fixture.facade.recordFpsReceiptPersisted({ allocationId: 'ALLOC-FPS-101', receivedQtyKg: 100 });
     await fixture.facade.recordFpsReceiptPersisted({ allocationId: 'ALLOC-FPS-202', receivedQtyKg: 100 });
@@ -104,11 +109,37 @@ describe('FPS identity-to-shop authorization', () => {
     await expect(auth.authOtp({
       authTxnId: 'AUTH-WRONG-TYPE', beneficiaryRefHash: 'beneficiary-hash',
       rationCardHash: 'ration-card-hash', authResult: AuthResult.SUCCESS
-    }, asFpsRequest('ISSUE-001'))).rejects.toMatchObject({ status: 403 });
+    }, asFpsRequest('GODOWN-B-001'))).rejects.toMatchObject({ status: 403 });
     await expect(distributions.distribute({
       distributionId: 'DIST-MISMATCH', fpsId: 'FPS-202', rationCardHash: 'ration-card-hash',
       beneficiaryRefHash: 'beneficiary-hash', commodity: 'Rice', deliveredKg: 1,
       authMode: AuthMode.MOCK_OTP, authResult: AuthResult.SUCCESS, authTxnRefHash: 'auth-ref'
     }, asFpsRequest('FPS-101'))).rejects.toMatchObject({ status: 403 });
+  });
+
+  it('derives the FPS shop from the durable database assignment when the token omits the optional claim', async () => {
+    const originalMode = process.env.PDS_AUTHORIZATION_MODE;
+    process.env.PDS_AUTHORIZATION_MODE = 'database';
+    try {
+      const assignment = await requireFpsAssignment({
+        getOperationalPool: () => ({
+          query: async () => ({ rows: [{ scope_id: 'FPS-101' }], rowCount: 1 })
+        }),
+        getStakeholder: () => ({
+          stakeholderId: 'FPS-101',
+          stakeholderType: 'FAIR_PRICE_SHOP',
+          status: 'ACTIVE'
+        })
+      } as never, {
+        headers: {},
+        user: { subject: 'fps-subject', roles: ['fps'], claims: {} }
+      });
+
+      expect(assignment.fpsId).toBe('FPS-101');
+      expect(assignment.operatorRef).toMatch(/^operator-[a-f0-9]{24}$/);
+    } finally {
+      if (originalMode === undefined) delete process.env.PDS_AUTHORIZATION_MODE;
+      else process.env.PDS_AUTHORIZATION_MODE = originalMode;
+    }
   });
 });

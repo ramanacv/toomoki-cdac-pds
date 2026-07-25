@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
+  allocations,
   backendSeed,
   commodities,
   eligibilityBeneficiaries,
   getScenarioAlerts,
   getScenarioDashboardSummary,
   getWorkspaceSnapshot,
-  stakeholders
+  stakeholders,
+  transfers
 } from '../src/index.js';
 
 describe('@pds/fixtures', () => {
@@ -14,10 +16,10 @@ describe('@pds/fixtures', () => {
     expect(stakeholders).toHaveLength(9);
     expect(stakeholders.map((entry) => entry.stakeholderId)).toEqual(
       expect.arrayContaining([
-        'PROC-001',
         'FCI-001',
+        'BSO-001',
         'GODOWN-S-001',
-        'ISSUE-001',
+        'GODOWN-B-001',
         'TRANS-001',
         'FPS-101',
         'FPS-202',
@@ -54,6 +56,13 @@ describe('@pds/fixtures', () => {
     const workspace = getWorkspaceSnapshot('happy-path');
     expect(workspace.distributions).toHaveLength(1);
     expect(workspace.alerts).toHaveLength(1);
+  });
+
+  it('seeds transport-leg evidence on transfers and FPS allotments', () => {
+    expect(transfers.every((transfer) => transfer.transporterId === 'TRANS-001')).toBe(true);
+    expect(transfers.every((transfer) => transfer.transporterName === 'Transport Contractor 01')).toBe(true);
+    expect(allocations.every((allocation) => allocation.transporterId === 'TRANS-001')).toBe(true);
+    expect(allocations.every((allocation) => Boolean(allocation.vehicleNo && allocation.dispatchTimestamp))).toBe(true);
   });
 
   it('exports Maharashtra and J&K canonical fictional eligibility panel profiles', () => {
