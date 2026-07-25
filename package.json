@@ -28,6 +28,8 @@
     "test:iam": "bash -n scripts/iam/bootstrap-keycloak.sh && npx vitest run apps/api/test/iam-config.spec.ts apps/api/test/durable-authorization.spec.ts",
     "test:lifecycle": "node --check scripts/live-lifecycle.mjs && node --check scripts/seed-integration-fixtures.mjs && npx vitest run apps/api/test/lifecycle-script.spec.ts apps/api/test/integration-postgres-atomicity.spec.ts",
     "iam:bootstrap": "scripts/iam/bootstrap-keycloak.sh",
+    "iam:configure-public-web": "scripts/iam/configure-public-web-client.sh",
+    "edge:https-env": "scripts/edge/configure-https-demo-env.sh",
     "benchmark:competition": "node scripts/benchmark-competition.mjs",
     "security:evidence": "scripts/generate-security-evidence.sh",
     "typecheck": "npm run typecheck --workspaces --if-present"

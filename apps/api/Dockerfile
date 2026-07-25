@@ -15,7 +15,8 @@ COPY packages/shared-types/package.json packages/shared-types/package.json
 COPY packages/fixtures/package.json packages/fixtures/package.json
 COPY blockchain/chaincode/pds-chaincode/package.json blockchain/chaincode/pds-chaincode/package.json
 
-RUN npm ci
+RUN npm ci \
+  && mkdir -p apps/api/node_modules
 
 # Copy the rest of the source and build only the packages the API consumes.
 COPY . .

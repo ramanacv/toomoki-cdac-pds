@@ -21,3 +21,8 @@ snapshots, and snapshot saving and proof-outbox insertion are separate
 operations. Run exactly one API replica. Do not claim crash atomicity,
 concurrent mutation safety, or pilot readiness until the
 [MVP hardening plan](docs/implementation/mvp-hardening-plan.md) is complete.
+
+For a public browser demo on EC2 (HTTPS via Compose `--profile edge` / Caddy),
+see [aws-ec2-https-demo.md](docs/implementation/aws-ec2-https-demo.md).
+Plain `http://<public-ip>:4173` cannot complete Sign in with Keycloak because
+OIDC PKCE requires a secure context.

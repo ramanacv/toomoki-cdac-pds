@@ -1,0 +1,17 @@
+# TLS edge for public controlled demos.
+# Hostnames come from Compose env (PDS_WEB_HOST / PDS_AUTH_HOST).
+# Example (no custom DNS): 151.185.43.18.sslip.io + auth.151.185.43.18.sslip.io
+
+{
+	email {$PDS_ACME_EMAIL}
+}
+
+{$PDS_WEB_HOST} {
+	encode gzip
+	reverse_proxy web:4173
+}
+
+{$PDS_AUTH_HOST} {
+	encode gzip
+	reverse_proxy keycloak:8080
+}
