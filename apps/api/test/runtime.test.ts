@@ -135,8 +135,8 @@ describe('PdsRuntime', () => {
         quantityKg: 1,
         qualityGrade: 'A',
         source: 'Test',
-        currentOwner: 'PROC-001',
-        currentLocation: 'Procurement Yard'
+        currentOwner: 'FCI-001',
+        currentLocation: 'FCI Depot'
       })
     ).rejects.toThrow(/fabric endorsement failed/);
   });

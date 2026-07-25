@@ -4,11 +4,13 @@ export const PDS_ROLES = [
   'procurement',
   'fci',
   'godown',
+  'block-office',
   'fps',
   'auditor',
   'platform-admin',
   'metrics-reader',
-  'demo-reset'
+  'demo-reset',
+  'integration-service'
 ] as const;
 
 export type PdsRole = (typeof PDS_ROLES)[number];

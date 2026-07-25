@@ -42,7 +42,10 @@ describe('postgres schema indexes and foreign keys (T6.1)', () => {
       'idx_ledger_events_event_type',
       'idx_ledger_events_timestamp',
       'idx_audit_alerts_status',
-      'idx_audit_alerts_entity_id'
+      'idx_audit_alerts_entity_id',
+      'idx_integration_events_status_ingested',
+      'idx_integration_events_source_status',
+      'idx_integration_events_parent'
     ];
     for (const name of expectedIndexes) {
       expect(schema).toContain(`CREATE INDEX IF NOT EXISTS ${name}`);
@@ -79,5 +82,26 @@ describe('postgres schema indexes and foreign keys (T6.1)', () => {
 
   it('retains the users table with a stakeholder FK (reserved for future IAM, not dropped)', () => {
     expect(schema).toMatch(/CREATE TABLE IF NOT EXISTS users[\s\S]*stakeholder_id TEXT REFERENCES stakeholders\(stakeholder_id\)/);
+  });
+
+  it('declares durable authorization and canonical source-event uniqueness', () => {
+    expect(schema).toContain('CREATE TABLE IF NOT EXISTS authorization_subjects');
+    expect(schema).toContain('CREATE TABLE IF NOT EXISTS subject_role_assignments');
+    expect(schema).toContain('CREATE TABLE IF NOT EXISTS subject_scope_assignments');
+    expect(schema).toContain('CREATE TABLE IF NOT EXISTS integration_source_assignments');
+    expect(schema).toContain('CREATE TABLE IF NOT EXISTS integration_credentials');
+    expect(schema).toMatch(/integration_events[\s\S]*UNIQUE \(source_system, source_event_id\)/);
+    expect(schema).toContain('approved_payload_hash');
+    expect(schema).toContain('parent_source_event_id');
+  });
+
+  it('declares additive eligibility case, action, optimistic-version, and idempotency storage', () => {
+    expect(schema).toContain('CREATE TABLE IF NOT EXISTS eligibility_cases');
+    expect(schema).toContain('CREATE TABLE IF NOT EXISTS eligibility_case_actions');
+    expect(schema).toContain('version INTEGER NOT NULL DEFAULT 1');
+    expect(schema).toContain('idempotency_key TEXT NOT NULL UNIQUE');
+    expect(schema).toContain('idx_eligibility_case_active_beneficiary');
+    expect(schema).toContain('idx_eligibility_actions_case');
+    expect(schema).toMatch(/eligibility_cases[\s\S]*ration_card_hash TEXT NOT NULL REFERENCES ration_cards_mock\(ration_card_hash\)/);
   });
 });

@@ -23,7 +23,12 @@ todos:
 isProject: false
 ---
 
-> Historical implementation record. Authentication details below were superseded by the secure-by-default Keycloak/OIDC migration in July 2026. Current deployment instructions are in `DEPLOYMENT.md`; no deployed mode accepts static tokens or stores access tokens in local storage.
+> Historical implementation record. Authentication details below were
+> superseded by the secure-by-default Keycloak/OIDC migration in July 2026.
+> Current instructions are in the
+> [deployment guide](../../fabric-deployment.md); no deployed mode accepts
+> static tokens or stores access tokens in local storage. The detailed status
+> tables and examples below are retained as dated evidence, not current state.
 
 # POC → MVP + Fabric Mode Readiness Plan
 

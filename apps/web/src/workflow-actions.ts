@@ -31,6 +31,9 @@ import type { DemoRole } from './demo-model.js';
 const DEFAULT_WORKFLOW_COMMODITY: CommodityName = 'Rice';
 const DEMO_RATION_CARD_HASH = 'demo-ration-card-hash';
 const DEMO_BENEFICIARY_HASH = 'beneficiary-hash';
+const DEMO_TRANSPORTER_ID = 'TRANS-001';
+const DEMO_TRANSPORTER_NAME = 'Transport Contractor 01';
+const DEMO_FPS_VEHICLE_NO = 'KA01AB1204';
 const now = () => new Date('2026-06-30T10:00:00.000Z').toISOString();
 const monthTimestamp = (month: string) => `${month}-15T10:00:00.000Z`;
 const monthKey = (timestamp: string) => timestamp.slice(0, 7);
@@ -56,7 +59,7 @@ export type WorkflowActionRequest =
         stage?: 'I' | 'II';
         roRef?: string;
         authorizedBy?: string;
-        transporterId?: string;
+        transporterId: string;
         transformedFromLotId?: string;
       };
     }
@@ -70,6 +73,8 @@ export type WorkflowActionRequest =
         allocatedQtyKg: number;
         month: string;
         sourceGodownId: string;
+        transporterId: string;
+        vehicleNo: string;
       };
     }
   | { kind: 'fps-receipt'; allocationId: string; receivedQtyKg: number }
@@ -143,7 +148,7 @@ type PlannedLeg = {
   stage: 'I' | 'II';
   roRef?: string;
   authorizedBy?: string;
-  transporterId?: string;
+  transporterId: string;
   transformedFromLotId?: string;
 };
 
@@ -151,24 +156,23 @@ const commodityDefinition = (commodity: string): CommodityDefinition =>
   COMMODITIES.find((item) => item.name === commodity) ?? COMMODITIES[0]!;
 
 const roleForSender = (fromOrg: string): DemoRole[] => {
-  if (fromOrg === 'PROC-001') return ['PROCUREMENT'];
   if (fromOrg === 'FCI-001') return ['FCI_DEPOT'];
-  if (fromOrg === 'ISSUE-001' || fromOrg === 'GODOWN-S-001') return ['DEPOT'];
+  if (fromOrg === 'GODOWN-S-001' || fromOrg === 'GODOWN-B-001') return ['GODOWN'];
   return ['GODOWN'];
 };
 
 const roleForReceiver = (toOrg: string): DemoRole[] => {
   if (toOrg === 'FCI-001') return ['FCI_DEPOT'];
-  if (toOrg === 'GODOWN-S-001' || toOrg === 'ISSUE-001') return ['DEPOT'];
+  if (toOrg === 'GODOWN-S-001' || toOrg === 'GODOWN-B-001') return ['GODOWN'];
   if (toOrg === 'FPS-101') return ['FPS'];
   return ['GODOWN'];
 };
 
 const vehicleForLeg = (leg: CommodityRouteLeg, index: number): string =>
-  leg.id.endsWith('PROC-FCI')
-    ? 'KA01AB1999'
-    : leg.id.endsWith('FCI-DEPOT')
-      ? 'FCI01AB2001'
+  leg.id.endsWith('FCI-DEPOT')
+    ? 'FCI01AB2001'
+    : leg.id.endsWith('DEPOT-BLOCK')
+      ? 'KA01AB2002'
       : `KA01AB${String(2000 + index).padStart(4, '0')}`;
 
 const quantityForLeg = (template: CommodityRouteTemplate, _leg: CommodityRouteLeg): number => {
@@ -178,32 +182,28 @@ const quantityForLeg = (template: CommodityRouteTemplate, _leg: CommodityRouteLe
 const labelForLeg = (template: CommodityRouteTemplate, leg: CommodityRouteLeg): string => {
   if (template.commodity === 'Rice') {
     const labels: Record<string, string> = {
-      'TR-POC-PROC-FCI': 'Dispatch procurement stock to FCI',
-      'TR-POC-RICE-PROC-FCI': 'Dispatch procurement stock to FCI',
-      'TR-POC-RICE-FCI-DEPOT': 'Stage-I dispatch to state depot',
-      'TR-POC-RICE-DEPOT-ISSUE': 'Stage-II state depot dispatch to issue point'
+      'TR-POC-RICE-FCI-DEPOT': 'Stage-I: FCI dispatch to state godown',
+      'TR-POC-RICE-DEPOT-BLOCK': 'Stage-II: state godown dispatch to block godown'
     };
     return labels[leg.id] ?? `Dispatch ${template.commodity}`;
   }
-  if (leg.toOrg === 'ISSUE-001') return `State depot dispatch ${template.commodity} to issue point`;
-  if (leg.toOrg === 'FPS-101') return `Allocate ${template.commodity} to FPS`;
-  if (leg.toOrg === 'GODOWN-S-001') return `Dispatch ${template.commodity} to state depot`;
-  if (leg.toOrg === 'FCI-001') return `Dispatch ${template.commodity} to FCI`;
+  if (leg.toOrg === 'GODOWN-B-001') return `Stage-II: dispatch ${template.commodity} to block godown`;
+  if (leg.toOrg === 'FPS-101') return `BSO allot ${template.commodity} to FPS`;
+  if (leg.toOrg === 'GODOWN-S-001') return `Stage-I: dispatch ${template.commodity} to state godown`;
   return `Dispatch ${template.commodity}`;
 };
 
 const detailForLeg = (template: CommodityRouteTemplate, leg: CommodityRouteLeg): string => {
   if (template.commodity === 'Rice') {
     const details: Record<string, string> = {
-      'TR-POC-PROC-FCI': 'Procurement centre hands the seeded lot to FCI before central buffer movement.',
-      'TR-POC-RICE-PROC-FCI': 'Procurement centre hands the seeded lot to FCI before state lifting.',
-      'TR-POC-RICE-FCI-DEPOT': 'Move lifted stock from FCI to the state depot.',
-      'TR-POC-RICE-DEPOT-ISSUE': 'State depot dispatches DSO/TSO-approved stock to the issue point. Issue-point receipt is the next checkpoint after this dispatch is recorded.'
+      'TR-POC-RICE-FCI-DEPOT': 'FCI Depot Officer moves stock from the FCI depot to the state godown.',
+      'TR-POC-RICE-DEPOT-BLOCK':
+        'After DSO Release Order approval, the Godown Operator dispatches stock to the block godown.'
     };
     return details[leg.id] ?? `Move ${template.commodity} stock through the configured route.`;
   }
   return leg.requiresAuthorization
-    ? `State depot dispatches DSO/TSO-approved ${template.commodity} stock to the issue point. Issue-point receipt is the next checkpoint after this dispatch is recorded.`
+    ? `After DSO Release Order approval, the Godown Operator dispatches ${template.commodity} to the block godown.`
     : `Move ${template.commodity} stock through the configured route.`;
 };
 
@@ -255,13 +255,13 @@ export const getPlannedLegs = (
     ...(leg.requiresAuthorization
       ? {
           roRef:
-            leg.id.endsWith('DEPOT-ISSUE')
+            leg.id.endsWith('DEPOT-BLOCK')
               ? 'RO-DSO-POC-001'
               : `RO-DSO-${leg.id.replace(/^TR-/, '')}`,
           authorizedBy: 'DSO-001'
         }
       : {}),
-    transporterId: 'TRANS-001',
+    transporterId: DEMO_TRANSPORTER_ID,
     ...(leg.lot === 'transformed' ? { transformedFromLotId: template.sourceLotId } : {})
   }));
 };
@@ -470,8 +470,8 @@ export function getWorkflowActions(context: WorkflowContext, commodity: string =
     if (!transfer && leg.roRef && priorLegsReceived(context, plannedLegs, legIndex) && missingApproval) {
       actions.push({
         id: leg.roRef ?? `RO-DSO-${leg.id}`,
-        label: `Approve: ${leg.label}`,
-        detail: `RO-lite approval unlocks ${leg.id} (${leg.fromOrg} → ${leg.toOrg}). ${leg.detail}`,
+        label: `DSO approve Release Order: ${leg.label}`,
+        detail: `District Supply Officer (DSO-001) must approve Stage-II before dispatch ${leg.fromOrg} → ${leg.toOrg}.`,
         roles: ['CONTROL_OFFICE'],
         status: 'pending',
         request: {
@@ -512,7 +512,7 @@ export function getWorkflowActions(context: WorkflowContext, commodity: string =
             stage: leg.stage,
             ...(leg.roRef ? { roRef: leg.roRef } : {}),
             ...(!missingApproval && leg.authorizedBy ? { authorizedBy: leg.authorizedBy } : {}),
-            ...(leg.transporterId ? { transporterId: leg.transporterId } : {}),
+            transporterId: leg.transporterId,
             ...(leg.transformedFromLotId ? { transformedFromLotId: leg.transformedFromLotId } : {})
           }
         }
@@ -521,10 +521,16 @@ export function getWorkflowActions(context: WorkflowContext, commodity: string =
     }
 
     if (transfer.status === TransferStatus.DISPATCHED) {
+      const receiptLabel =
+        leg.toOrg === 'GODOWN-S-001'
+          ? 'Confirm receipt at state godown'
+          : leg.toOrg === 'GODOWN-B-001'
+            ? 'Confirm receipt at block godown'
+            : `Confirm receipt at ${leg.toOrg}`;
       actions.push({
         id: `${leg.id}-receive`,
-        label: `Confirm receipt at ${leg.toOrg}`,
-        detail: `Record stock received against ${transfer.dispatchedQtyKg} kg dispatched.`,
+        label: receiptLabel,
+        detail: `Godown Operator records ${transfer.dispatchedQtyKg} kg received against the dispatch.`,
         roles: roleForReceiver(leg.toOrg),
         status: 'dispatched',
         request: { kind: 'receive', transferId: leg.id, receivedQtyKg: transfer.dispatchedQtyKg }
@@ -540,9 +546,9 @@ export function getWorkflowActions(context: WorkflowContext, commodity: string =
     if (!allocation) {
       actions.push({
         id: fpsDelivery.allocationId,
-        label: `Allocate ${route.commodity} stock to FPS`,
-        detail: `Debit ${fpsDelivery.sourceGodownId} and create an FPS allocation before citizen distribution.`,
-        roles: ['DEPOT'],
+        label: `BSO allot ${route.commodity} to FPS`,
+        detail: `Block Supply Officer (BSO-001) allots ${fpsDelivery.allocatedQtyKg} kg from block godown ${fpsDelivery.sourceGodownId} to ${fpsDelivery.fpsId} via ${DEMO_TRANSPORTER_NAME} (${DEMO_TRANSPORTER_ID}).`,
+        roles: ['BLOCK_OFFICE'],
         status: 'pending',
         request: {
           kind: 'allocate',
@@ -552,7 +558,9 @@ export function getWorkflowActions(context: WorkflowContext, commodity: string =
             commodity: route.commodity,
             allocatedQtyKg: fpsDelivery.allocatedQtyKg,
             month: '2026-06',
-            sourceGodownId: fpsDelivery.sourceGodownId
+            sourceGodownId: fpsDelivery.sourceGodownId,
+            transporterId: DEMO_TRANSPORTER_ID,
+            vehicleNo: DEMO_FPS_VEHICLE_NO
           }
         }
       });
@@ -561,8 +569,8 @@ export function getWorkflowActions(context: WorkflowContext, commodity: string =
     if (!isAllocationReceived(allocation)) {
       actions.push({
         id: `${fpsDelivery.allocationId}-receipt`,
-        label: `Confirm FPS receipt for ${route.commodity}`,
-        detail: `Record stock received at ${fpsDelivery.fpsId} against allocation ${fpsDelivery.allocationId}.`,
+        label: `FPS Dealer confirm receipt for ${route.commodity}`,
+        detail: `FPS Dealer at ${fpsDelivery.fpsId} confirms receipt against allotment ${fpsDelivery.allocationId}.`,
         roles: ['FPS'],
         status: 'pending',
         request: {
@@ -743,15 +751,20 @@ export function applyMockWorkflowAction(context: WorkflowContext, request: Workf
           `Insufficient stock for ${request.payload.fromOrg}: ${available} kg available, ${request.payload.dispatchedQtyKg} kg requested`
         );
       }
+      if (!request.payload.transporterId?.trim()) {
+        throw new Error('transporterId is required for transport evidence');
+      }
       const transfer: TransferOrder = {
         ...request.payload,
+        transporterId: request.payload.transporterId,
+        transporterName: DEMO_TRANSPORTER_NAME,
         status: TransferStatus.DISPATCHED,
         dispatchTimestamp: now(),
         ...(request.payload.stage === 'II' ? { approvalStatus: 'APPROVED' as const } : {})
       };
       current.transfers.push(transfer);
       event = evidence('DISPATCH_LOT', 'transfer', transfer.transferId, transfer);
-      message = `${transfer.transferId} dispatched with transporter evidence.`;
+      message = `${transfer.transferId} dispatched with transporter ${transfer.transporterName} (${transfer.transporterId}).`;
     }
   } else if (request.kind === 'receive') {
     const transfer = current.transfers.find((item) => item.transferId === request.transferId);
@@ -900,13 +913,21 @@ export function applyMockWorkflowAction(context: WorkflowContext, request: Workf
         `Insufficient stock for ${request.payload.sourceGodownId}: ${available} kg available, ${request.payload.allocatedQtyKg} kg requested`
       );
     }
+    if (!request.payload.transporterId?.trim()) {
+      throw new Error('transporterId is required for transport evidence');
+    }
+    if (!request.payload.vehicleNo?.trim()) {
+      throw new Error('vehicleNo is required for FPS doorstep transport');
+    }
     const allocation: FPSAllocation = {
       ...request.payload,
+      transporterName: DEMO_TRANSPORTER_NAME,
+      dispatchTimestamp: now(),
       status: 'ALLOCATED'
     };
     current.allocations.push(allocation);
     event = evidence('ALLOCATE_TO_FPS', 'allocation', allocation.allocationId, allocation);
-    message = `${allocation.allocationId} allocated to ${allocation.fpsId}.`;
+    message = `${allocation.allocationId} allocated to ${allocation.fpsId} via ${allocation.transporterName} (${allocation.transporterId}).`;
   } else if (request.kind === 'fps-receipt') {
     const allocation = current.allocations.find((item) => item.allocationId === request.allocationId);
     if (!allocation) {
@@ -926,6 +947,7 @@ export function applyMockWorkflowAction(context: WorkflowContext, request: Workf
       item.allocationId === request.allocationId
         ? {
             ...item,
+            receiveTimestamp: now(),
             status: shortageQtyKg > 0 ? ('RECEIVED_WITH_SHORTAGE' as const) : ('RECEIVED' as const),
             receivedQtyKg: request.receivedQtyKg,
             ...(shortageQtyKg > 0 ? { shortageQtyKg } : {})

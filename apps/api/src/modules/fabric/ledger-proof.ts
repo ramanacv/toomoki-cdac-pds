@@ -3,7 +3,8 @@ import type { LedgerEvent, LedgerProof } from '@pds/shared-types';
 
 const isProhibitedKey = (key: string): boolean => {
   const normalized = key.toLowerCase().replace(/[^a-z0-9]/g, '');
-  if (['aadhaar', 'mobile', 'phone', 'otp', 'biometric'].some((term) => normalized.includes(term))) return true;
+  if (['aadhaar', 'mobile', 'phone', 'otp', 'biometric', 'address', 'credential'].some((term) => normalized.includes(term))) return true;
+  if (normalized === 'name' || normalized.endsWith('beneficiaryname') || normalized.endsWith('dealername')) return true;
   return normalized.includes('rationcard') && !/(hash|refhash|digest)$/.test(normalized);
 };
 
@@ -17,15 +18,18 @@ export const canonicalJson = (value: unknown): string => {
     .join(',')}}`;
 };
 
-const assertProofSafe = (value: unknown, path = 'proofPayload'): void => {
+export const assertPrivacySafe = (value: unknown, path = 'payload'): void => {
+  if (typeof value === 'string' && /^\d{10,16}$/.test(value.replace(/[\s-]/g, ''))) {
+    throw new Error(`${path} looks like a raw numeric personal identifier`);
+  }
   if (value === null || typeof value !== 'object') return;
   if (Array.isArray(value)) {
-    value.forEach((item, index) => assertProofSafe(item, `${path}[${index}]`));
+    value.forEach((item, index) => assertPrivacySafe(item, `${path}[${index}]`));
     return;
   }
   for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
     if (isProhibitedKey(key)) throw new Error(`${path}.${key} contains prohibited personal data`);
-    assertProofSafe(item, `${path}.${key}`);
+    assertPrivacySafe(item, `${path}.${key}`);
   }
 };
 
@@ -36,7 +40,7 @@ export const ledgerProofFromEvent = (
   actor: ProofActor,
   operationId = event.ledgerTxId
 ): LedgerProof => {
-  assertProofSafe(event.payload);
+  assertPrivacySafe(event.payload, 'proofPayload');
   const payloadHash = createHash('sha256').update(canonicalJson(event.payload)).digest('hex');
   return {
     eventId: event.ledgerTxId,

@@ -15,9 +15,8 @@ const duplicateClaimWorkspace = {
   stakeholders: [],
   lots: [{ lotId: 'LOT-RICE-2026-001', commodity: 'Rice', currentLocation: 'FPS 101' }],
   transfers: [
-    ['TR-POC-RICE-PROC-FCI', 'PROC-001', 'FCI-001', 1000],
     ['TR-POC-RICE-FCI-DEPOT', 'FCI-001', 'GODOWN-S-001', 1000],
-    ['TR-POC-RICE-DEPOT-ISSUE', 'GODOWN-S-001', 'ISSUE-001', 1000]
+    ['TR-POC-RICE-DEPOT-BLOCK', 'GODOWN-S-001', 'GODOWN-B-001', 1000]
   ].map(([transferId, fromOrg, toOrg, qty]) => ({
     transferId: String(transferId),
     lotId: 'LOT-RICE-2026-001',
@@ -28,7 +27,9 @@ const duplicateClaimWorkspace = {
     vehicleNo: 'KA01AB2000',
     status: 'RECEIVED',
     dispatchTimestamp: '2026-06-09T10:00:00.000Z',
-    receiveTimestamp: '2026-06-09T11:00:00.000Z'
+    receiveTimestamp: '2026-06-09T11:00:00.000Z',
+    transporterId: 'TRANS-001',
+    transporterName: 'Transport Contractor 01'
   })),
   allocations: [
     {
@@ -38,8 +39,13 @@ const duplicateClaimWorkspace = {
       allocatedQtyKg: 300,
       receivedQtyKg: 300,
       month: '2026-06',
-      sourceGodownId: 'ISSUE-001',
-      status: 'RECEIVED'
+      sourceGodownId: 'GODOWN-B-001',
+      status: 'RECEIVED',
+      transporterId: 'TRANS-001',
+      transporterName: 'Transport Contractor 01',
+      vehicleNo: 'KA01AB1204',
+      dispatchTimestamp: '2026-06-09T12:00:00.000Z',
+      receiveTimestamp: '2026-06-09T13:00:00.000Z'
     }
   ],
   authTransactions: [],
@@ -61,7 +67,7 @@ const duplicateClaimWorkspace = {
     {
       ledgerTxId: 'MOCK-RO',
       entityType: 'workflow',
-      entityId: 'TR-POC-RICE-DEPOT-ISSUE',
+      entityId: 'TR-POC-RICE-DEPOT-BLOCK',
       eventType: 'RO_LITE_APPROVED',
       payload: {},
       timestamp: '2026-06-09T10:00:00.000Z'
@@ -186,6 +192,14 @@ describe('app shell', () => {
     expect(await screen.findByRole('heading', { name: 'Demo operating network' })).toBeInTheDocument();
   });
 
+  it('exposes eligibility review to oversight roles but keeps offline screening read-only', async () => {
+    const user = await renderApp('/?role=AUDITOR');
+    await user.click(sidebar().getByRole('link', { name: 'Eligibility review' }));
+    expect(await screen.findByText('External-service simulation using synthetic beneficiaries')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Run external eligibility check' })).toBeDisabled();
+    expect(screen.getByText(/Offline fixture mode is read-only/)).toBeInTheDocument();
+  });
+
   it('keeps workflow actions on the workbench only', async () => {
     const user = await renderApp('/?role=GODOWN');
 
@@ -203,7 +217,7 @@ describe('app shell', () => {
     await screen.findByRole('heading', { name: 'Overview' });
 
     await user.click(screen.getByRole('combobox'));
-    await user.click(await screen.findByRole('option', { name: 'Fair Price Shop' }));
+    await user.click(await screen.findByRole('option', { name: 'FPS Dealer' }));
 
     expect(await sidebar().findByRole('link', { name: 'Distribution' })).toBeInTheDocument();
     expect(sidebar().queryByRole('link', { name: 'Stakeholders' })).not.toBeInTheDocument();

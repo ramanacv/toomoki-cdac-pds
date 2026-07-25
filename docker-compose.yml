@@ -20,6 +20,32 @@ services:
       - ./infra/postgres/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
       - ./infra/postgres/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
 
+  schema-migrate:
+    image: postgres:16-alpine
+    restart: 'no'
+    environment:
+      PGPASSWORD: pds
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command:
+      [
+        'psql',
+        '-h',
+        'postgres',
+        '-U',
+        'pds',
+        '-d',
+        'pds_chain',
+        '-v',
+        'ON_ERROR_STOP=1',
+        '--single-transaction',
+        '-f',
+        '/schema/schema.sql'
+      ]
+    volumes:
+      - ./infra/postgres/schema.sql:/schema/schema.sql:ro
+
   api:
     build:
       context: .
@@ -52,8 +78,9 @@ services:
       PDS_FABRIC_KEY_PATH: ${PDS_FABRIC_KEY_PATH:-/app/blockchain/fabric-network/crypto/peerOrganizations/food.example.com/users/User1@food.example.com/msp/keystore}
       PDS_FABRIC_CHANNEL: ${PDS_FABRIC_CHANNEL:-pdschannel}
       PDS_FABRIC_CHAINCODE: ${PDS_FABRIC_CHAINCODE:-pds-chaincode}
-      PDS_FABRIC_ENDORSING_ORGS: ${PDS_FABRIC_ENDORSING_ORGS:-}
+      PDS_FABRIC_ENDORSING_ORGS: ${PDS_FABRIC_ENDORSING_ORGS:-FoodAndCivilSuppliesMSP,GodownWarehouseMSP}
       PDS_AUTH_MODE: oidc
+      PDS_AUTHORIZATION_MODE: ${PDS_AUTHORIZATION_MODE:-database}
       PDS_OIDC_ISSUER: ${PDS_OIDC_ISSUER:-http://localhost:8080/realms/viksitpds}
       PDS_OIDC_AUDIENCE: pds-api
       PDS_OIDC_JWKS_URI: ${PDS_OIDC_JWKS_URI:-http://keycloak:8080/realms/viksitpds/protocol/openid-connect/certs}
@@ -62,16 +89,44 @@ services:
       PDS_ALLOW_RESET: ${PDS_ALLOW_RESET:-false}
       PDS_RATE_LIMIT_READ_PER_MINUTE: ${PDS_RATE_LIMIT_READ_PER_MINUTE:-120}
       PDS_RATE_LIMIT_MUTATION_PER_MINUTE: ${PDS_RATE_LIMIT_MUTATION_PER_MINUTE:-30}
+      PDS_ELIGIBILITY_SERVICE_URL: http://eligibility-mock:3010
+      PDS_ELIGIBILITY_SERVICE_TIMEOUT_MS: ${PDS_ELIGIBILITY_SERVICE_TIMEOUT_MS:-3000}
+      PDS_ELIGIBILITY_SERVICE_TOKEN: ${PDS_ELIGIBILITY_SERVICE_TOKEN:-}
     ports:
       - '3000:3000'
     depends_on:
       postgres:
         condition: service_healthy
+      schema-migrate:
+        condition: service_completed_successfully
     volumes:
       - ./blockchain/fabric-network/crypto:/app/blockchain/fabric-network/crypto:ro
     networks:
       - default
       - pds-fabric
+
+  eligibility-mock:
+    profiles: [eligibility]
+    build:
+      context: .
+      dockerfile: apps/eligibility-mock/Dockerfile
+    environment:
+      PORT: 3010
+      PDS_ELIGIBILITY_SERVICE_TOKEN: ${PDS_ELIGIBILITY_SERVICE_TOKEN:-}
+    ports:
+      - '3010:3010'
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3010/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+        ]
+      interval: 3s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
 
   web:
     build:

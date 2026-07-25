@@ -120,7 +120,7 @@ export function TraceExplorer({
       <div className="mt-4 grid gap-2 rounded-3xl border border-dashed border-primary/20 bg-primary/5 p-4">
         <p className="leading-relaxed">
           Selected lot: <strong>{traceLot?.commodity ?? 'Rice'}</strong> in{' '}
-          {traceLot?.currentLocation ?? 'Issue Point 01'}.
+          {traceLot?.currentLocation ?? 'Block Godown 01'}.
         </p>
         <p className="leading-relaxed">
           Selected receipt: <strong>{visibleDistribution?.deliveredKg ?? demoQuantities.citizenDistributionKg} kg</strong> for ration

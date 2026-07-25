@@ -85,8 +85,6 @@ function actualQuantities(commodity, plannedQtyKg) {
       receive1Kg: plannedQtyKg,
       dispatch2Kg: plannedQtyKg,
       receive2Kg: plannedQtyKg,
-      dispatch3Kg: plannedQtyKg,
-      receive3Kg: plannedQtyKg,
       allocationKg: plannedQtyKg,
       fpsReceiptKg: plannedQtyKg,
       distributionKg: plannedQtyKg
@@ -98,8 +96,6 @@ function actualQuantities(commodity, plannedQtyKg) {
     receive1Kg: 4900,
     dispatch2Kg: 4800,
     receive2Kg: 4750,
-    dispatch3Kg: 4600,
-    receive3Kg: 4550,
     allocationKg: 4500,
     fpsReceiptKg: 4400,
     distributionKg: 4400
@@ -158,9 +154,8 @@ async function runCommodity(reset, commodity, qty, index) {
   const stockChecks = [];
   const shortageAlerts = [];
   const ids = {
-    procToFci: `TR-${runId}-${commoditySlug}-PROC-FCI`,
     fciToDepot: `TR-${runId}-${commoditySlug}-FCI-DEPOT`,
-    depotToIssue: `TR-${runId}-${commoditySlug}-DEPOT-ISSUE`,
+    depotToBlock: `TR-${runId}-${commoditySlug}-DEPOT-BLOCK`,
     allocation: `ALLOC-${runId}-${commoditySlug}-FPS`,
     auth: `AUTH-${runId}-${commoditySlug}`,
     distribution: `DIST-${runId}-${commoditySlug}-001`,
@@ -184,59 +179,32 @@ async function runCommodity(reset, commodity, qty, index) {
   const dispatch1 = await post(
     '/transfers',
     {
-      transferId: ids.procToFci,
+      transferId: ids.fciToDepot,
       lotId: lot.lotId,
-      fromOrg: 'PROC-001',
-      toOrg: 'FCI-001',
+      fromOrg: 'FCI-001',
+      toOrg: 'GODOWN-S-001',
       dispatchedQtyKg: quantities.dispatch1Kg,
       vehicleNo: vehicle,
       stage: 'I',
       transporterId: 'TRANS-001'
     },
-    { role: 'procurement' }
-  );
-  stockChecks.push(await captureStock(commodity, 'after procurement dispatch', {
-    'PROC-001': lot.quantityKg - quantities.dispatch1Kg,
-    'FCI-001': 0
-  }));
-  const receive1 = await post(`/transfers/${ids.procToFci}/receive`, { receivedQtyKg: quantities.receive1Kg }, { role: 'godown' });
-  stockChecks.push(await captureStock(commodity, 'after FCI receipt', {
-    'PROC-001': lot.quantityKg - quantities.dispatch1Kg,
-    'FCI-001': quantities.receive1Kg
-  }));
-  if (quantities.receive1Kg < quantities.dispatch1Kg) {
-    shortageAlerts.push(await assertShortReceiptAlert(ids.procToFci, quantities.dispatch1Kg, quantities.receive1Kg));
-  }
-
-  const dispatch2 = await post(
-    '/transfers',
-    {
-      transferId: ids.fciToDepot,
-      lotId: lot.lotId,
-      fromOrg: 'FCI-001',
-      toOrg: 'GODOWN-S-001',
-      dispatchedQtyKg: quantities.dispatch2Kg,
-      vehicleNo: `${vehicle}B`,
-      stage: 'I',
-      transporterId: 'TRANS-001'
-    },
-    { role: 'godown' }
+    { role: 'fci' }
   );
   stockChecks.push(await captureStock(commodity, 'after FCI dispatch', {
-    'FCI-001': quantities.receive1Kg - quantities.dispatch2Kg,
+    'FCI-001': lot.quantityKg - quantities.dispatch1Kg,
     'GODOWN-S-001': 0
   }));
-  const receive2 = await post(`/transfers/${ids.fciToDepot}/receive`, { receivedQtyKg: quantities.receive2Kg }, { role: 'godown' });
+  const receive1 = await post(`/transfers/${ids.fciToDepot}/receive`, { receivedQtyKg: quantities.receive1Kg }, { role: 'godown' });
   stockChecks.push(await captureStock(commodity, 'after state godown receipt', {
-    'FCI-001': quantities.receive1Kg - quantities.dispatch2Kg,
-    'GODOWN-S-001': quantities.receive2Kg
+    'FCI-001': lot.quantityKg - quantities.dispatch1Kg,
+    'GODOWN-S-001': quantities.receive1Kg
   }));
-  if (quantities.receive2Kg < quantities.dispatch2Kg) {
-    shortageAlerts.push(await assertShortReceiptAlert(ids.fciToDepot, quantities.dispatch2Kg, quantities.receive2Kg));
+  if (quantities.receive1Kg < quantities.dispatch1Kg) {
+    shortageAlerts.push(await assertShortReceiptAlert(ids.fciToDepot, quantities.dispatch1Kg, quantities.receive1Kg));
   }
 
   const approval = await post(
-    `/transfers/${ids.depotToIssue}/authorize`,
+    `/transfers/${ids.depotToBlock}/authorize`,
     {
       authorizedBy: 'DSO-001',
       roRef: ids.ro,
@@ -244,22 +212,22 @@ async function runCommodity(reset, commodity, qty, index) {
     },
     { role: 'department' }
   );
-  assertEqual(approval.transferId, ids.depotToIssue, `${commodity} authorization transfer id`);
+  assertEqual(approval.transferId, ids.depotToBlock, `${commodity} authorization transfer id`);
   assertEqual(approval.authorizedBy, 'DSO-001', `${commodity} authorization actor`);
   stockChecks.push(await captureStock(commodity, 'after stage-II authorization', {
-    'GODOWN-S-001': quantities.receive2Kg,
-    'ISSUE-001': 0
+    'GODOWN-S-001': quantities.receive1Kg,
+    'GODOWN-B-001': 0
   }));
 
-  const dispatch3 = await post(
+  const dispatch2 = await post(
     '/transfers',
     {
-      transferId: ids.depotToIssue,
+      transferId: ids.depotToBlock,
       lotId: lot.lotId,
       fromOrg: 'GODOWN-S-001',
-      toOrg: 'ISSUE-001',
-      dispatchedQtyKg: quantities.dispatch3Kg,
-      vehicleNo: `${vehicle}C`,
+      toOrg: 'GODOWN-B-001',
+      dispatchedQtyKg: quantities.dispatch2Kg,
+      vehicleNo: `${vehicle}B`,
       stage: 'II',
       roRef: ids.ro,
       authorizedBy: 'DSO-001',
@@ -267,19 +235,19 @@ async function runCommodity(reset, commodity, qty, index) {
     },
     { role: 'godown' }
   );
-  assertEqual(dispatch3.approvalStatus, 'APPROVED', `${commodity} stage-II workflow approval`);
-  assertEqual(dispatch3.authorizedBy, 'DSO-001', `${commodity} stage-II approved by`);
+  assertEqual(dispatch2.approvalStatus, 'APPROVED', `${commodity} stage-II workflow approval`);
+  assertEqual(dispatch2.authorizedBy, 'DSO-001', `${commodity} stage-II approved by`);
   stockChecks.push(await captureStock(commodity, 'after state godown dispatch', {
-    'GODOWN-S-001': quantities.receive2Kg - quantities.dispatch3Kg,
-    'ISSUE-001': 0
+    'GODOWN-S-001': quantities.receive1Kg - quantities.dispatch2Kg,
+    'GODOWN-B-001': 0
   }));
-  const receive3 = await post(`/transfers/${ids.depotToIssue}/receive`, { receivedQtyKg: quantities.receive3Kg }, { role: 'godown' });
-  stockChecks.push(await captureStock(commodity, 'after issue centre receipt', {
-    'GODOWN-S-001': quantities.receive2Kg - quantities.dispatch3Kg,
-    'ISSUE-001': quantities.receive3Kg
+  const receive2 = await post(`/transfers/${ids.depotToBlock}/receive`, { receivedQtyKg: quantities.receive2Kg }, { role: 'godown' });
+  stockChecks.push(await captureStock(commodity, 'after block godown receipt', {
+    'GODOWN-S-001': quantities.receive1Kg - quantities.dispatch2Kg,
+    'GODOWN-B-001': quantities.receive2Kg
   }));
-  if (quantities.receive3Kg < quantities.dispatch3Kg) {
-    shortageAlerts.push(await assertShortReceiptAlert(ids.depotToIssue, quantities.dispatch3Kg, quantities.receive3Kg));
+  if (quantities.receive2Kg < quantities.dispatch2Kg) {
+    shortageAlerts.push(await assertShortReceiptAlert(ids.depotToBlock, quantities.dispatch2Kg, quantities.receive2Kg));
   }
 
   const allocation = await post(
@@ -290,12 +258,14 @@ async function runCommodity(reset, commodity, qty, index) {
       commodity,
       allocatedQtyKg: quantities.allocationKg,
       month,
-      sourceGodownId: 'ISSUE-001'
+      sourceGodownId: 'GODOWN-B-001',
+      transporterId: 'TRANS-001',
+      vehicleNo: `${vehicle}F`
     },
-    { role: 'godown' }
+    { role: 'block-office' }
   );
   stockChecks.push(await captureStock(commodity, 'after FPS allocation approval', {
-    'ISSUE-001': quantities.receive3Kg - quantities.allocationKg,
+    'GODOWN-B-001': quantities.receive2Kg - quantities.allocationKg,
     'FPS-101': 0
   }));
   const fpsReceipt = await post(
@@ -304,7 +274,7 @@ async function runCommodity(reset, commodity, qty, index) {
     { role: 'fps' }
   );
   stockChecks.push(await captureStock(commodity, 'after FPS receipt', {
-    'ISSUE-001': quantities.receive3Kg - quantities.allocationKg,
+    'GODOWN-B-001': quantities.receive2Kg - quantities.allocationKg,
     'FPS-101': quantities.fpsReceiptKg
   }));
   if (quantities.fpsReceiptKg < quantities.allocationKg) {
@@ -327,7 +297,6 @@ async function runCommodity(reset, commodity, qty, index) {
     '/distributions',
     {
       distributionId: ids.distribution,
-      fpsId: 'FPS-101',
       rationCardHash,
       beneficiaryRefHash,
       commodity,
@@ -335,7 +304,6 @@ async function runCommodity(reset, commodity, qty, index) {
       authMode: auth.authMode,
       authResult: auth.authResult,
       authTxnRefHash: auth.authTxnRefHash,
-      dealerId: 'FPS-DEALER-101',
       timestamp: `${month}-15T10:00:00.000Z`
     },
     { role: 'fps' }
@@ -344,14 +312,13 @@ async function runCommodity(reset, commodity, qty, index) {
   const entitlementAfter = await get(pathWithQuery(`/entitlements/${rationCardHash}`, { commodity, month }));
   const stock = await get(pathWithQuery('/stock', { commodity }));
 
-  assertEqual(receive1.status, quantities.receive1Kg < quantities.dispatch1Kg ? 'RECEIVED_WITH_SHORTAGE' : 'RECEIVED', `${commodity} procurement to FCI receipt`);
-  assertEqual(receive2.status, quantities.receive2Kg < quantities.dispatch2Kg ? 'RECEIVED_WITH_SHORTAGE' : 'RECEIVED', `${commodity} FCI to godown receipt`);
-  assertEqual(receive3.status, quantities.receive3Kg < quantities.dispatch3Kg ? 'RECEIVED_WITH_SHORTAGE' : 'RECEIVED', `${commodity} godown to issue receipt`);
+  assertEqual(receive1.status, quantities.receive1Kg < quantities.dispatch1Kg ? 'RECEIVED_WITH_SHORTAGE' : 'RECEIVED', `${commodity} FCI to godown receipt`);
+  assertEqual(receive2.status, quantities.receive2Kg < quantities.dispatch2Kg ? 'RECEIVED_WITH_SHORTAGE' : 'RECEIVED', `${commodity} godown to block receipt`);
   assertEqual(fpsReceipt.status, quantities.fpsReceiptKg < quantities.allocationKg ? 'RECEIVED_WITH_SHORTAGE' : 'RECEIVED', `${commodity} FPS receipt`);
   assertEqual(distribution.deliveredKg, quantities.distributionKg, `${commodity} beneficiary distribution`);
   assertEqual(entitlementAfter.availableBalanceKg, 0, `${commodity} entitlement balance`);
   stockChecks.push(await captureStock(commodity, 'after beneficiary distribution', {
-    'ISSUE-001': quantities.receive3Kg - quantities.allocationKg,
+    'GODOWN-B-001': quantities.receive2Kg - quantities.allocationKg,
     'FPS-101': quantities.fpsReceiptKg - quantities.distributionKg
   }));
 
@@ -367,11 +334,9 @@ async function runCommodity(reset, commodity, qty, index) {
       entitlement: entitlement.ledgerTxId,
       dispatch1: dispatch1.ledgerTxId,
       receive1: receive1.ledgerTxId,
+      approval: approval.ledgerTxId,
       dispatch2: dispatch2.ledgerTxId,
       receive2: receive2.ledgerTxId,
-      approval: approval.ledgerTxId,
-      dispatch3: dispatch3.ledgerTxId,
-      receive3: receive3.ledgerTxId,
       allocation: allocation.ledgerTxId,
       fpsReceipt: fpsReceipt.ledgerTxId,
       auth: auth.ledgerTxId,
@@ -382,7 +347,7 @@ async function runCommodity(reset, commodity, qty, index) {
       stockChecks,
       shortageAlerts,
       fpsStockAfterKg: stock.find((item) => item.entityId === 'FPS-101')?.quantityKg ?? 0,
-      issueStockAfterKg: stock.find((item) => item.entityId === 'ISSUE-001')?.quantityKg ?? 0
+      blockGodownStockAfterKg: stock.find((item) => item.entityId === 'GODOWN-B-001')?.quantityKg ?? 0
     }
   };
 }

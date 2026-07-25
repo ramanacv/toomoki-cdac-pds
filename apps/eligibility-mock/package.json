@@ -1,0 +1,19 @@
+{
+  "name": "@pds/eligibility-mock",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/src/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "start": "node dist/src/main.js"
+  },
+  "dependencies": {
+    "@pds/shared-types": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.29"
+  }
+}

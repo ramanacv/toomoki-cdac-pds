@@ -1,6 +1,11 @@
 # Challenge Readiness Tracker
 
-This tracker implements the gaps identified in [the initial evaluation](../product/initial-evaluation.md) and the preserved [competition readiness plan](evaluation-gaps-impl.md). Status is evidence-based: **implemented** means code/configuration and automated checks exist; **partial** means a required live or operational gate remains; **planned** is not claimed as a current capability.
+This tracker implements the gaps identified in
+[the initial evaluation](../product/gpt56sol-initial-evaluation.md) and the
+preserved [competition readiness plan](evaluation-gaps-impl.md). Status is
+evidence-based: **implemented** means code/configuration and automated checks
+exist; **partial** means a required live or operational gate remains;
+**planned** is not claimed as a current capability.
 
 ## Competition track
 

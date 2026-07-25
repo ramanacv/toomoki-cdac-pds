@@ -28,18 +28,20 @@ todos:
 isProject: false
 ---
 
-# NestJS 11 + Modular API + Fabric 3.x Gateway Path
+> Historical refactor record, completed 24 June 2026. The deployed local
+> network now uses Fabric 2.5.15, Keycloak/OIDC and asynchronous
+> `RecordLedgerProof` submission. Current instructions are in the
+> [deployment guide](../../fabric-deployment.md); current release gates are in
+> [MVP hardening](mvp-hardening-plan.md).
+
+# NestJS 11 + Modular API + Fabric Gateway Path
 
 ## Implementation status: complete
 
 All phases below are implemented. Verification: **52/52 API tests passing**; `node scripts/smoke-fabric-gateway.mjs` against `--profile fabric` stack.
 
-Quick reference:
-
-- **Demo mode:** `docker compose up` (default `PDS_LEDGER_MODE=demo`)
-- **Fabric mode:** `blockchain/fabric-network/scripts/bootstrap-network.sh` then `PDS_LEDGER_MODE=fabric docker compose --profile fabric up --build`
-- **API modules:** `apps/api/src/modules/` (Core, Ledger, Fabric, Health, Openapi, Dashboard, Stakeholders, Lots, Transfers, Allocations, Auth, Entitlements, Distributions, Trace, Audit)
-- **Ledger env:** `PDS_LEDGER_MODE=demo|fabric`; legacy `PDS_LEDGER_BACKEND` mapped in `ledger-mode.config.ts`
+The detailed phases below preserve the proposal as written and must not be used
+as current deployment instructions or current test counts.
 
 ### Follow-ups (out of scope for this refactor)
 

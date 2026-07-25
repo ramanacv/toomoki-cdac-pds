@@ -17,8 +17,8 @@ documented as future peers — see `connection-profiles/` and
 - `generate-crypto.sh` — generates MSP material with `cryptogen` via the
   `fabric-tools:2.5.15` image.
 - `configtxgen.sh` — generates the channel genesis / configtx block.
-- `osnadmin-channel-join.sh` — joins the orderer to the channel via the
-  osnadmin channel-participation API (Fabric 3.x pattern).
+- `osnadmin-channel-join.sh` — joins the orderer through the channel
+  participation API.
 - `peer-channel-join.sh` — joins peers to `pdschannel`.
 - `generate-connection-profiles.sh` — emits the per-org client connection
   profiles under `../connection-profiles/`.
@@ -43,9 +43,14 @@ documented as future peers — see `connection-profiles/` and
 
 ## Notes
 
-- These scripts do not launch containers by themselves in CI (no Docker is
-  available in the build environment). They are safe, non-destructive, and
-  idempotent where possible.
+- `bootstrap-fabric-full.sh` resets in-container Fabric ledger state. It is
+  destructive and must not be used as an ordinary test or without explicit
+  authorization. Individual lifecycle scripts are idempotent where practical,
+  but callers must still inspect the deployed channel and chaincode definition.
+- Chaincode changes require a new sequence, identical packages on both peers,
+  approval from both organizations, commit-readiness verification, and a
+  two-peer regression.
+- The exact deployed Godown MSP ID is `GodownWarehouseMSP`.
 - CouchDB credentials for the peer state database are sourced from
   environment variables in `../docker-compose.fabric.yml` — do not hardcode
   them in scripts.

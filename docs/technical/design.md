@@ -1,276 +1,242 @@
-# Technical Design: ViksitPDS MVP
-
-## Domain Model
-
-Core entities:
-
-- Stakeholder: participating organization or actor such as procurement centre, FCI, state godown, issue point, FPS, DSO, transporter, or auditor.
-- User: authenticated application user mapped to stakeholder and roles.
-- CommodityLot: tracked commodity batch with quantity, grade, owner, location, and status.
-- StockPosition: current stock balance by stakeholder, commodity, lot, and month where applicable.
-- TransferOrder: dispatch and receipt workflow between stakeholders.
-- TransferEvent: ledger-recorded dispatch or receipt event.
-- FPSAllocation: monthly or periodic allocation from godown to FPS.
-- BeneficiaryRegistryMock: MVP mock beneficiary reference data.
-- RationCardMock: MVP mock ration card and household entitlement data.
-- MonthlyEntitlement: entitlement, lifted quantity, and balance for a ration card hash.
-- AuthTransaction: simulated authentication result.
-- DistributionTransaction: FPS delivery record.
-- LedgerTxIndex: mapping of application records to blockchain transaction IDs.
-- AuditAlert: exception raised by rule engine or auditor.
+# Technical Design: ViksitPDS
 
-## Mock Data And Fixtures
+## Design Status
 
-MVP mock records are not embedded in business logic. They are defined as JSON under `mock/` and loaded through `@pds/fixtures`.
+This document describes the implemented controlled-PoC design and clearly marks
+the pilot target. The application is a complementary trust layer, not a
+replacement for SMART-PDS/RCMS, IAeSCM/state-SCM, or AePDS/ePoS.
 
-| Location | Role |
-|----------|------|
-| `mock/entities/` | Workspace entity arrays for web mock/auto mode |
-| `mock/seed/backend.json` | Shared backend bootstrap for API, chaincode, and PostgreSQL |
-| `mock/scenarios/` | Scenario-specific alerts and dashboard overrides |
-| `packages/fixtures/` | Typed exports consumed by web, API seed path, and chaincode |
+The repository-wide operational runtime still uses an in-memory engine with
+serialized PostgreSQL snapshots. Snapshot saving and proof-outbox insertion are
+separate operations. The row-scoped transactional design below is therefore a
+mandatory pilot target, not a completed capability.
 
-PostgreSQL seed SQL at `infra/postgres/seed.sql` is generated from the same backend seed payload (`npm run fixtures:sql`).
+## Shared Domain Contracts
 
-Beneficiary and ration card mock tables (`beneficiary_registry_mock`, `ration_cards_mock`) are populated from `mock/seed/backend.json`. Operational entitlement rows align with the same ration card hash used across fixtures.
+Public contracts live in `@pds/shared-types`.
 
-Full editing and switching guidance: [Mock data and fixtures](../implementation/mock-data.md).
+Operational entities include:
 
-## Backend Structure
+- `Stakeholder`, `CommodityLot`, `StockPosition`, `TransferOrder`, and
+  `FPSAllocation`;
+- mock beneficiary and ration-card references, `MonthlyEntitlement`, and
+  `AuthTransaction`;
+- `DistributionTransaction`, `AuditAlert`, and proof-status views.
 
-The NestJS 11 API lives under `apps/api/src/modules/`:
+`AuthTransaction` carries `fpsId` and an opaque, server-derived operator
+reference. Allocation, movement, authentication, distribution, entitlement
+reference, and FPS master response models may carry optional
+`SourceProvenance`. Existing non-integrated fixtures remain compatible.
 
-| Module | Responsibility |
-|--------|----------------|
-| `config` | Env validation (`PDS_LEDGER_MODE`, persistence, Fabric gateway vars) |
-| `core` | `PdsLedgerFacade`, bootstrap `OnModuleInit` |
-| `ledger` | Ledger port factory; demo vs fabric adapter selection |
-| `fabric` | Gateway connection, identity, chaincode client ports |
-| Domain modules | Thin controllers per API group (stakeholders, lots, transfers, …) |
+Canonical integration contracts include:
 
-**Ledger modes:**
+- `SourceEventEnvelope<T>`;
+- `SourceProvenance`;
+- source system, canonical event type, and source-event processing status;
+- source, event, entity, operation, amendment, reversal, and parent references;
+- occurrence, device-sync where applicable, ingestion, and processing times.
+
+Provenance exposes only the approved-payload hash and metadata, never the raw
+source payload.
 
-- `PDS_LEDGER_MODE=demo` (default): in-process `PdsChaincodeInvoker` + PostgreSQL snapshots.
-- `PDS_LEDGER_MODE=fabric`: `@hyperledger/fabric-gateway` to `pds-chaincode` on `pdschannel`.
+## Fixture And Seed Design
 
-Legacy `PDS_LEDGER_BACKEND` values map to these modes for backward compatibility.
+Canonical demo data is under `mock/` and loaded through `@pds/fixtures`.
 
-## Chaincode Assets
-
-- Stakeholder.
-- CommodityLot.
-- TransferEvent.
-- FPSAllocation.
-- EntitlementRecordHash.
-- AuthTransactionHash.
-- DistributionReceipt.
-- AuditAlert.
-
-## Chaincode Functions
-
-- `RegisterStakeholder`.
-- `CreateCommodityLot`.
-- `DispatchLot`.
-- `ReceiveLot`.
-- `AllocateToFPS`.
-- `RecordFPSReceipt`.
-- `RegisterBeneficiaryHash`.
-- `CreateMonthlyEntitlement`.
-- `RecordDistribution`.
-- `CheckDuplicateClaim`.
-- `RaiseAuditFlag`.
-- `ResolveAuditFlag`.
-- `GetLotHistory`.
-- `GetDistributionHistory`.
-- `GetCurrentStock`.
-- `VerifyDatabaseHash`.
-
-## Backend API Groups
-
-### Stakeholders
-
-- `POST /stakeholders`: register stakeholder.
-- `GET /stakeholders`: list stakeholders.
-- `GET /stakeholders/{stakeholderId}`: get stakeholder.
-- `PATCH /stakeholders/{stakeholderId}/status`: activate or deactivate stakeholder.
-
-### Lots
-
-- `POST /lots`: create commodity lot.
-- `GET /lots`: list lots.
-- `GET /lots/{lotId}`: get current lot state.
-- `GET /lots/{lotId}/history`: get ledger-backed lot history.
-
-### Transfers
-
-- `POST /transfers`: dispatch stock.
-- `POST /transfers/{transferId}/receive`: confirm receipt.
-- `GET /transfers`: list transfers.
-- `GET /transfers/{transferId}`: get transfer details.
-
-### FPS Allocations
-
-- `POST /fps-allocations`: create FPS allocation.
-- `POST /fps-allocations/{allocationId}/receipt`: confirm FPS receipt.
-- `GET /fps-allocations`: list allocations.
-
-### Beneficiaries And Entitlements
-
-- `GET /beneficiaries/{beneficiaryRefHash}`: get masked beneficiary mock record.
-- `GET /entitlements/{rationCardHash}`: get monthly entitlement.
-- `POST /entitlements/validate`: validate entitlement before distribution.
-
-### Authentication
-
-- `POST /auth/mock-otp`: simulate OTP authentication.
-- `POST /auth/simulated-biometric`: simulate biometric authentication.
-- `POST /auth/supervisor-exception`: record approved exception flow.
-
-### Distributions
-
-- `POST /distributions`: record FPS distribution.
-- `GET /distributions/{distributionId}`: get distribution.
-- `GET /distributions/{distributionId}/receipt`: get masked citizen receipt.
-
-### Trace
-
-- `GET /trace/lots/{lotId}`: verify lot trace.
-- `GET /trace/distributions/{distributionId}`: verify distribution receipt.
-
-### Audit
-
-- `GET /audit-alerts`: list alerts.
-- `POST /audit-alerts/reconcile`: run reconciliation rules.
-- `POST /audit-alerts/{alertId}/resolve`: resolve alert.
-
-### Dashboard
-
-- `GET /dashboard/summary`: stock, lots, distributions, and alerts summary.
-- `GET /dashboard/fps-risk`: high-risk FPS list.
-- `GET /dashboard/pending-receipts`: pending receipt list.
-
-## PostgreSQL Tables
-
-- `stakeholders`.
-- `users`.
-- `commodity_lots`.
-- `stock_positions`.
-- `transfer_orders`.
-- `fps_allocations`.
-- `beneficiary_registry_mock`.
-- `ration_cards_mock`.
-- `monthly_entitlements`.
-- `auth_transactions`.
-- `distribution_transactions`.
-- `ledger_tx_index`.
-- `audit_alerts`.
-- `smartpds_integration_logs`.
-
-## Event Flow
-
-### Lot Creation
-
-1. API validates request and role.
-2. PostgreSQL transaction creates lot and initial stock position.
-3. Backend submits `CreateCommodityLot` to Fabric.
-4. Backend stores `ledgerTxId` in `ledger_tx_index`.
-5. API returns lot state and ledger reference.
-
-### Custody Transfer
-
-1. Sender dispatches stock.
-2. Backend validates sender stock.
-3. Backend updates transfer status and reserves or reduces sender stock.
-4. Backend submits `DispatchLot`.
-5. Receiver confirms receipt.
-6. Backend updates receiver stock.
-7. Backend submits `ReceiveLot`.
-8. If received quantity is lower, backend creates `SHORT_RECEIPT` audit alert and submits `RaiseAuditFlag`.
-
-### Distribution
-
-1. FPS dealer initiates mock authentication.
-2. Backend records auth result.
-3. Backend validates entitlement and FPS stock.
-4. Backend records distribution and updates lifted quantity.
-5. Backend reduces FPS stock.
-6. Backend submits `RecordDistribution`.
-7. API returns masked receipt and verification ID.
-
-### Reconciliation
-
-1. Audit engine reads operational records.
-2. Audit engine reads ledger transaction references and current ledger state.
-3. Rules compare quantities, statuses, and hashes.
-4. Mismatches create audit alerts.
-5. Alerts are visible in dashboard and trace views.
-
-## Role Model
-
-- System Admin: users, roles, configuration, seed data.
-- Department Admin: stakeholders, lots, allocations, oversight, alert resolution.
-- Procurement User: lot creation and dispatch from procurement centre.
-- Godown Operator: stock receipt and dispatch.
-- FPS Dealer: FPS receipt, authentication initiation, entitlement validation, distribution.
-- Auditor: trace viewing, alert review, alert creation, alert resolution workflow.
-
-## Audit Rules
-
-- `DB_LEDGER_MISMATCH`: operational DB quantity or hash differs from ledger proof.
-- `SHORT_RECEIPT`: received quantity is lower than dispatched quantity.
-- `FPS_OVER_DISTRIBUTION`: distribution exceeds FPS stock.
-- `DUPLICATE_CLAIM`: beneficiary attempts to lift same monthly entitlement twice.
-- `IN_TRANSIT_DELAY`: stock remains in transit beyond configured threshold.
-- `UNAUTHORIZED_TRANSACTION`: actor attempts restricted transaction.
-- `FPS_CLOSING_STOCK_MISMATCH`: calculated closing stock differs from recorded stock.
-- `DISTRIBUTION_TAMPERED`: distribution record hash differs from ledger proof.
-
-## Error Handling
-
-- Reject invalid or unauthorized role.
-- Reject inactive stakeholder.
-- Reject insufficient stock.
-- Reject duplicate claim.
-- Reject inactive ration card.
-- Reject failed authentication unless supervisor exception exists.
-- Reject invalid quantity.
-- Create audit alert for quantity mismatch instead of silently correcting it.
-- Return consistent API errors with request ID and error code.
-
-## Demo Seed Data
-
-Canonical records are defined in `mock/` and loaded through `@pds/fixtures`. Key identifiers:
-
-- One district demo set with seven stakeholders (procurement through auditor).
-- One ration card hash: `demo-ration-card-hash`.
-- One beneficiary ref hash: `beneficiary-hash` (canonical across backend seed and workspace entities).
-- One rice lot: `LOT-RICE-2026-001`.
-- Workspace allocations: `ALLOC-2026-001`, `ALLOC-2026-002`.
-- One successful distribution: `DIST-2026-001`.
-
-Backend bootstrap uses `mock/seed/backend.json`. Richer workspace/demo state uses `mock/entities/` and `mock/scenarios/`. See [Mock data and fixtures](../implementation/mock-data.md).
-
-## Data Privacy Design
-
-Ledger distribution receipt fields should use:
-
-- `distributionId`.
-- `fpsId`.
-- `rationCardHash`.
-- `beneficiaryRefHash`.
-- `commodity`.
-- `deliveredKg`.
-- `authMode`.
-- `authResult`.
-- `authTxnRefHash`.
-- `dealerId`.
-- `timestamp`.
-
-Ledger distribution receipt fields must not include:
-
-- Aadhaar number.
-- Biometric data.
-- OTP.
-- Mobile number.
-- Full ration card number.
-- Full beneficiary name unless explicitly approved for a non-sensitive demo dataset.
+| Location | Responsibility |
+|---|---|
+| `mock/entities/` | Workspace records, including two FPS identities for isolation |
+| `mock/integrations/` | Simulated SMART-PDS/RCMS, SCM, and AePDS/ePoS events |
+| `mock/seed/backend.json` | Backend bootstrap records |
+| `mock/scenarios/` | Demonstration exceptions and dashboard overrides |
+| `packages/fixtures/` | Typed consumers of the canonical JSON |
+
+`npm run fixtures:sql` regenerates `infra/postgres/seed.sql`.
+`npm run fixtures:integrations` posts the simulated source events through the
+same normalization boundary used by server-to-server integration clients.
+
+Fixtures are demonstrations of a contract seam, not real state-system data or
+evidence of an approved integration.
+
+## API Modules
+
+The NestJS API under `apps/api/src/modules/` keeps controllers thin.
+
+| Area | Responsibility |
+|---|---|
+| `auth` | OIDC/JWT subject parsing and visibly simulated FPS authentication |
+| `authorization` | Durable role, organization, geography, stakeholder, FPS/facility, and integration-source assignments |
+| Domain modules | Lots, transfers, allocations, stock, entitlements, distributions, trace, audit, and dashboards |
+| `integrations` | Validation, canonical hashing, replay, quarantine, correlation, reconciliation, source health, and trace |
+| `persistence` | Snapshot persistence today; repositories/atomic command boundary for the pilot target |
+| `proofs` and `outbox` | Proof status and asynchronous Fabric submission |
+| `fabric` | Privacy-approved proof construction and Fabric Gateway adapter |
+| `admin` | Administrative functions without implied operational authority |
+
+Token claims identify the subject but do not replace active database
+authorization checks.
+
+## Entry And Identity Journeys
+
+The web application presents Department, Supply-chain Operations, Fair Price
+Shop Demo, Audit/Management, and Platform Administration entry journeys.
+
+For an FPS request:
+
+1. verify the token and active application role;
+2. load the active `FAIR_PRICE_SHOP` assignment;
+3. derive the effective FPS and opaque operator reference;
+4. scope collection and dashboard queries to that FPS;
+5. return `404` for an individual resource assigned to another FPS;
+6. if a legacy mutation includes `fpsId` or `dealerId`, return `403` unless it
+   matches the derived identity;
+7. never grant operational authority solely because the subject is a platform
+   administrator.
+
+The maintained web client omits caller-controlled `fpsId` and `dealerId`.
+`FPS-101` and `FPS-202` fixtures and tests demonstrate isolation.
+
+## Integration Endpoints
+
+Pilot source events use the authenticated `integration-service` role:
+
+- `POST /integrations/smartpds/v1/master-references`;
+- `POST /integrations/scm/v1/allocation-events`;
+- `POST /integrations/scm/v1/movement-events`;
+- `POST /integrations/epos/v1/distribution-events`.
+
+Operational support endpoints expose event lists, per-source health,
+reconciliation, and source-to-operation-to-proof trace. Service accounts are
+restricted to configured source systems, endpoint families, event types, and
+active credentials.
+
+Ingestion result semantics are:
+
+- `201`: new event accepted and processed;
+- `200`: identical replay, with the original result;
+- `202`: valid event durably quarantined pending a missing parent;
+- `409`: source event ID reused with conflicting approved content;
+- validation error: malformed schema or a recursively prohibited field.
+
+## Canonical Ingestion Flow
+
+1. Authenticate the integration-service subject and load its database
+   assignments.
+2. Validate endpoint family, source system, event type, schema version, and
+   credential status.
+3. Recursively reject prohibited identity or device-credential fields.
+4. Map the configured external shape into a state-neutral canonical payload.
+5. Canonicalize the privacy-approved payload and recompute its hash.
+6. Resolve `(source_system, source_event_id)`.
+7. Return the original result for an identical replay.
+8. Record a conflict and audit exception for different approved content.
+9. Store a valid missing-parent event as `QUARANTINED`.
+10. For a processable event, apply the normalized business operation, record
+    reconciliation/domain results, and create proof intent.
+11. Correlate quarantined children when their parent arrives.
+
+Amendments and reversals are new linked events; history is never overwritten.
+
+## Operational Command And Proof Flow
+
+The pilot-safe transaction boundary is:
+
+```text
+BEGIN
+  lock affected rows
+  validate idempotency, version, stock, and entitlement
+  insert accepted source/domain event
+  apply business mutation and workflow history
+  insert reconciliation result or exception
+  insert Fabric outbox proof intent
+COMMIT
+```
+
+All steps must use one PostgreSQL client. Quantity changes use row locks,
+conditional updates, unique idempotency constraints, and optimistic versions.
+Ingestion, FPS receipt, and distribution are the first vertical slices that
+must move to this path before pilot traffic.
+
+The controlled-PoC runtime has not completed this migration. It must run one API
+replica, be reset/reseeded before demonstration, and must not be used to claim
+crash atomicity or concurrent mutation safety.
+
+After PostgreSQL acceptance, the embedded outbox worker asynchronously calls
+`RecordLedgerProof`. Operational success is returned independently from proof
+status. Fabric commit confirmation changes the proof to `COMMITTED` and records
+the real Fabric transaction ID. Retryable failures remain visible; exhausted
+failures become `DEAD_LETTER` until an authorized replay.
+
+## Stock And Entitlement Invariants
+
+- Quantities are positive integer kilograms for this cycle.
+- A movement cannot exceed the locked source lot's remaining quantity.
+- A partial movement creates a child lot with `rootLotId` and `parentLotId`.
+- Shortage, damage, rejection, transit loss, and process loss require explicit
+  adjustments; an alert never changes quantity.
+- Repeated commands and transitions are idempotent.
+- Conflicting reuse of an idempotency key is a conflict.
+- Stock and entitlement balances may not be double-spent.
+- Root-lot conservation follows the equation in the
+  [MVP hardening plan](../implementation/mvp-hardening-plan.md).
+
+## Reconciliation Design
+
+The engine compares:
+
+- allocation with dispatch and remaining stock;
+- movement with receipt or explicit adjustment;
+- FPS opening stock + receipts - distributions - adjustments with closing
+  stock.
+
+It tolerates late and out-of-order batches by retaining source occurrence,
+device-sync, ingestion, and processing times. Missing-parent age,
+reconciliation lag, schema versions, and accepted/duplicate/conflicted/
+rejected/quarantined counters are visible per source.
+
+Privacy-safe dead letters retain only data allowed by the same recursive
+boundary validation.
+
+## Fabric Proof Design
+
+Every proof includes:
+
+- `eventId` and `operationId`;
+- actor and application role;
+- submitting organization;
+- canonical payload hash and schema version;
+- non-sensitive entity identifiers;
+- API-generated business timestamp.
+
+Chaincode derives transaction identity and execution time from the Fabric stub.
+Identical `eventId` replay succeeds; conflicting content fails. The API never
+places raw Aadhaar, biometric, OTP, phone/mobile, ration-card, beneficiary-name,
+address, or device-credential material in a proof.
+
+Named chaincode business functions remain compatibility functions.
+`RecordLedgerProof` is the maintained API submission boundary.
+
+## User Interface Status Model
+
+The FPS workspace shows:
+
+- assigned shop and simulated device mapping;
+- allocation, stock, and pending receipts;
+- recent simulated distributions and reconciliation exceptions;
+- source system and source-event status;
+- operational result and proof status as separate concepts;
+- Fabric transaction reference only after a confirmed commit.
+
+Browser authentication and distribution controls are explicitly PoC
+simulations. In a pilot, their authoritative events originate in AePDS/ePoS.
+
+## Verification Gates
+
+Controlled-PoC acceptance requires two-FPS isolation, provenance and status UI,
+privacy rejection, replay/conflict/quarantine tests, build/typecheck/lint/unit
+tests, and demo HTTP tests where loopback is permitted.
+
+Pilot acceptance additionally requires approved Maharashtra contracts,
+row-scoped atomic command tests including crashes and simultaneous operations,
+backup/restore and recovery exercises, security/privacy review, integration
+operations, and a two-peer Fabric regression.

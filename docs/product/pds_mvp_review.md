@@ -1,6 +1,10 @@
 # ViksitPDS POC/MVP: Architectural and Functional Review
 
-This document provides a comprehensive review of the **ViksitPDS** proof-of-concept (POC) / minimum viable product (MVP). It compares the system's entities and operational flows against the typical Public Distribution System (PDS) in India and evaluates how well the design conforms to the requirements defined in the [CDAC Problem Statement](file:///home/ramana/work/sources/cc/toomoki-cdac-pds/docs/requirements/cdac-problem-statement.md).
+> Historical review snapshot. Use the maintained product requirements,
+> architecture, and hardening trackers for current behavior.
+
+This document compares an earlier **ViksitPDS** proof-of-concept against the
+[CDAC Problem Statement](../requirements/cdac-problem-statement.md).
 
 ---
 
@@ -76,7 +80,7 @@ sequenceDiagram
 
 ### CDAC Goal Alignment
 
-The [CDAC Problem Statement](file:///home/ramana/work/sources/cc/toomoki-cdac-pds/docs/requirements/cdac-problem-statement.md) demands:
+The [CDAC Problem Statement](../requirements/cdac-problem-statement.md) demands:
 > *"Blockchain enabled PDS to enhance the transparency, accountability and efficiency of food grain/ commodity distribution... immutable, transparent, shared record of all transactions from procurement to delivery... combat issues related to misuse and leakage."*
 
 The POC is **very well-conceived** in terms of target objectives:

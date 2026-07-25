@@ -1,5 +1,9 @@
 # Maharashtra PDS Gaps Implementation Plan
 
+> Superseded by the maintained
+> [J&K/Maharashtra ePoS–SMART-PDS implementation plan](jkmaha-epos-smartpds-implementation-plan.md).
+> This note remains as historical scope context.
+
 This planning note is reset to the current POC/MVP scope.
 
 Current implemented chain:

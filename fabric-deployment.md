@@ -1,546 +1,387 @@
-# Fabric Mode — Deployment & Testing Guide
+# ViksitPDS Controlled-Demo Deployment Guide
 
-This guide covers bootstrapping the live Hyperledger Fabric network, starting the ViksitPDS stack in **Fabric mode** (`PDS_LEDGER_MODE=fabric`), and verifying end-to-end behavior.
+## Scope And Safety
 
-For general deployment options (demo mode, local dev, production notes), see [DEPLOYMENT.md](DEPLOYMENT.md).
+This guide deploys the local controlled demonstration: PostgreSQL, Keycloak,
+one NestJS API replica, the React web application, and optionally the
+Hyperledger Fabric 2.5.15 two-peer network.
+
+It is not a pilot or production deployment. SMART-PDS/RCMS, state-SCM, and
+AePDS/ePoS fixtures simulate approved integration seams; they are not live
+government connections.
+
+The current operational runtime uses an in-memory engine with serialized
+full-state PostgreSQL snapshots. Snapshot saving and proof-outbox insertion are
+separate operations. Consequently:
+
+- run exactly one API replica;
+- reset and deterministically reseed before a controlled demonstration;
+- do not claim crash safety or concurrent mutation safety;
+- do not deploy pilot traffic on this persistence path;
+- report PostgreSQL operational acceptance separately from Fabric proof
+  completion.
+
+The replacement gate is defined in
+[MVP hardening plan](docs/implementation/mvp-hardening-plan.md).
+
+## Services And Ports
+
+| Service | Local endpoint |
+|---|---|
+| Web | http://localhost:4173 |
+| API | http://localhost:3000 |
+| API health | http://localhost:3000/health |
+| OpenAPI | http://localhost:3000/openapi.json |
+| Keycloak | http://localhost:8080 |
+| PostgreSQL | `localhost:5433` |
+| Food CouchDB debug profile | http://localhost:5984/_utils |
+| Godown CouchDB debug profile | http://localhost:6984/_utils |
+
+The API's PostgreSQL DSN inside Compose uses port `5432`; host tools use the
+published port `5433`.
 
 ## Prerequisites
 
-| Requirement | Notes |
-|-------------|-------|
-| **Docker + Docker Compose** | Required |
-| **Node.js 22+** and **npm** | For smoke/demo/regression scripts from the host |
-| **Ports free** | `3000` (API), `4173` (web), `5433` (postgres), `7050/7051/7053/9051` (Fabric) |
+- Node.js 22 and npm;
+- Docker and Docker Compose;
+- Git;
+- sufficient local resources for PostgreSQL, Keycloak, and optional Fabric.
 
-You do **not** need Fabric CLI binaries on the host if you use the all-in-one bootstrap script (recommended).
+The maintained Fabric bootstrap runs pinned `hyperledger/fabric-tools:2.5.15`
+inside Docker. Host `peer`, `osnadmin`, and `configtxgen` binaries are not
+required.
 
-## Architecture (fabric profile)
+Never commit `.env`, local secrets, generated Fabric crypto, channel artifacts,
+chaincode packages, database dumps, journal output, or lifecycle evidence.
 
-```text
-web ──▶ api (PDS_LEDGER_MODE=fabric) ──▶ postgres
-              │
-              ├── gRPC/TLS ──▶ peer0.food.example.com
-              └── (dual-write) operational snapshots in postgres
-orderer + peer0.godown + CouchDB + Fabric CAs (profile fabric)
-```
+## Configuration
 
-- **Channel:** `pdschannel`
-- **Chaincode:** `pds-chaincode`
-- **Organizations (deployed):** Food Department + Godown (2-org demo)
-
----
-
-## Step 1 — Bootstrap the Fabric network
-
-From the repository root:
+Copy the non-secret template:
 
 ```bash
-cd /path/to/toomoki-cdac-pds
-
-# Recommended: full bootstrap via Docker tools (no host peer/osnadmin/configtxgen needed)
-./blockchain/fabric-network/scripts/bootstrap-fabric-full.sh
+cp .env.example .env
 ```
 
-This script:
+Important settings:
 
-1. Stops existing Fabric containers (clears in-container ledger state)
-2. Generates crypto, channel config, and connection profiles
-3. Starts Fabric containers (orderer, 2 peers, CouchDB, CAs)
-4. Joins the orderer and peers to channel `pdschannel`
-5. Deploys chaincode `pds-chaincode`
+| Setting | Controlled-demo value |
+|---|---|
+| `PDS_AUTH_MODE` | `oidc` |
+| `PDS_AUTHORIZATION_MODE` | `database` |
+| `PDS_PERSISTENCE_BACKEND` | `postgres` in Compose |
+| `PDS_LEDGER_MODE` | `demo` or `fabric` |
+| `PDS_ALLOW_RESET` | `false` except during an explicitly authorized reset |
+| `VITE_DATA_SOURCE` | `api`; use `mock` only as an explicitly labelled offline workspace |
+| `VITE_OIDC_AUTHORITY` | browser-reachable Keycloak realm |
 
-**Alternative (manual):** if you already have Fabric CLI tools installed:
+Static deployed API tokens are not supported. Browser users use Authorization
+Code + PKCE. Service clients use OIDC client credentials.
+
+Use strong local-only values for:
+
+- `KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME`;
+- `KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD`;
+- `PDS_METRICS_CLIENT_SECRET`;
+- `PDS_BENCHMARK_CLIENT_SECRET`;
+- `PDS_INTEGRATION_CLIENT_SECRET`;
+- `PDS_DEMO_USER_PASSWORD`.
+
+Do not place those values in tracked files or shell history on a shared host.
+
+## Install And Verify Source
 
 ```bash
-./blockchain/fabric-network/scripts/bootstrap-network.sh
-docker compose --profile fabric up -d \
-  orderer.pds.example.com couchdb0 couchdb1 \
-  peer0.food.example.com peer0.godown.example.com \
-  ca.food.example.com ca.godown.example.com
-./blockchain/fabric-network/scripts/osnadmin-channel-join.sh
-./blockchain/fabric-network/scripts/peer-channel-join.sh
-./blockchain/fabric-network/scripts/deploy-chaincode.sh
+npm ci
+npm run build
+npm run typecheck
+npm run lint
+npm test
 ```
 
-Verify Fabric containers are running:
+HTTP verification is a separate gate:
 
 ```bash
-docker compose --profile fabric ps
+npm run test:demo-http
 ```
 
-You should see `orderer.pds.example.com`, `peer0.food.example.com`, `peer0.godown.example.com`, etc.
+If the execution environment forbids loopback listeners, report that command as
+environment-blocked rather than an application success or failure.
 
----
+## Start PostgreSQL And IAM
 
-## Step 2 — Configure Fabric mode + auth tokens
-
-Copy the Fabric env template to `.env` at the repo root (Docker Compose reads this):
+Start only the dependencies first:
 
 ```bash
-cp .env.fabric.example .env
+KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME=pds-local-admin \
+KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD='<local-admin-password>' \
+docker compose --profile iam up -d postgres keycloak
 ```
 
-Key values in `.env.fabric.example`:
-
-```env
-PDS_LEDGER_MODE=fabric
-PDS_PERSISTENCE_BACKEND=postgres
-PDS_POSTGRES_DSN=postgresql://pds:pds@localhost:5433/pds_chain
-
-# Required for mutating API calls in fabric mode
-PDS_DEV_AUTH_TOKEN=dev-mvp-token
-PDS_DEV_AUTH_ROLE=department
-PDS_DEV_AUTH_SUBJECT=fabric-smoke
-PDS_ADMIN_TOKEN=admin-mvp-token
-
-# Web — always use live API in fabric mode
-VITE_DATA_SOURCE=api
-VITE_API_BASE_URL=/api
-VITE_DEV_AUTH_TOKEN=dev-mvp-token
-VITE_ADMIN_TOKEN=admin-mvp-token
-```
-
-**Important:** In Fabric mode, every **mutating** API call (`POST`, `PUT`, etc.) requires:
-
-```http
-Authorization: Bearer dev-mvp-token
-```
-
----
-
-## Step 3 — Start the full stack
-
-```bash
-docker compose --profile fabric up --build -d
-```
-
-This starts:
-
-- **postgres** (port `5433`)
-- **api** with `PDS_LEDGER_MODE=fabric`, connected to the Fabric peer over the `pds-fabric` Docker network
-- **web** UI (port `4173`)
-- All Fabric services (if not already up from bootstrap)
-
-Wait for health:
+Wait until both services are healthy:
 
 ```bash
 docker compose ps
-# api should show "healthy"
 ```
 
----
-
-## Step 4 — Verify API is in Fabric mode
+Bootstrap the realm clients, roles, demo users, and database assignments:
 
 ```bash
-curl -s http://localhost:3000/health | jq
+KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME=pds-local-admin \
+KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD='<local-admin-password>' \
+PDS_METRICS_CLIENT_SECRET='<metrics-secret>' \
+PDS_BENCHMARK_CLIENT_SECRET='<benchmark-secret>' \
+PDS_INTEGRATION_CLIENT_SECRET='<integration-secret>' \
+PDS_DEMO_USER_PASSWORD='<demo-user-password>' \
+npm run iam:bootstrap
 ```
 
-Expected:
+The bootstrap:
 
-```json
-{ "ok": true, "ledgerMode": "fabric" }
-```
+- assigns `demo-fps` to `FPS-101`;
+- creates durable subject-role and FPS-scope assignments;
+- configures management, department, supply-chain, audit, and platform users;
+- configures the Maharashtra non-production integration service client;
+- restricts that client to SMART-PDS/RCMS, state-SCM, and AePDS/ePoS endpoint
+  families and canonical event types.
 
-If you see `"ledgerMode": "demo"`, your `.env` was not picked up — confirm `PDS_LEDGER_MODE=fabric` is in `.env` and restart:
+Run the IAM checks after changing realm or authorization configuration:
 
 ```bash
-docker compose --profile fabric up --build -d
+npm run test:iam
 ```
 
-Readiness (ledger bootstrapped from seed data):
+## Start In Demo Ledger Mode
+
+The demo ledger mode does not require Fabric containers:
 
 ```bash
-curl -s http://localhost:3000/health/ready | jq
+PDS_LEDGER_MODE=demo docker compose up -d --build api web
 ```
 
-Dashboard smoke:
+Check the deployment:
 
 ```bash
-curl -s http://localhost:3000/dashboard/summary | jq
+docker compose ps
+curl http://localhost:3000/health
 ```
 
----
+Open http://localhost:4173 and sign in through Keycloak. The UI presents:
 
-## Step 5 — Run automated Fabric smoke tests
+- Department;
+- Supply-chain Operations;
+- Fair Price Shop Demo;
+- Audit/Management;
+- Platform Administration.
 
-### Gateway smoke (recommended first check)
+The FPS workspace must display the authenticated `FPS-101` assignment.
+Authentication and distribution controls must remain visibly labelled as
+simulations of authoritative AePDS/ePoS events.
+
+## Seed Simulated Integration Events
+
+This command sends `mock/integrations/maharashtra-sandbox-events.json` through
+the authenticated canonical integration endpoints:
 
 ```bash
-PDS_DEV_AUTH_TOKEN=dev-mvp-token npm run smoke:fabric
+PDS_INTEGRATION_CLIENT_SECRET='<integration-secret>' \
+npm run fixtures:integrations
 ```
 
-This:
+Expected output identifies
+`adapter: "fixture-backed-maharashtra-sandbox"` and
+`realIntegration: false`.
 
-1. Hits `/health`
-2. `POST /stakeholders` (with Bearer token)
-3. `GET /trace/lots/LOT-RICE-2026-001` and asserts `verificationSource === "chaincode"`
+The source-event HTTP contract is:
 
-### Shell smoke
+| Result | Status |
+|---|---|
+| New accepted event | `201` |
+| Identical replay | `200`, original result |
+| Missing-parent quarantine | `202` |
+| Conflicting content for the same source ID | `409` |
+| Malformed or prohibited content | validation error |
+
+Use the integration service token to inspect:
+
+- `GET /integrations/events`;
+- `GET /integrations/health`;
+- `GET /integrations/events/{sourceSystem}/{sourceEventId}/trace`;
+- `POST /integrations/reconcile`.
+
+The browser demo endpoints are not pilot ingestion endpoints.
+
+## Start Fabric Mode
+
+### Destructive reset warning
+
+`blockchain/fabric-network/scripts/bootstrap-fabric-full.sh` stops the Fabric
+containers and clears their in-container ledger state before rebuilding the
+local network. Run it only when the local Fabric reset is explicitly
+authorized.
 
 ```bash
-PDS_DEV_AUTH_TOKEN=dev-mvp-token blockchain/fabric-network/scripts/smoke-fabric.sh
+blockchain/fabric-network/scripts/bootstrap-fabric-full.sh
 ```
 
-### Happy-path demo against live Fabric API
+The script generates local crypto and connection profiles, starts the orderer,
+both peers, CouchDB, and CAs, joins `pdschannel`, and deploys
+`pds-chaincode`.
+
+The bootstrap's initial policy is a local-demo choice. Inspect the committed
+definition before presenting governance claims. A policy requiring both Food
+and Godown signatures must be deployed as an explicit new chaincode sequence
+and verified on both peers.
+
+Start the application in Fabric mode:
 
 ```bash
-PDS_DEV_AUTH_TOKEN=dev-mvp-token node scripts/demo/happy-path.mjs --ledger=fabric
+PDS_LEDGER_MODE=fabric \
+PDS_FABRIC_ENDORSING_ORGS=FoodAndCivilSuppliesMSP,GodownWarehouseMSP \
+docker compose --profile fabric up -d --build api web
 ```
 
-### Exception-path demo
+Use the exact deployed MSP ID `GodownWarehouseMSP`.
+
+`RecordLedgerProof` is the API's submission boundary. Named chaincode business
+functions are compatibility functions. Do not configure the API to synchronously
+re-execute business commands on Fabric.
+
+### Chaincode upgrades
+
+Before changing a deployed definition:
+
+1. query the currently committed definition;
+2. choose a new sequence for changed code;
+3. package and install the identical artifact on both peers;
+4. approve with Food and Godown organizations;
+5. check commit readiness;
+6. commit the definition;
+7. verify it and run the two-peer regression.
+
+Never copy an example sequence blindly or reuse a committed sequence for changed
+code. Preserve the cross-peer gossip and discovery settings.
+
+## Verify Operational And Proof Completion
+
+Check API mode:
 
 ```bash
-PDS_DEV_AUTH_TOKEN=dev-mvp-token node scripts/demo/exception-path.mjs --ledger=fabric
+curl http://localhost:3000/health
 ```
 
-### Full regression suite (includes Fabric gates)
+Run the Fabric regression only against a running local network:
 
 ```bash
-PDS_DEV_AUTH_TOKEN=dev-mvp-token npm run regression:fabric
+PDS_E2E_FABRIC=true npm run regression:fabric
 ```
 
-This runs build, all tests, demo smoke, fabric smoke, and opt-in fabric e2e tests.
-
----
-
-## Verifying Fabric writes
-
-Writes flow through the API → Fabric Gateway → peer → `pds-chaincode` on `pdschannel`, with an operational mirror in Postgres. Use the checks below to confirm data landed on the **live ledger**, not just in the database.
-
-### What gets written where
+For any accepted business event, inspect its proof:
 
 ```text
-Web UI action
-  → API (PDS_LEDGER_MODE=fabric)
-      → Fabric Gateway → peer0.food / peer0.godown
-          → chaincode pds-chaincode (channel pdschannel)
-              → world state in CouchDB (pds.* keys)
-              → block on the orderer ledger
-      → (dual-write) Postgres snapshot (ledger_events, etc.)
+GET /ledger-proofs/{eventId}
 ```
 
-| Layer | What it proves |
-|-------|----------------|
-| `/health` → `ledgerMode: "fabric"` | API is configured for live Fabric, not demo mode |
-| `/trace/lots/:id` → `verificationSource: "chaincode"` | API read chaincode on the peer (strongest app-level proof) |
-| Workflow success → `Ledger tx …` | A Fabric transaction ID was returned for the write |
-| Peer logs → `"operation"` + `txId` | Chaincode executed and logged on the peer |
-| CouchDB Fauxton → `pds.*` documents | Raw world-state keys (dev only) |
-| `peer channel getinfo` | Block height increases after writes |
+Auditor or platform-admin subjects can inspect:
 
-### 1. Confirm Fabric mode
+```text
+GET /admin/proofs/summary
+```
+
+Interpret status exactly:
+
+| Status | Meaning |
+|---|---|
+| `PENDING` | ready or scheduled for submission |
+| `SUBMITTING` | claimed by one worker |
+| `COMMITTED` | Fabric commit confirmed and `fabricTxId` recorded |
+| `FAILED` | retryable, with `nextAttemptAt` |
+| `DEAD_LETTER` | retry limit exhausted; authorized manual retry required |
+
+An operation can be successful while its proof is pending or retryable. Do not
+call it proof-complete until the row is `COMMITTED` with a real Fabric
+transaction ID.
+
+## Authorized Reset And Live Lifecycle
+
+The live lifecycle mutates local demo data and requires reset permission. Do not
+run it unless reset/reseed was requested or clearly authorized.
+
+For an authorized controlled demonstration:
+
+1. enable reset only for the lifecycle window;
+2. run exactly one API replica;
+3. reset and deterministically reseed;
+4. ingest the simulated integration fixtures if they are part of the script;
+5. exercise the operational journey;
+6. wait for every intended proof to become `COMMITTED`;
+7. store any generated evidence outside the repository;
+8. disable reset again.
 
 ```bash
-curl -s http://localhost:3000/health | jq '.ledgerMode'
-# expected: "fabric"
+PDS_BENCHMARK_CLIENT_SECRET='<benchmark-secret>' \
+node scripts/live-lifecycle.mjs
 ```
 
-If you see `"demo"`, copy `.env.fabric.example` → `.env` and restart with `--profile fabric`.
-
-### 2. Confirm chaincode reads (trace endpoint)
-
-```bash
-curl -s http://localhost:3000/trace/lots/LOT-RICE-2026-001 | jq '{verificationSource, history: (.history | length)}'
-```
-
-Expected: `"verificationSource": "chaincode"`. In demo mode this field is absent and history comes from the in-process engine only.
-
-After a mutating workflow, re-run the trace call — `history` length should grow.
-
-### 3. Web UI indicators
-
-| Location | What to look for |
-|----------|------------------|
-| Status badge (top bar) | **Live API (Fabric)** |
-| Workflow action success | `Ledger tx <id>` in the toast |
-| **Trace Explorer** (Lots page) | Lot/receipt trail for the selected lot |
-| **Admin → Ledger activity** (`/admin/ledger`) | Recent events with tx IDs (needs admin token) |
-
-The Trace Explorer and admin ledger pages show **business records** via the API. They do not show raw Fabric blocks or CouchDB rows.
-
-### 4. Peer logs (chaincode execution)
-
-Every chaincode write emits a structured log line (see `contract-base.ts`):
-
-```bash
-docker logs peer0.food.example.com 2>&1 | grep '"operation"'
-```
-
-Example line:
-
-```json
-{"level":"info","plane":"data","operation":"RecordDistribution","txId":"<fabric-tx-id>","ts":"..."}
-```
-
-Match the `txId` to the **Ledger tx** shown in the web UI or API response.
-
-### 5. Query chaincode directly (peer CLI)
-
-Use the helper script (runs a read-only query inside `peer0.food.example.com`):
-
-```bash
-chmod +x blockchain/fabric-network/scripts/query-chaincode.sh
-
-./blockchain/fabric-network/scripts/query-chaincode.sh \
-  GetLotHistory '{"lotId":"LOT-RICE-2026-001"}'
-
-./blockchain/fabric-network/scripts/query-chaincode.sh GetCurrentStock
-```
-
-Check channel block height (should increase after writes):
-
-```bash
-docker cp blockchain/fabric-network/crypto/peerOrganizations/food.example.com/users/Admin@food.example.com/msp \
-  peer0.food.example.com:/tmp/admin-msp
-
-docker exec -e CORE_PEER_MSPCONFIGPATH=/tmp/admin-msp peer0.food.example.com \
-  peer channel getinfo -c pdschannel
-```
-
-### 6. Browse world state in CouchDB Fauxton (dev only)
-
-By default CouchDB ports are **not** exposed to the host. For local debugging, start with the `fabric-debug` profile:
-
-```bash
-docker compose --profile fabric --profile fabric-debug up -d
-```
-
-| Instance | Fauxton URL | Peer |
-|----------|-------------|------|
-| couchdb0 | http://localhost:5984/_utils | peer0.food |
-| couchdb1 | http://localhost:6984/_utils | peer0.godown |
-
-Login: `pds_couch` / `changeme-couch` (override via `PDS_COUCHDB_USER` / `PDS_COUCHDB_PASSWORD` in `.env`).
-
-Open database **`pdschannel_pds-chaincode`** and look for document IDs such as:
-
-| Document `_id` | Contents |
-|----------------|----------|
-| `pds.lots` | All commodity lots |
-| `pds.events` | Ledger events |
-| `pds.distributions` | Distribution records |
-| `pds.stock` | Stock positions |
-| `pds.stakeholders` | Registered stakeholders |
-
-Composite keys (e.g. `rationcard~<hash>`) appear as separate documents.
-
-**Security:** do not enable `fabric-debug` on shared or production hosts — it exposes raw ledger state.
-
-### 7. Hyperledger Explorer (not included)
-
-This repo does not ship [Hyperledger Explorer](https://github.com/hyperledger-labs/blockchain-explorer). For a full block-and-transaction browser UI (blocks, endorsements, chaincode invocations), you would add Explorer as a separate stack pointed at `pdschannel` / `pds-chaincode`.
-
-### Quick verification checklist
-
-```bash
-# 1. Fabric mode
-curl -sf http://localhost:3000/health | jq -e '.ledgerMode == "fabric"'
-
-# 2. Chaincode verification
-curl -sf http://localhost:3000/trace/lots/LOT-RICE-2026-001 | jq -e '.verificationSource == "chaincode"'
-
-# 3. Automated smoke (register + trace)
-PDS_DEV_AUTH_TOKEN=dev-mvp-token npm run smoke:fabric
-
-# 4. Peer query
-./blockchain/fabric-network/scripts/query-chaincode.sh GetCurrentStock
-```
-
----
-
-## Step 6 — Test in the Web UI
-
-1. Open **http://localhost:4173**
-
-2. Confirm the status badge shows **"Live API (Fabric)"** (not "Demo data" or "Live API (Demo)").
-
-3. A yellow banner appears at the top in Fabric mode — **enter the API bearer token**:
-   - Token: `dev-mvp-token` (must match `PDS_DEV_AUTH_TOKEN` on the API)
-   - Click **Save token**
-
-4. Switch roles via the role selector:
-   - Department, Procurement, Godown, FPS, Auditor
-
-5. Exercise workflow actions from the workbench (allocate, receipt, distribution, etc.) — these hit the real Fabric ledger.
-
-6. Open **Trace Explorer** for a lot (e.g. `LOT-RICE-2026-001`) and confirm trace data comes from chaincode (`verificationSource: chaincode`).
-
-7. Try scenario selectors:
-   - **Happy path**
-   - **Short receipt**
-   - **Duplicate claim**
-
-8. **Admin pages** (optional): `/admin` routes need `X-Admin-Token: admin-mvp-token` when `PDS_ADMIN_TOKEN` is set. Set this in the admin UI or via `VITE_ADMIN_TOKEN` if you rebuild the web image with that env baked in.
-
----
-
-## Step 7 — Manual API testing with curl
-
-Register a stakeholder (requires auth in fabric mode):
-
-```bash
-curl -s -X POST http://localhost:3000/stakeholders \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer dev-mvp-token" \
-  -d '{
-    "stakeholderId": "MANUAL-001",
-    "stakeholderType": "DISTRICT_SUPPLY_OFFICE",
-    "name": "Manual Test",
-    "district": "Demo",
-    "licenseNo": "MAN-001",
-    "status": "ACTIVE"
-  }' | jq
-```
-
-Trace a lot:
-
-```bash
-curl -s http://localhost:3000/trace/lots/LOT-RICE-2026-001 | jq
-```
-
-OpenAPI spec: **http://localhost:3000/openapi.json**
-
----
-
-## Step 8 — Validate Fabric artifacts (optional)
-
-```bash
-node blockchain/fabric-network/scripts/validate-fabric-artifacts.mjs
-```
-
----
-
-## Cleanup / reset
-
-Stop everything:
-
-```bash
-docker compose --profile fabric down
-```
-
-Stop and wipe postgres data:
-
-```bash
-docker compose --profile fabric down -v
-```
-
-### Full Fabric re-bootstrap (crypto or channel corruption)
-
-If channel join fails or crypto is stale, wipe cryptogen artifacts and re-bootstrap. **Do not** re-run `cryptogen` on top of an existing tree without deleting org MSP directories first.
-
-```bash
-docker compose --profile fabric down
-
-# Wipe stale cryptogen artifacts (keep fabric-ca/ — used by CA containers)
-rm -rf blockchain/fabric-network/crypto/ordererOrganizations \
-       blockchain/fabric-network/crypto/peerOrganizations \
-       blockchain/fabric-network/channel-artifacts
-
-./blockchain/fabric-network/scripts/bootstrap-fabric-full.sh
-docker compose --profile fabric up --build -d
-```
-
----
+The script reports operational results and polls proof status separately. A
+business lifecycle pass with outstanding proofs is not a full proof-completion
+pass.
 
 ## Troubleshooting
 
-### Common issues
+### API cannot validate tokens
 
-| Symptom | Fix |
-|---------|-----|
-| `ledgerMode: "demo"` in `/health` | Copy `.env.fabric.example` → `.env`, restart compose with `--profile fabric` |
-| `401` on POST requests | Set `PDS_DEV_AUTH_TOKEN` on API **and** Bearer token in web UI |
-| `Fabric gateway smoke` fails on `verificationSource` | API still in demo mode — see above |
-| API can't connect to peer | Run bootstrap; check `docker compose --profile fabric ps`; crypto must exist under `blockchain/fabric-network/crypto/` |
-| `ECONNREFUSED` to postgres | `docker compose up postgres -d`; host port is **5433** |
-| Web shows mock/fixture data | API not reachable — check `curl localhost:3000/health`; badge should say "Live API (Fabric)" |
-| Port conflicts | Stop other services on 3000/4173/7051 or change ports in compose files |
-| Need to browse CouchDB world state | `docker compose --profile fabric --profile fabric-debug up -d`, then Fauxton at http://localhost:5984/_utils |
+- Confirm Keycloak is healthy.
+- Confirm the browser issuer is reachable from the browser.
+- Confirm the API's JWKS URI is reachable from the API container.
+- Confirm audience `pds-api`.
+- Re-run `npm run iam:bootstrap` only with the required local secrets.
 
-### JoinChain / MSP / certificate errors
+### Authenticated subject receives `403`
 
-**Error example:**
+- Confirm the token subject has an active database role assignment.
+- For FPS calls, confirm an active `FPS` scope assignment.
+- For integration calls, confirm source system, endpoint family, event type,
+  and credential assignments.
+- Do not treat token claims as a substitute for database authorization.
 
-```text
-proposal failed (err: bad proposal response 500: "JoinChain" for channelID = pdschannel failed
-because of validation of configuration block ... Failed capabilities check ...
-x509: ECDSA verification failure ... ca.pds.example.com
-```
+### FPS resource returns `404`
 
-**Root cause:** Partial crypto regeneration. `cryptogen` does not safely refresh an existing `crypto/` tree. Re-running it without wiping first can leave:
+An individual resource assigned to another FPS intentionally returns `404` to
+avoid disclosure. A legacy mutation body whose identity fields conflict with
+the authenticated assignment returns `403`.
 
-- A **CA cert wrongly placed in `admincerts/`** (e.g. `ca.pds.example.com-cert.pem`)
-- **New** org-level `cacerts/` but **old** orderer/peer node certs that no longer chain to the new CA
+### Proof remains pending or failed
 
-When a peer runs `peer channel join`, it validates the channel config block and sets up the Orderer MSP. A CA cert in `admincerts/` causes ECDSA verification failure.
+- Check `GET /ledger-proofs/{eventId}` and `/admin/proofs/summary`.
+- Inspect API logs without copying sensitive payloads into an issue.
+- Confirm both peers, orderer, chaincode definition, gateway identity, TLS
+  paths, discovery, and endorsement settings.
+- Do not manually mark a proof committed.
+- Use authorized replay for `DEAD_LETTER` after correcting the cause.
 
-**Fix:** Use the [Full Fabric re-bootstrap](#full-fabric-re-bootstrap-crypto-or-channel-corruption) steps above.
+### Fabric discovery or endorsement fails
 
-The bootstrap scripts now guard against this:
+- Confirm both peers joined `pdschannel`.
+- Confirm the exact MSP IDs in the committed policy.
+- Confirm identical chaincode packages and approvals.
+- Preserve peer external endpoints and cross-peer gossip bootstrap settings.
+- Run a two-peer regression after correction.
 
-- `generate-crypto.sh` deletes `ordererOrganizations/` and `peerOrganizations/` before `cryptogen`
-- `configtxgen.sh` removes stale channel blocks before regenerating
-- `bootstrap-fabric-full.sh` runs `docker compose --profile fabric down` first
+## Pilot Release Gate
 
-**Verify MSP health after regeneration:**
+Before any pilot-ready claim, complete all of the following:
 
-```bash
-# admincerts should contain only Admin identity certs, NOT the CA cert
-ls blockchain/fabric-network/crypto/ordererOrganizations/pds.example.com/msp/admincerts/
+- Maharashtra department/NIC-approved RCMS/SMART-PDS, IAeSCM, and AePDS
+  contracts and fixtures;
+- row-scoped atomic PostgreSQL commands for ingestion, FPS receipt, and
+  distribution;
+- simultaneous command, worker, rollback, and crash testing;
+- privacy and security review;
+- TLS, secrets, VAPT, monitoring, incident response, retention, and authorized
+  replay operations;
+- backup/restore and recovery exercises;
+- reconciliation sign-off;
+- two-peer Fabric regression;
+- deployment and HA/DR design for the approved target environment.
 
-# Orderer node cert should verify against org CA
-openssl verify \
-  -CAfile blockchain/fabric-network/crypto/ordererOrganizations/pds.example.com/msp/cacerts/ca.pds.example.com-cert.pem \
-  blockchain/fabric-network/crypto/ordererOrganizations/pds.example.com/orderers/orderer.pds.example.com/msp/signcerts/*.pem
-```
-
-### Chaincode install / Docker build errors
-
-**Error example:**
-
-```text
-chaincode install failed: docker build failed: write unix @->/run/docker.sock: write: broken pipe
-```
-
-**Root cause (most common):** **Docker Engine v29+** is incompatible with Fabric peer/orderer images **before v2.5.15**. The peer uses an older Docker client library that breaks when talking to Docker v29's API (see [hyperledger/fabric#5350](https://github.com/hyperledger/fabric/issues/5350)).
-
-**Fix (recommended):** Use Fabric **2.5.15+** peer and orderer images (this repo defaults to `hyperledger/fabric-peer:2.5.15` and `hyperledger/fabric-orderer:2.5.15`). Recreate the Fabric containers, then redeploy chaincode:
-
-```bash
-docker compose --profile fabric pull orderer.pds.example.com peer0.food.example.com peer0.godown.example.com
-docker compose --profile fabric up -d --force-recreate \
-  orderer.pds.example.com peer0.food.example.com peer0.godown.example.com
-./blockchain/fabric-network/scripts/deploy-chaincode.sh
-```
-
-**Alternatives if you cannot upgrade Fabric images:**
-
-- Downgrade Docker Engine to **v28.x**, or
-- Deploy chaincode as a service (CCAAS) so peers do not build Docker images during `chaincode install`
-
-Ensure Docker is healthy (`docker info`) and peers can reach the socket (they mount `/var/run/docker.sock`).
-
----
-
-## Quick reference — one-liner flow
-
-```bash
-cd /path/to/toomoki-cdac-pds
-./blockchain/fabric-network/scripts/bootstrap-fabric-full.sh
-cp .env.fabric.example .env
-docker compose --profile fabric up --build -d
-curl -s http://localhost:3000/health
-PDS_DEV_AUTH_TOKEN=dev-mvp-token npm run smoke:fabric
-# Then open http://localhost:4173, save token dev-mvp-token, test workflows
-# Optional: expose CouchDB for world-state inspection
-# docker compose --profile fabric --profile fabric-debug up -d
-```
-
----
-
-## Related documentation
-
-- [DEPLOYMENT.md](DEPLOYMENT.md) — general deployment models and environment reference
-- [blockchain/fabric-network/README.md](blockchain/fabric-network/README.md) — Fabric topology and bootstrap script breakdown
-- [docs/technical/poc-to-mvp-with-fabric.md](docs/technical/poc-to-mvp-with-fabric.md) — Fabric mode readiness plan and auth/UI changes
+Passing the controlled-demo lifecycle does not satisfy this gate.

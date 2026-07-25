@@ -1,8 +1,10 @@
 import { Plane } from '../../infrastructure/plane.decorator.js';
-import { Body, Controller, Get, Inject, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Inject, Param, Post, Req } from '@nestjs/common';
 import { PdsLedgerFacade } from '../core/pds-ledger.facade.js';
 import { VerifyLedgerDto } from './dto/verify-ledger.dto.js';
 import { OPERATIONAL_ROLES, Roles } from '../auth/roles.decorator.js';
+import type { AuthenticatedRequest } from '../auth/identity-provider.js';
+import { fpsAssignmentForRead, hideCrossShopResource } from '../auth/fps-scope.js';
 
 @Plane('data')
 @Controller()
@@ -16,9 +18,15 @@ export class TraceController {
   }
 
   @Get('/trace/distributions/:distributionId')
-  async distributionTrace(@Param('distributionId') distributionId: string) {
+  async distributionTrace(
+    @Param('distributionId') distributionId: string,
+    @Req() request?: AuthenticatedRequest
+  ) {
+    const distribution = await Promise.resolve(this.ledger.getDistributionReceipt(distributionId));
+    const assignment = await fpsAssignmentForRead(this.ledger, request);
+    if (assignment && distribution.fpsId !== assignment.fpsId) hideCrossShopResource('Distribution');
     return {
-      distribution: this.ledger.getDistributionReceipt(distributionId),
+      distribution,
       history: await this.ledger.getDistributionHistoryFromChainAsync(distributionId)
     };
   }

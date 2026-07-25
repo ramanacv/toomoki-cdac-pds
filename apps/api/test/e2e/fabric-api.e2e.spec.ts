@@ -11,7 +11,7 @@ const acquireToken = async (): Promise<string> => {
   if (authToken) return authToken;
   const secret = process.env.PDS_BENCHMARK_CLIENT_SECRET;
   if (!secret) throw new Error('Set PDS_BENCHMARK_CLIENT_SECRET for live Fabric e2e');
-  const response = await fetch(process.env.PDS_OIDC_TOKEN_URL ?? 'http://127.0.0.1:8080/realms/viksitpds/protocol/openid-connect/token', {
+  const response = await fetch(process.env.PDS_OIDC_TOKEN_URL ?? 'http://localhost:8080/realms/viksitpds/protocol/openid-connect/token', {
     method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({ grant_type: 'client_credentials', client_id: 'pds-benchmark', client_secret: secret })
   });
@@ -85,10 +85,11 @@ describe.skipIf(!fabricE2eEnabled)('Fabric API e2e', () => {
         await authed('procurement').post('/transfers').send({
           transferId: `${smokeId}-TR`,
           lotId: riceLot!.lotId,
-          fromOrg: 'PROC-001',
-          toOrg: 'FCI-001',
+          fromOrg: 'FCI-001',
+          toOrg: 'GODOWN-S-001',
           dispatchedQtyKg: 10,
-          vehicleNo: 'KA01FAB001'
+          vehicleNo: 'KA01FAB001',
+          transporterId: 'TRANS-001'
         })
       ).status
     );
@@ -127,9 +128,9 @@ describe.skipIf(!fabricE2eEnabled)('Fabric API e2e', () => {
       expectSuccess((await authed('godown').post(`/transfers/${transferId}/receive`).send({ receivedQtyKg: qty })).status);
     };
 
-    await move(`${prefix}-TR1`, 'PROC-001', 'FCI-001', 'procurement');
+    await move(`${prefix}-TR1`, 'FCI-001', 'FCI-001', 'procurement');
     await move(`${prefix}-TR2`, 'FCI-001', 'GODOWN-S-001', 'godown');
-    await move(`${prefix}-TR3`, 'GODOWN-S-001', 'ISSUE-001', 'godown');
+    await move(`${prefix}-TR3`, 'GODOWN-S-001', 'GODOWN-B-001', 'godown');
 
     expectSuccess(
       (
@@ -139,7 +140,9 @@ describe.skipIf(!fabricE2eEnabled)('Fabric API e2e', () => {
           commodity: 'Rice',
           allocatedQtyKg: qty,
           month: '2026-06',
-          sourceGodownId: 'ISSUE-001'
+          sourceGodownId: 'GODOWN-B-001',
+          transporterId: 'TRANS-001',
+          vehicleNo: `KA${prefix.slice(-6)}F`
         })
       ).status
     );
@@ -175,7 +178,6 @@ describe.skipIf(!fabricE2eEnabled)('Fabric API e2e', () => {
 
     const distribution = await authed('fps').post('/distributions').send({
       distributionId: `${prefix}-DIST`,
-      fpsId: 'FPS-101',
       rationCardHash: 'demo-ration-card-hash',
       beneficiaryRefHash: 'beneficiary-hash',
       commodity: 'Rice',
@@ -183,7 +185,6 @@ describe.skipIf(!fabricE2eEnabled)('Fabric API e2e', () => {
       authMode: AuthMode.MOCK_OTP,
       authResult: AuthResult.SUCCESS,
       authTxnRefHash: auth.body.authTxnRefHash,
-      dealerId: 'FPS-DEALER-101',
       timestamp: '2026-06-30T10:00:00.000Z'
     });
     expectSuccess(distribution.status);

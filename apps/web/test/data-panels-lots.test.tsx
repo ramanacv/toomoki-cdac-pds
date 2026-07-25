@@ -11,9 +11,9 @@ const lot = (overrides: Partial<CommodityLot>): CommodityLot => ({
   season: 'Kharif 2026',
   quantityKg: 100,
   qualityGrade: 'A',
-  source: 'PROC-001',
-  currentOwner: 'PROC-001',
-  currentLocation: 'PROC-001',
+  source: 'FCI Central Depot',
+  currentOwner: 'FCI-001',
+  currentLocation: 'FCI Depot',
   status: LotStatus.CREATED,
   ...overrides
 });

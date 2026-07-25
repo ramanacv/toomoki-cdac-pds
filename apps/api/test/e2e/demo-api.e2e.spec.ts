@@ -3,13 +3,15 @@ import request from 'supertest';
 import { AuthMode, AuthResult, StakeholderStatus, StakeholderType } from '@pds/shared-types';
 import { PdsLedgerFacade } from '../../src/modules/core/pds-ledger.facade.js';
 import { createDemoHttpApp, type DemoHttpAppFixture } from '../helpers/demo-http-app.js';
-import { moveLotToIssuePoint } from '../helpers/demo-ledger.js';
+import { moveLotToBlockGodown } from '../helpers/demo-ledger.js';
 
 const expectSuccess = (status: number): void => {
   expect([200, 201]).toContain(status);
 };
 
-const asRole = (role: string) => ({ Authorization: `Bearer test-token:${role}` });
+const asRole = (role: string) => ({
+  Authorization: `Bearer test-token:${role}${role === 'fps' ? ':FPS-101' : ''}`
+});
 
 describe('Demo API e2e', () => {
   let fixture: DemoHttpAppFixture;
@@ -97,14 +99,14 @@ describe('Demo API e2e', () => {
 
     expectSuccess(
       (
-        await request(server).post('/lots').set(asRole('procurement')).send({
+        await request(server).post('/lots').set(asRole('fci')).send({
           lotId: 'LOT-E2E-001',
           commodity: 'Rice',
           season: 'Kharif 2026',
           quantityKg: 300,
           qualityGrade: 'A',
           source: 'E2E Source',
-          currentOwner: 'PROC-001',
+          currentOwner: 'FCI-001',
           currentLocation: 'E2E Yard'
         })
       ).status
@@ -112,13 +114,14 @@ describe('Demo API e2e', () => {
 
     expectSuccess(
       (
-        await request(server).post('/transfers').set(asRole('procurement')).send({
+        await request(server).post('/transfers').set(asRole('fci')).send({
           transferId: 'TR-E2E-001',
           lotId: 'LOT-E2E-001',
-          fromOrg: 'PROC-001',
-          toOrg: 'FCI-001',
+          fromOrg: 'FCI-001',
+          toOrg: 'GODOWN-S-001',
           dispatchedQtyKg: 100,
-          vehicleNo: 'KA01E20001'
+          vehicleNo: 'KA01E20001',
+          transporterId: 'TRANS-001'
         })
       ).status
     );
@@ -136,7 +139,7 @@ describe('Demo API e2e', () => {
     fixture = await createDemoHttpApp();
     const server = fixture.app.getHttpServer();
 
-    moveLotToIssuePoint(fixture.app.get(PdsLedgerFacade));
+    moveLotToBlockGodown(fixture.app.get(PdsLedgerFacade));
 
     expectSuccess(
       (
@@ -146,7 +149,9 @@ describe('Demo API e2e', () => {
           commodity: 'Rice',
           allocatedQtyKg: 40,
           month: '2026-06',
-          sourceGodownId: 'ISSUE-001'
+          sourceGodownId: 'GODOWN-B-001',
+          transporterId: 'TRANS-001',
+          vehicleNo: 'KA01E2E001'
         })
       ).status
     );
@@ -170,7 +175,6 @@ describe('Demo API e2e', () => {
       (
         await request(server).post('/distributions').set(asRole('fps')).send({
           distributionId: 'DIST-E2E-001',
-          fpsId: 'FPS-101',
           rationCardHash: 'demo-ration-card-hash',
           beneficiaryRefHash: 'beneficiary-hash',
           commodity: 'Rice',
@@ -178,7 +182,6 @@ describe('Demo API e2e', () => {
           authMode: AuthMode.MOCK_OTP,
           authResult: AuthResult.SUCCESS,
           authTxnRefHash: auth.body.authTxnRefHash,
-          dealerId: 'DEALER-001',
           timestamp: '2026-06-09T10:10:00.000Z'
         })
       ).status
@@ -186,6 +189,32 @@ describe('Demo API e2e', () => {
 
     const distribution = await request(server).get('/distributions/DIST-E2E-001').set(asRole('fps')).expect(200);
     expect(distribution.body.distributionId).toBe('DIST-E2E-001');
+  });
+
+  it('enforces canonical integration replay, quarantine, and privacy semantics over HTTP', async () => {
+    fixture = await createDemoHttpApp();
+    const server = fixture.app.getHttpServer();
+    const headers = asRole('integration-service');
+    const event = {
+      sourceSystem: 'STATE_SCM',
+      sourceEventId: 'HTTP-SCM-ALLOC-1',
+      eventType: 'ALLOCATION',
+      schemaVersion: 'maha-sandbox-1',
+      occurredAt: '2026-07-23T08:00:00.000Z',
+      payload: { entityType: 'allocation', entityId: 'ALLOC-HTTP-1', fpsRef: 'FPS-101', quantityKg: 10 }
+    };
+    const accepted = await request(server).post('/integrations/scm/v1/allocation-events').set(headers).send(event).expect(201);
+    expect(accepted.body.provenance.status).toBe('ACCEPTED');
+    const duplicate = await request(server).post('/integrations/scm/v1/allocation-events').set(headers).send(event).expect(200);
+    expect(duplicate.body.provenance.operationId).toBe(accepted.body.provenance.operationId);
+    await request(server).post('/integrations/scm/v1/allocation-events').set(headers)
+      .send({ ...event, payload: { ...event.payload, quantityKg: 11 } }).expect(409);
+    await request(server).post('/integrations/scm/v1/allocation-events').set(headers)
+      .send({ ...event, sourceEventId: 'HTTP-PRIVATE', payload: { nested: { mobileNumber: '9999999999' } } })
+      .expect(400);
+    const quarantined = await request(server).post('/integrations/scm/v1/allocation-events').set(headers)
+      .send({ ...event, sourceEventId: 'HTTP-CHILD', parentSourceEventId: 'HTTP-PARENT' }).expect(202);
+    expect(quarantined.body.provenance.status).toBe('QUARANTINED');
   });
 
   it('maps domain errors to correct HTTP status codes via the global filter (T5.2 e2e)', async () => {
@@ -198,7 +227,7 @@ describe('Demo API e2e', () => {
     // Duplicate create → 409 (create the same lot twice).
     await request(server)
       .post('/lots')
-      .set(asRole('procurement'))
+      .set(asRole('fci'))
       .send({
         lotId: 'LOT-DUP-E2E',
         commodity: 'Rice',
@@ -206,13 +235,13 @@ describe('Demo API e2e', () => {
         quantityKg: 50,
         qualityGrade: 'A',
         source: 'src',
-        currentOwner: 'PROC-001',
+        currentOwner: 'FCI-001',
         currentLocation: 'yard'
       })
       .expect(201);
     const duplicate = await request(server)
       .post('/lots')
-      .set(asRole('procurement'))
+      .set(asRole('fci'))
       .send({
         lotId: 'LOT-DUP-E2E',
         commodity: 'Rice',
@@ -220,7 +249,7 @@ describe('Demo API e2e', () => {
         quantityKg: 50,
         qualityGrade: 'A',
         source: 'src',
-        currentOwner: 'PROC-001',
+        currentOwner: 'FCI-001',
         currentLocation: 'yard'
       });
     expect(duplicate.status).toBe(409);
@@ -262,7 +291,7 @@ describe('Demo API e2e', () => {
     fixture = await createDemoHttpApp();
     const server = fixture.app.getHttpServer();
     const ledger = fixture.app.get(PdsLedgerFacade);
-    moveLotToIssuePoint(ledger);
+    moveLotToBlockGodown(ledger);
 
     // Allocation → FPS receipt.
     await request(server)
@@ -274,7 +303,9 @@ describe('Demo API e2e', () => {
         commodity: 'Rice',
         allocatedQtyKg: 50,
         month: '2026-06',
-        sourceGodownId: 'ISSUE-001'
+        sourceGodownId: 'GODOWN-B-001',
+        transporterId: 'TRANS-001',
+        vehicleNo: 'KA01SYS0002'
       })
       .expect(201);
     await request(server).post('/fps-allocations/ALLOC-SYS-001/receipt').set(asRole('fps')).send({ receivedQtyKg: 50 }).expect(201);
@@ -282,14 +313,15 @@ describe('Demo API e2e', () => {
     // A short transfer receipt raises a SHORT_RECEIPT audit alert (exception path).
     await request(server)
       .post('/transfers')
-      .set(asRole('procurement'))
+      .set(asRole('fci'))
       .send({
         transferId: 'TR-SYS-SHORT',
         lotId: 'LOT-KEROSENE-2026-001',
-        fromOrg: 'PROC-001',
-        toOrg: 'FCI-001',
+        fromOrg: 'FCI-001',
+        toOrg: 'GODOWN-S-001',
         dispatchedQtyKg: 20,
-        vehicleNo: 'KA01SYS0001'
+        vehicleNo: 'KA01SYS0001',
+        transporterId: 'TRANS-001'
       })
       .expect(201);
     await request(server).post('/transfers/TR-SYS-SHORT/receive').set(asRole('fci')).send({ receivedQtyKg: 18 }).expect(201);
@@ -314,7 +346,6 @@ describe('Demo API e2e', () => {
       .set(asRole('fps'))
       .send({
         distributionId: 'DIST-SYS-001',
-        fpsId: 'FPS-101',
         rationCardHash: 'demo-ration-card-hash',
         beneficiaryRefHash: 'beneficiary-hash',
         commodity: 'Rice',
@@ -322,7 +353,6 @@ describe('Demo API e2e', () => {
         authMode: AuthMode.MOCK_OTP,
         authResult: AuthResult.SUCCESS,
         authTxnRefHash: auth.body.authTxnRefHash,
-        dealerId: 'DEALER-001',
         timestamp: '2026-06-09T10:10:00.000Z'
       })
       .expect(201);

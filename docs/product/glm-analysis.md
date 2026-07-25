@@ -3,6 +3,9 @@
 > Generated: 2026-06-25
 > Scope: Full review of docs, API (`apps/api`), chaincode (`blockchain/`), frontend (`apps/web`), infra (`infra/`, `scripts/`), and repo hygiene.
 > Companion document: [docs/implementation/glm-analysis-impl.md](../implementation/glm-analysis-impl.md) — implementation plan for every issue below.
+>
+> Historical review snapshot. Use the maintained architecture and hardening
+> trackers for current state.
 
 ## What's working well
 

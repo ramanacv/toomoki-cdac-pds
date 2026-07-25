@@ -1,296 +1,236 @@
 # ViksitPDS
 
-Blockchain-enabled trust, traceability, audit, and authenticated-delivery layer for India's **Public Distribution System (PDS)**.
+ViksitPDS is a demonstration and near-MVP trust, reconciliation, traceability,
+and immutable-proof layer for India's Public Distribution System.
 
-ViksitPDS complements SMART-PDS, state PDS systems, ePoS, and command-centre dashboards. It does **not** replace them. The MVP demonstrates one complete rice journey from procurement to beneficiary distribution with mock data and simulated integrations.
+It complements SMART-PDS/RCMS, IAeSCM and state supply-chain systems,
+AePDS/ePoS, procurement, logistics, authentication infrastructure, and command
+centres. It does not replace them and is not production-ready.
 
-## What the MVP Demonstrates
+## What The Controlled PoC Demonstrates
 
-```text
-Procurement Centre
-  -> FCI
-  -> State Godown
-  -> Issue Point
-  -> FPS Allocation
-  -> FPS Receipt
-  -> Beneficiary Authentication (mock)
-  -> Entitlement Validation
-  -> Distribution
-  -> Blockchain Receipt
-  -> Audit And Traceability
-```
+- a procurement-to-FPS custody journey;
+- an identity-scoped `FPS-101` workspace with a second FPS fixture proving
+  isolation;
+- visibly simulated FPS authentication and distribution actions;
+- fixture-backed SMART-PDS/RCMS, state-SCM, and AePDS/ePoS source events;
+- privacy-safe beneficiary lifecycle projections, external ghost/duplicate
+  screening, guided decisions, appeals, and reinstatement;
+- canonical provenance, replay/conflict handling, missing-parent quarantine,
+  reconciliation, and source-to-proof trace;
+- PostgreSQL operational state with asynchronous, non-sensitive Fabric proofs;
+- separate operational and proof completion.
 
-## Core Privacy Rule
+The external adapters are simulations of authorized integration seams. They are
+not live Maharashtra or J&K integrations.
 
-Sensitive beneficiary data stays **off-chain**. Aadhaar numbers, biometrics, OTPs, mobile numbers, and full ration card numbers must not be written to the ledger. Only privacy-preserving hashes, references, and audit proofs are stored on-chain.
+## Authority And Privacy
 
-## Architecture Overview
+PostgreSQL is authoritative for ViksitPDS operational workflow state. Fabric
+stores privacy-approved immutable proofs asynchronously through
+`RecordLedgerProof`; Fabric delay or failure does not roll back an accepted
+operation.
 
-ViksitPDS supports two ledger modes via `PDS_LEDGER_MODE`:
+Never place raw Aadhaar, biometrics, OTPs, phone/mobile numbers, full ration-card
+values, unmasked beneficiary names or addresses, or device credentials in
+responses, logs, source-event storage, dead letters, or Fabric proofs. Use
+approved hashes and opaque references.
 
-| Mode | Value | Ledger | Fabric containers |
-|------|-------|--------|-------------------|
-| **Demo** (default) | `demo` | In-process `PdsChaincodeInvoker` + PostgreSQL snapshots | Not required |
-| **Fabric** | `fabric` | `@hyperledger/fabric-gateway` → `pds-chaincode` on `pdschannel` | `--profile fabric` |
+## Current Limitation
 
-Legacy `PDS_LEDGER_BACKEND=chaincode-runtime` maps to demo; `fabric-gateway` maps to fabric.
+The controlled demo still runs the in-memory domain engine with serialized
+full-state PostgreSQL snapshots. Snapshot persistence and proof-outbox insertion
+are separate operations. Run exactly one API replica, reset and deterministically
+reseed before demonstrations, and do not infer crash atomicity, concurrent
+mutation safety, pilot readiness, or production readiness.
 
-The NestJS API is organized into feature modules under `apps/api/src/modules/` (health, stakeholders, lots, transfers, allocations, auth, entitlements, distributions, trace, audit, dashboard, ledger, fabric).
+The mandatory replacement is tracked in
+[MVP hardening plan](docs/implementation/mvp-hardening-plan.md).
 
-## Technology Stack
+## Architecture
 
-| Layer | Technology |
-|-------|------------|
-| Blockchain | Hyperledger Fabric 2.5.15 (2-org demo) or in-process chaincode runtime (demo mode) |
-| Chaincode | TypeScript (`blockchain/chaincode/pds-chaincode`) |
-| API | NestJS 11 on Node.js 22 |
-| Database | PostgreSQL 16 |
-| Frontend | React 19 + Vite 7 |
-| Monorepo | npm workspaces |
+| Layer | Technology and responsibility |
+|---|---|
+| Web | React 19 + Vite 7; separate department, operations, FPS, audit/management, and platform-admin journeys |
+| API | NestJS 11 on Node.js 22; OIDC, database authorization, domain and integration services |
+| Operations | PostgreSQL 16; workflow state, assignments, canonical events, reconciliation, proof outbox |
+| Proofs | Hyperledger Fabric 2.5.15 two-org demo or in-process demo ledger |
+| Contracts | `@pds/shared-types` and fixture-backed adapters in `mock/integrations/` |
+
+Ledger modes:
+
+| `PDS_LEDGER_MODE` | Behavior |
+|---|---|
+| `demo` | In-process ledger adapter; Fabric containers not required |
+| `fabric` | Fabric Gateway to `pds-chaincode` on `pdschannel` |
+
+The API modules include authorization, integrations, proof/outbox operations,
+and the operational domain modules under `apps/api/src/modules/`.
 
 ## Repository Layout
 
 ```text
-apps/
-  api/          NestJS REST API
-  web/          React dashboard and workflow UI
-blockchain/
-  chaincode/pds-chaincode/   Shared ledger engine + Fabric contract
-  fabric-network/            Fabric 3.x 2-org stack, bootstrap scripts, connection profiles
-infra/
-  postgres/     schema.sql and seed.sql (generated from mock seed)
-mock/
-  entities/     Canonical mock domain records (JSON)
-  seed/         Backend bootstrap payload
-  scenarios/    Per-demo scenario overrides
-  workspace/    Dashboard mock aggregates
-packages/
-  fixtures/     Typed loader for mock/ data (@pds/fixtures)
-  shared-types/ DTOs, enums, shared constants
-scripts/
-  demo/         Happy-path and exception-path demos
-  fabric/       Chaincode runtime bootstrap
-docs/           Product, technical, and implementation documentation
+apps/api/                    NestJS API
+apps/web/                    React application
+packages/shared-types/       Public domain and API contracts
+packages/fixtures/           Typed canonical fixtures
+blockchain/chaincode/        TypeScript Fabric contracts
+blockchain/fabric-network/   Fabric 2.5.15 two-org local network
+infra/postgres/              Additive schema and generated seed
+infra/keycloak/              Local OIDC realm import
+mock/entities/               Canonical operational fixtures
+mock/integrations/           Simulated source-system events
+scripts/                     Seed, IAM, lifecycle, smoke, and regression tooling
+docs/                        Product, architecture, design, and implementation docs
 ```
 
-> **Note:** The `NBF-LITE/` folder contains separate CDAC/academia reference tooling and is not part of the ViksitPDS application runtime.
+`NBF-LITE/` is separate reference/research tooling and is not part of the
+ViksitPDS runtime.
 
 ## Prerequisites
 
-- **Node.js 22+** and **npm** (matches Docker images)
-- **Docker** and **Docker Compose** (recommended for quickest start)
-- **Git**
+- Node.js 22 and npm;
+- Docker and Docker Compose;
+- Git.
 
-Optional for local PostgreSQL without Docker:
+Fabric CLI binaries are not required on the host for the maintained full
+bootstrap; its scripts use the pinned Fabric 2.5.15 tool image.
 
-- PostgreSQL 16 with database `pds_chain`, user `pds`, password `pds`
+## Controlled Local Start
 
-## Quick Start (Docker — Recommended)
-
-From the repository root:
+Copy the non-secret template and install dependencies:
 
 ```bash
-# 1. Clone and enter the repo
-git clone <repository-url>
-cd toomoki-cdac-pds
-
-# 2. Copy environment template (for local/non-Docker use; Docker Compose sets its own env)
 cp .env.example .env
-
-# 3. Start PostgreSQL, API, and web UI
-docker compose up --build
-```
-
-| Service | URL |
-|---------|-----|
-| Web UI | http://localhost:4173 |
-| API | http://localhost:3000 |
-| API health | http://localhost:3000/health |
-| OpenAPI spec | http://localhost:3000/openapi.json |
-| PostgreSQL | `localhost:5433` (db: `pds_chain`, user/pass: `pds`/`pds`) |
-
-The web UI data mode is controlled by `VITE_DATA_SOURCE` (default `auto`): use the live API when online, fixtures from `mock/` when offline, or force `api` / `mock` explicitly. See [Mock data and fixtures](docs/implementation/mock-data.md).
-
-### Demo Scenarios in the UI
-
-Use the scenario selector in the dashboard:
-
-- **Happy path** — full custody chain clears
-- **Short receipt** — receipt mismatch raises an audit alert
-- **Duplicate claim** — second distribution in the same month is blocked
-
-Role views: Department, Procurement, Godown, FPS, Auditor.
-
-### Fabric profile (live blockchain)
-
-Requires Fabric CLI tools on the host (`peer`, `osnadmin`, `configtxgen`). See [DEPLOYMENT.md](DEPLOYMENT.md) for the full sequence.
-
-```bash
-# 1. Generate crypto, channel config, deploy chaincode
-blockchain/fabric-network/scripts/bootstrap-network.sh
-
-# 2. Start postgres + API (fabric mode) + web + Fabric peers/orderer/CAs
-PDS_LEDGER_MODE=fabric docker compose --profile fabric up --build
-
-# 3. Smoke test (API must be healthy; expects verificationSource=chaincode)
-node scripts/smoke-fabric-gateway.mjs
-```
-
-Default `docker compose up` keeps demo mode (`PDS_LEDGER_MODE=demo`) unchanged. The API container joins the `pds-fabric` Docker network for peer connectivity when the fabric profile is active.
-
-## Local Development (Without Docker)
-
-### 1. Install dependencies
-
-```bash
 npm ci
 ```
 
-### 2. Configure environment
+Start PostgreSQL and Keycloak:
 
 ```bash
-cp .env.example .env
+KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME=pds-local-admin \
+KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD='<local-admin-password>' \
+docker compose --profile iam up -d postgres keycloak
 ```
 
-Default `.env.example` values use file persistence and demo ledger mode (`PDS_LEDGER_BACKEND=chaincode-runtime` → `PDS_LEDGER_MODE=demo`).
-
-### 3. Bootstrap chaincode runtime state
+Bootstrap demo users, `demo-fps` → `FPS-101`, database authorization, and
+service clients. Supply local-only secrets; do not commit them:
 
 ```bash
-npm run fabric:bootstrap
+KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME=pds-local-admin \
+KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD='<local-admin-password>' \
+PDS_METRICS_CLIENT_SECRET='<metrics-secret>' \
+PDS_BENCHMARK_CLIENT_SECRET='<benchmark-secret>' \
+PDS_INTEGRATION_CLIENT_SECRET='<integration-secret>' \
+PDS_DEMO_USER_PASSWORD='<demo-user-password>' \
+npm run iam:bootstrap
 ```
 
-### 4. Build workspaces
+Then start the single API replica and web application:
+
+```bash
+docker compose up -d --build api web
+```
+
+| Service | URL |
+|---|---|
+| Web | http://localhost:4173 |
+| API | http://localhost:3000 |
+| Health | http://localhost:3000/health |
+| OpenAPI | http://localhost:3000/openapi.json |
+| Keycloak | http://localhost:8080 |
+| PostgreSQL | `localhost:5433` |
+
+`VITE_DATA_SOURCE=api` is the maintained online mode.
+`VITE_DATA_SOURCE=mock` is an explicitly labelled fixture-only workspace; there
+is no automatic fallback.
+
+For Fabric startup, integration fixture ingestion, reset/reseed gates, and proof
+verification, use the [deployment guide](fabric-deployment.md).
+
+## Key Configuration
+
+| Variable | Purpose |
+|---|---|
+| `PDS_AUTH_MODE=oidc` | Validate OIDC access tokens |
+| `PDS_AUTHORIZATION_MODE=database` | Require durable authorization assignments |
+| `PDS_OIDC_*` | Issuer, audience, JWKS URI, and clock skew |
+| `PDS_POSTGRES_DSN` | PostgreSQL connection |
+| `PDS_LEDGER_MODE` | `demo` or `fabric` |
+| `PDS_FABRIC_*` | Gateway identity, peer, channel, chaincode, and endorsers |
+| `PDS_ALLOW_RESET` | Keep `false` except an explicitly authorized demo reset |
+| `VITE_DATA_SOURCE` | `api` or explicit `mock` |
+| `VITE_OIDC_*` | Browser OIDC authority and public client ID |
+
+See [.env.example](.env.example) and
+[fabric-env.example](blockchain/fabric-network/fabric-env.example) for the
+complete local contract.
+
+## Integration API
+
+Authenticated `integration-service` accounts use:
+
+- `POST /integrations/smartpds/v1/master-references`;
+- `POST /integrations/scm/v1/allocation-events`;
+- `POST /integrations/scm/v1/movement-events`;
+- `POST /integrations/epos/v1/distribution-events`.
+
+New, identical, quarantined, and conflicting events return `201`, `200`, `202`,
+and `409` respectively. Operational endpoints expose integration events, source
+health, reconciliation, trace, and proof status. Full API details are available
+at `/openapi.json`.
+
+## Beneficiary registry and eligibility demonstration
+
+The Eligibility Review workspace contains fictional Maharashtra and J&K
+profiles. A department user can run the separately deployable external
+screening simulation, review death/activity/economic/land/duplicate signals,
+record due-process actions, and demonstrate that review remains non-blocking
+until an authorized RCMS decision.
+
+Authorized lifecycle events use:
+
+- `POST /beneficiary-registry/v1/events`;
+- `GET /beneficiary-registry/v1/summary`;
+- the eligibility case endpoints under `/eligibility/v1`.
+
+PostgreSQL stores the operational registry projection and case history.
+Privacy-safe lifecycle mutations and final decisions create asynchronous Fabric
+proof intents; beneficiary identity and raw cross-agency evidence remain
+off-chain. See the
+[requirements alignment](docs/implementation/beneficiary-registry-alignment.md).
+
+## Development And Verification
 
 ```bash
 npm run build
-```
-
-### 5. Start PostgreSQL (if using postgres persistence)
-
-```bash
-docker compose up postgres -d
-```
-
-Set in `.env`:
-
-```env
-PDS_PERSISTENCE_BACKEND=postgres
-PDS_POSTGRES_DSN=postgresql://pds:pds@localhost:5432/pds_chain
-```
-
-### 6. Start the API
-
-```bash
-npm run start --workspace=@pds/api
-```
-
-API listens on port `3000` (override with `PORT`).
-
-### 7. Start the web UI
-
-**Production-like preview** (serves built assets):
-
-```bash
-npm run build --workspace=@pds/web
-npm run start --workspace=@pds/web
-```
-
-Open http://localhost:4173. The Vite dev server proxies `/api` to `http://localhost:3000` when using `npx vite` from `apps/web` during development.
-
-## Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PORT` | `3000` | API listen port |
-| `PDS_LEDGER_MODE` | `demo` | `demo` (in-process chaincode) or `fabric` (gateway client) |
-| `PDS_PERSISTENCE_BACKEND` | `file` | `file` or `postgres` |
-| `PDS_POSTGRES_DSN` | `postgresql://pds:pds@localhost:5432/pds_chain` | PostgreSQL connection string |
-| `PDS_LEDGER_BACKEND` | `chaincode-runtime` | **Deprecated alias** — use `PDS_LEDGER_MODE`; see [DEPLOYMENT.md](DEPLOYMENT.md) |
-| `PDS_FABRIC_CLIENT_ORG` | `FoodAndCivilSupplies` | Fabric client org identity (fabric mode) |
-| `PDS_FABRIC_CHANNEL` | `pdschannel` | Fabric channel (fabric mode) |
-| `PDS_FABRIC_CHAINCODE` | `pds-chaincode` | Chaincode name (fabric mode) |
-| `PDS_STATE_PATH` | `./tmp/pds-state.json` | Local file state (file persistence) |
-| `PDS_LEDGER_JOURNAL_PATH` | `./tmp/pds-ledger.ndjson` | Append-only ledger journal |
-| `PDS_CHAINCODE_STATE_PATH` | `./tmp/chaincode-world-state.json` | Chaincode world state file |
-| `PDS_FABRIC_ENVELOPE_PATH` | `./tmp/pds-fabric-envelope.ndjson` | Fabric envelope journal |
-| `VITE_DATA_SOURCE` | `api` | Web data mode: `api` (jury/online) or explicitly selected `mock` (offline backup) |
-| `VITE_API_BASE_URL` | `/api` | Web API base URL |
-
-Docker Compose overrides these for container networking. See [DEPLOYMENT.md](DEPLOYMENT.md) for full deployment and backend-mode guidance.
-
-### Mock data and live switching
-
-Mock entities live under `mock/` and are loaded through `@pds/fixtures`. The API and chaincode seed from `mock/seed/backend.json`; PostgreSQL seed SQL is generated from the same source (`npm run fixtures:sql`).
-
-| `VITE_DATA_SOURCE` | Web behavior |
-|--------------------|--------------|
-| `api` | Fetch only from the REST API |
-| `mock` | Use fixtures only (no API reads) |
-
-There is no automatic fallback: API or IAM failure is shown as a failure in online mode.
-
-## NPM Scripts
-
-| Command | Description |
-|---------|-------------|
-| `npm run build` | Build all workspaces |
-| `npm test` | Run all workspace tests |
-| `npm run lint` | ESLint across apps, packages, chaincode |
-| `npm run typecheck` | TypeScript check all workspaces |
-| `npm run smoke` | Build + run end-to-end demo smoke test |
-| `npm run demo:happy` | Run happy-path demo script |
-| `npm run demo:exception` | Run exception-path demo script |
-| `npm run fabric:bootstrap` | Initialize chaincode runtime world state |
-| `npm run fixtures:sql` | Regenerate `infra/postgres/seed.sql` from mock seed |
-| `npm run seed` | Reset `tmp/` and seed file-based demo state |
-| `npm run reset` | Remove `tmp/` runtime artifacts |
-
-## API Overview
-
-Key endpoints (full spec at `/openapi.json`):
-
-| Group | Examples |
-|-------|----------|
-| Health | `GET /health` |
-| Dashboard | `GET /dashboard/summary` |
-| Stakeholders | `GET /stakeholders`, `POST /stakeholders` |
-| Lots | `GET /lots`, `POST /lots`, `GET /lots/:lotId/history` |
-| Transfers | `POST /transfers`, `POST /transfers/:id/receive` |
-| FPS | `POST /fps-allocations`, `POST /fps-allocations/:id/receipt` |
-| Auth (mock) | `POST /auth/mock-otp`, `POST /auth/simulated-biometric` |
-| Entitlements | `GET /entitlements`, `POST /entitlements/validate` |
-| Distribution | `POST /distributions`, `GET /distributions/:id` |
-| Trace | `GET /trace/lots/:lotId`, `GET /trace/distributions/:id` |
-| Audit | `GET /audit-alerts`, `POST /audit-alerts/reconcile` |
-
-## Verification
-
-```bash
-# Unit and integration tests (52 API tests)
+npm run typecheck
+npm run lint
 npm test
-
-# Full smoke (happy + exception flows, demo mode)
-npm run smoke
-
-# Fabric gateway smoke (requires --profile fabric stack)
-node scripts/smoke-fabric-gateway.mjs
-
-# API health (when running)
-curl http://localhost:3000/health
+npm run test:demo-http
 ```
+
+Focused commands:
+
+| Command | Purpose |
+|---|---|
+| `npm run fixtures:sql` | Regenerate PostgreSQL seed SQL |
+| `npm run fixtures:integrations` | Ingest simulated source events through the canonical API seam |
+| `npm run test:iam` | Check Keycloak and durable-authorization behavior |
+| `npm run test:lifecycle` | Check lifecycle scripts and integration atomicity coverage |
+| `npm run regression:fabric` | Opt-in two-peer Fabric regression when the network is running |
+
+The full live lifecycle resets local demo data. Run it only when reset/reseed is
+explicitly authorized. Report operational completion separately from proof
+completion and verify all intended outbox rows are `COMMITTED`.
 
 ## Documentation
 
-Start with [docs/README.md](docs/README.md):
+Start with the [documentation index](docs/README.md), especially:
 
-1. [Business Requirements](docs/product/brd.md)
-2. [Product Requirements](docs/product/prd.md)
-3. [Feature Specification](docs/product/feature-spec.md)
-4. [Technical Architecture](docs/technical/architecture.md)
-5. [MVP Implementation Plan](docs/implementation/mvp-implementation-plan.md)
-6. [Fabric Gateway refactor](docs/implementation/fabric-gateway-plus-refactor.md) — completed NestJS 11 + ledger modes
-
-## Deployment
-
-For Docker Compose, environment matrices, demo vs fabric ledger modes, Fabric bootstrap, and production notes, see **[DEPLOYMENT.md](DEPLOYMENT.md)**.
+1. [Product requirements](docs/product/prd.md)
+2. [J&K/Maharashtra product reference](docs/product/jkmaha-epos-smartpds-reference.md)
+3. [Technical architecture](docs/technical/architecture.md)
+4. [Technical design](docs/technical/design.md)
+5. [J&K/Maharashtra implementation plan](docs/implementation/jkmaha-epos-smartpds-implementation-plan.md)
+6. [Deployment guide](fabric-deployment.md)

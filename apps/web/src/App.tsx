@@ -11,6 +11,7 @@ import { AllocationsPage } from '@/pages/workspace/AllocationsPage.js';
 import { DistributionPage } from '@/pages/workspace/DistributionPage.js';
 import { AuditAlertsPage } from '@/pages/workspace/AuditAlertsPage.js';
 import { VerifyPage } from '@/pages/workspace/VerifyPage.js';
+import { EligibilityReviewPage } from '@/pages/workspace/EligibilityReviewPage.js';
 import { AdminOverviewPage } from '@/pages/admin/AdminOverviewPage.js';
 import { AdminNetworkPage } from '@/pages/admin/AdminNetworkPage.js';
 import { AdminStakeholdersPage } from '@/pages/admin/AdminStakeholdersPage.js';
@@ -27,6 +28,14 @@ export function AppRoutes() {
       <Route path="/role-login" element={<RoleLoginPage />} />
       <Route path="/" element={<WorkspaceLayout />}>
         <Route index element={<DefaultScreenRedirect />} />
+        <Route
+          path="eligibility"
+          element={
+            <ScreenGuard screen="eligibility-review">
+              <EligibilityReviewPage />
+            </ScreenGuard>
+          }
+        />
         <Route
           path="dashboard"
           element={

@@ -27,6 +27,9 @@ describe('shared types', () => {
 
   it('exposes stakeholder enums', () => {
     expect(StakeholderType.FAIR_PRICE_SHOP).toBe('FAIR_PRICE_SHOP');
+    expect(StakeholderType.BLOCK_GODOWN).toBe('BLOCK_GODOWN');
+    expect(StakeholderType.BLOCK_SUPPLY_OFFICE).toBe('BLOCK_SUPPLY_OFFICE');
+    expect(StakeholderType.TRANSPORTER).toBe('TRANSPORTER');
   });
 
   it('exposes the supported commodity catalog', () => {
@@ -46,29 +49,31 @@ describe('shared types', () => {
 
     expect(kerosene?.requiresTransformation).toBe(false);
     expect(oil?.requiresTransformation).toBe(false);
-    expect(kerosene?.legs.map((leg) => leg.toOrg)).toEqual(['FCI-001', 'GODOWN-S-001', 'ISSUE-001']);
-    expect(kerosene?.legs.some((leg) => leg.fromOrg === 'GODOWN-S-001' && leg.toOrg === 'ISSUE-001')).toBe(true);
+    expect(kerosene?.legs.map((leg) => leg.toOrg)).toEqual(['GODOWN-S-001', 'GODOWN-B-001']);
+    expect(kerosene?.legs.some((leg) => leg.fromOrg === 'GODOWN-S-001' && leg.toOrg === 'GODOWN-B-001')).toBe(true);
     expect(kerosene?.legs.some((leg) => leg.toOrg === 'FPS-101')).toBe(false);
     expect(kerosene?.fpsDelivery?.allocationId).toBe('ALLOC-POC-KEROSENE-FPS');
+    expect(kerosene?.fpsDelivery?.sourceGodownId).toBe('GODOWN-B-001');
   });
 
-  it('keeps rice on the canonical issue point to FPS allocation path', () => {
+  it('keeps rice on the canonical block godown to FPS allocation path', () => {
     const rice = getCommodityRouteTemplate('Rice');
 
     expect(rice?.legs.map((leg) => leg.toOrg)).toEqual([
-      'FCI-001',
       'GODOWN-S-001',
-      'ISSUE-001'
+      'GODOWN-B-001'
     ]);
     expect(rice?.requiresTransformation).toBe(false);
     expect(rice?.fpsDelivery?.fpsId).toBe('FPS-101');
+    expect(rice?.fpsDelivery?.sourceGodownId).toBe('GODOWN-B-001');
   });
 });
 
 describe('reset series id helpers', () => {
   it('builds POC bootstrap ids matching fixtures', () => {
     expect(buildSeedLotId('KEROSENE', INITIAL_DEMO_SERIES_ID)).toBe('LOT-KEROSENE-2026-001');
-    expect(buildTransferId(INITIAL_DEMO_SERIES_ID, 'KEROSENE', 'PROC-FCI')).toBe('TR-POC-KEROSENE-PROC-FCI');
+    expect(buildTransferId(INITIAL_DEMO_SERIES_ID, 'KEROSENE', 'FCI-DEPOT')).toBe('TR-POC-KEROSENE-FCI-DEPOT');
+    expect(buildTransferId(INITIAL_DEMO_SERIES_ID, 'KEROSENE', 'DEPOT-BLOCK')).toBe('TR-POC-KEROSENE-DEPOT-BLOCK');
     expect(buildAllocationId(INITIAL_DEMO_SERIES_ID, 'KEROSENE')).toBe('ALLOC-POC-KEROSENE-FPS');
     expect(buildDistributionId(INITIAL_DEMO_SERIES_ID, 'RICE', '001')).toBe('DIST-POC-001');
   });
@@ -76,7 +81,7 @@ describe('reset series id helpers', () => {
   it('builds unique series-scoped ids after reset', () => {
     const seriesId = 'R20260710-165432-ab12';
     expect(buildSeedLotId('KEROSENE', seriesId)).toBe('LOT-KEROSENE-R20260710-165432-ab12-001');
-    expect(buildTransferId(seriesId, 'KEROSENE', 'PROC-FCI')).toBe('TR-R20260710-165432-ab12-KEROSENE-PROC-FCI');
+    expect(buildTransferId(seriesId, 'KEROSENE', 'FCI-DEPOT')).toBe('TR-R20260710-165432-ab12-KEROSENE-FCI-DEPOT');
     expect(seriesIdFromLotId('LOT-KEROSENE-R20260710-165432-ab12-001')).toBe(seriesId);
     expect(seriesIdFromLotId('LOT-RICE-2026-001')).toBe(INITIAL_DEMO_SERIES_ID);
   });
@@ -84,7 +89,8 @@ describe('reset series id helpers', () => {
   it('clones commodity routes onto a new series', () => {
     const route = buildCommodityRouteForSeries('Kerosene', 'R20260710-165432-ab12');
     expect(route?.sourceLotId).toBe('LOT-KEROSENE-R20260710-165432-ab12-001');
-    expect(route?.legs[0]?.id).toBe('TR-R20260710-165432-ab12-KEROSENE-PROC-FCI');
+    expect(route?.legs[0]?.id).toBe('TR-R20260710-165432-ab12-KEROSENE-FCI-DEPOT');
+    expect(route?.legs[1]?.id).toBe('TR-R20260710-165432-ab12-KEROSENE-DEPOT-BLOCK');
     expect(route?.fpsDelivery?.allocationId).toBe('ALLOC-R20260710-165432-ab12-KEROSENE-FPS');
   });
 

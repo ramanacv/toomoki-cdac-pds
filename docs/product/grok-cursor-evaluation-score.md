@@ -1,4 +1,8 @@
-**Estimated jury score as the app stands today: 26/50.** Demo-ready Fabric PoC; not pilot/production-ready. Full filled answers are in [PoC evaluation scorecard](/home/ramana/.cursor/projects/home-ramana-work-sources-cc-toomoki-cdac-pds/canvases/poc-evaluation-scorecard.canvas.tsx) (open beside chat).
+# Historical Jury Score Snapshot
+
+> This 26/50 estimate predates the current evaluation and is retained only as
+> historical evidence. Its editor-local scorecard is not part of this
+> repository. See [current evaluation](gpt56sol-current-evaluation.md).
 
 ### Jury scorecard
 

@@ -1,13 +1,13 @@
 import { UserManager, WebStorageStateStore, type User } from 'oidc-client-ts';
 
 export const WEB_ROLES = [
-  'management', 'department', 'procurement', 'fci', 'godown', 'fps', 'auditor',
-  'platform-admin', 'metrics-reader', 'demo-reset'
+  'management', 'department', 'procurement', 'fci', 'godown', 'block-office', 'fps', 'auditor',
+  'platform-admin', 'metrics-reader', 'demo-reset', 'integration-service'
 ] as const;
 export type WebRole = (typeof WEB_ROLES)[number];
 
 export const OPERATIONAL_WEB_ROLES: readonly WebRole[] = [
-  'management', 'department', 'procurement', 'fci', 'godown', 'fps', 'auditor'
+  'management', 'department', 'procurement', 'fci', 'godown', 'block-office', 'fps', 'auditor'
 ];
 
 export const hasOperationalRole = (roles: readonly WebRole[]): boolean =>

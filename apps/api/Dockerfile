@@ -9,6 +9,7 @@ WORKDIR /app
 # Copy workspace manifests first for better layer caching.
 COPY package.json package-lock.json tsconfig.base.json ./
 COPY apps/api/package.json apps/api/package.json
+COPY apps/eligibility-mock/package.json apps/eligibility-mock/package.json
 COPY apps/web/package.json apps/web/package.json
 COPY packages/shared-types/package.json packages/shared-types/package.json
 COPY packages/fixtures/package.json packages/fixtures/package.json

@@ -50,7 +50,9 @@ export const runHappyPathFabric = async ({ apiBase, token }) => {
       commodity: 'Rice',
       allocatedQtyKg: demoQuantities.fpsAllocationKg,
       month: '2026-06',
-      sourceGodownId: 'ISSUE-001'
+      sourceGodownId: 'GODOWN-B-001',
+      transporterId: 'TRANS-001',
+      vehicleNo: 'KA01AB9999'
     })
   });
 
@@ -74,7 +76,6 @@ export const runHappyPathFabric = async ({ apiBase, token }) => {
     method: 'POST',
     body: JSON.stringify({
       distributionId: `${prefix}-DIST`,
-      fpsId: 'FPS-101',
       rationCardHash: 'demo-ration-card-hash',
       beneficiaryRefHash: 'beneficiary-hash',
       commodity: 'Rice',
@@ -82,7 +83,6 @@ export const runHappyPathFabric = async ({ apiBase, token }) => {
       authMode: auth.authMode,
       authResult: auth.authResult,
       authTxnRefHash: auth.authTxnRefHash,
-      dealerId: 'FPS-DEALER-101',
       timestamp: '2026-06-30T10:00:00.000Z'
     })
   });
@@ -117,10 +117,11 @@ export const runExceptionPathFabric = async ({ apiBase, token }) => {
     body: JSON.stringify({
       transferId: `${prefix}-TR`,
       lotId: 'LOT-RICE-2026-001',
-      fromOrg: 'PROC-001',
-      toOrg: 'FCI-001',
+      fromOrg: 'FCI-001',
+      toOrg: 'GODOWN-S-001',
       dispatchedQtyKg: demoQuantities.shortReceiptDispatchKg,
-      vehicleNo: 'KA01AB3001'
+      vehicleNo: 'KA01AB3001',
+      transporterId: 'TRANS-001'
     })
   });
 
@@ -140,7 +141,9 @@ export const runExceptionPathFabric = async ({ apiBase, token }) => {
       commodity: 'Rice',
       allocatedQtyKg: demoQuantities.fpsAllocationKg,
       month: '2026-06',
-      sourceGodownId: 'ISSUE-001'
+      sourceGodownId: 'GODOWN-B-001',
+      transporterId: 'TRANS-001',
+      vehicleNo: 'KA01AB9999'
     })
   });
 
@@ -164,7 +167,6 @@ export const runExceptionPathFabric = async ({ apiBase, token }) => {
     method: 'POST',
     body: JSON.stringify({
       distributionId: `${prefix}-DIST-1`,
-      fpsId: 'FPS-101',
       rationCardHash: 'demo-ration-card-hash',
       beneficiaryRefHash: 'beneficiary-hash',
       commodity: 'Rice',
@@ -172,7 +174,6 @@ export const runExceptionPathFabric = async ({ apiBase, token }) => {
       authMode: auth.authMode,
       authResult: auth.authResult,
       authTxnRefHash: auth.authTxnRefHash,
-      dealerId: 'FPS-DEALER-101',
       timestamp: '2026-06-30T10:00:00.000Z'
     })
   });
@@ -184,7 +185,6 @@ export const runExceptionPathFabric = async ({ apiBase, token }) => {
       method: 'POST',
       body: JSON.stringify({
         distributionId: `${prefix}-DIST-2`,
-        fpsId: 'FPS-101',
         rationCardHash: 'demo-ration-card-hash',
         beneficiaryRefHash: 'beneficiary-hash',
         commodity: 'Rice',
@@ -192,7 +192,6 @@ export const runExceptionPathFabric = async ({ apiBase, token }) => {
         authMode: auth.authMode,
         authResult: auth.authResult,
         authTxnRefHash: auth.authTxnRefHash,
-        dealerId: 'FPS-DEALER-101',
         timestamp: '2026-06-30T10:05:00.000Z'
       })
     });

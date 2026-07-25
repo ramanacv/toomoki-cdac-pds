@@ -10,14 +10,48 @@ export type QuickRoleLogin = {
 };
 
 export const quickRoleLogins: QuickRoleLogin[] = [
-  { title: 'Management', username: 'demo-management', description: 'Operational overview and aggregate monitoring.', returnUrl: '/dashboard' },
-  { title: 'Department', username: 'demo-department', description: 'Entitlements and Stage-II movement authorization.', returnUrl: '/workbench' },
-  { title: 'Procurement', username: 'demo-procurement', description: 'Lot creation and procurement dispatch.', returnUrl: '/workbench' },
-  { title: 'FCI', username: 'demo-fci', description: 'Central depot receipt and onward dispatch.', returnUrl: '/workbench' },
-  { title: 'Godown', username: 'demo-godown', description: 'Godown receipts, custody, and allocations.', returnUrl: '/workbench' },
-  { title: 'Fair Price Shop', username: 'demo-fps', description: 'FPS receipt, authentication, and distribution.', returnUrl: '/workbench' },
-  { title: 'Auditor', username: 'demo-auditor', description: 'Traceability, proofs, and audit alerts.', returnUrl: '/dashboard' },
-  { title: 'Platform administrator', username: 'demo-platform-admin', description: 'Application administration and network evidence.', returnUrl: '/admin/overview' }
+  {
+    title: 'FCI Depot Officer',
+    username: 'demo-fci',
+    description: 'Originate central lots and dispatch Stage-I stock to the state godown.',
+    returnUrl: '/workbench'
+  },
+  {
+    title: 'Godown Operator',
+    username: 'demo-godown',
+    description: 'Receive and dispatch stock at state and block godowns.',
+    returnUrl: '/workbench'
+  },
+  {
+    title: 'District Supply Officer (DSO)',
+    username: 'demo-department',
+    description: 'Authorize Stage-II Release Orders from the state godown to the block godown.',
+    returnUrl: '/workbench'
+  },
+  {
+    title: 'Block Supply Officer (BSO)',
+    username: 'demo-block-office',
+    description: 'Allot block-godown stock to Fair Price Shops and monitor block supply.',
+    returnUrl: '/workbench'
+  },
+  {
+    title: 'FPS Dealer',
+    username: 'demo-fps',
+    description: 'Shop-bound FPS-101 workspace. Authentication and ration issue are clearly simulated AePDS/ePoS events.',
+    returnUrl: '/workbench'
+  },
+  {
+    title: 'Auditor',
+    username: 'demo-auditor',
+    description: 'Read-only reconciliation, traceability, operational status, and Fabric proof evidence.',
+    returnUrl: '/dashboard'
+  },
+  {
+    title: 'Platform administrator',
+    username: 'demo-platform-admin',
+    description: 'Application administration and network evidence.',
+    returnUrl: '/admin/overview'
+  }
 ];
 
 export function RoleLoginPage() {
@@ -25,7 +59,7 @@ export function RoleLoginPage() {
     <main id="main" className="mx-auto min-h-screen w-full max-w-[1040px] px-4 py-10">
       <section className="mb-6 px-1 py-2">
         <p className="eyebrow">ViksitPDS · local testing</p>
-        <h1 className="text-3xl font-semibold tracking-tight">Quick role login</h1>
+        <h1 className="text-3xl font-semibold tracking-tight">Choose an entry journey</h1>
         <p className="mt-2 max-w-3xl leading-relaxed text-muted-foreground">
           Choose a demo persona. Keycloak still authenticates the user and signs the role-bearing token; this page only pre-fills the username.
         </p>
@@ -58,6 +92,10 @@ export function RoleLoginPage() {
         </div>
         <p className="mt-5 text-sm text-muted-foreground">
           Passwords are never stored or submitted by this page. Enter the configured local demo password on Keycloak.
+        </p>
+        <p className="mt-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
+          Controlled PoC: ViksitPDS complements SMART-PDS/RCMS, IAeSCM/state SCM, and AePDS/ePoS.
+          Fixture-backed actions simulate authoritative source-system events; they are not live state integrations.
         </p>
       </Panel>
     </main>

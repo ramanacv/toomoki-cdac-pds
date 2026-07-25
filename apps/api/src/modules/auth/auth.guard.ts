@@ -1,7 +1,8 @@
-import { CanActivate, ExecutionContext, ForbiddenException, HttpException, HttpStatus, Inject, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { CanActivate, ExecutionContext, ForbiddenException, HttpException, HttpStatus, Inject, Injectable, Logger, Optional, UnauthorizedException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { IDENTITY_PROVIDER, type AuthenticatedRequest, type IdentityProvider, type PdsIdentity, type PdsRole } from './identity-provider.js';
 import { IS_PUBLIC_KEY } from './public.decorator.js';
+import { DurableAuthorizationService } from './durable-authorization.service.js';
 
 /**
  * Authentication guard for business endpoints (T2.5).
@@ -45,7 +46,8 @@ export class BusinessAuthGuard implements CanActivate {
   private readonly mutationRequestsPerMinute = positiveIntegerFromEnv('PDS_RATE_LIMIT_MUTATION_PER_MINUTE', 30);
   constructor(
     @Inject(IDENTITY_PROVIDER) private readonly identityProvider: IdentityProvider,
-    @Inject(Reflector) private readonly reflector: Reflector
+    @Inject(Reflector) private readonly reflector: Reflector,
+    @Optional() private readonly durableAuthorization?: DurableAuthorizationService
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -84,6 +86,7 @@ export class BusinessAuthGuard implements CanActivate {
     }
 
     const options = this.optionsFor(context);
+    await this.durableAuthorization?.assertRoles(identity, options.roles);
     if (options.roles && options.roles.length > 0) {
       if (!options.roles.some((role) => identity.roles.includes(role))) {
         this.audit(request, identity, path, 'deny', 403);

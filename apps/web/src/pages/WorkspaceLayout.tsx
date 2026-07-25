@@ -8,6 +8,7 @@ import { AppShell } from '@/components/layout/AppShell';
 import { getCurrentIdentity, signIn, signOut } from '@/auth-token.js';
 import { getDataSourceMode } from '@/data-source.js';
 import { oidcRoleToDemoRole } from '@/demo-model.js';
+import { Button } from '@/components/ui/button.js';
 
 export function WorkspaceLayout() {
   const [params, setParams] = useSearchParams();
@@ -55,7 +56,9 @@ export function WorkspaceLayout() {
   }
 
   if (!offlineMode && workspace.error) {
-    return <main className="mx-auto max-w-xl p-8"><h1 className="text-2xl font-semibold">Online service unavailable</h1><p className="mt-3 text-muted-foreground">{workspace.error}</p><p className="mt-2 text-sm">Fixture data was not substituted. Choose the explicitly labelled offline build for a backup demonstration.</p></main>;
+    const accessDenied = workspace.error.startsWith('Access denied while loading ');
+    const identityExpired = workspace.error.startsWith('Your identity session is missing or expired.');
+    return <main className="mx-auto max-w-xl p-8"><h1 className="text-2xl font-semibold">{identityExpired ? 'Identity session expired' : accessDenied ? 'Workspace access incomplete' : 'Online service unavailable'}</h1><p className="mt-3 text-muted-foreground">{workspace.error}</p><p className="mt-2 text-sm">{accessDenied ? 'Sign out and sign in again after the identity administrator repairs the role or scope assignment.' : identityExpired ? 'Start a fresh Keycloak session to continue.' : 'Fixture data was not substituted. Choose the explicitly labelled offline build for a backup demonstration.'}</p>{(accessDenied || identityExpired) && <Button className="mt-5" onClick={() => { void signOut(); }}>Sign out and sign in again</Button>}</main>;
   }
 
   const context: WorkspaceOutletContext = {

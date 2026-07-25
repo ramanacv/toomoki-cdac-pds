@@ -2,9 +2,16 @@
 
 ## Executive Summary
 
-ViksitPDS is a blockchain-enabled trust and audit layer for the Public Distribution System. It creates an immutable, privacy-preserving, and verifiable record of high-risk PDS events across commodity procurement, milling, godown movement, Fair Price Shop allocation, beneficiary authentication, entitlement validation, and ration delivery.
+ViksitPDS is a blockchain-enabled trust and audit layer for the Public
+Distribution System. It creates immutable, privacy-preserving, verifiable
+proofs for high-risk PDS events across procurement, godown movement, Fair Price
+Shop allocation, simulated beneficiary authentication, entitlement reference,
+and ration delivery.
 
-The 2-week MVP demonstrates a complete rice distribution journey using mock data and simulated integrations. The platform is not intended to replace SMART-PDS, state PDS systems, or ePoS devices. It provides an independent audit trail and reconciliation layer that can later integrate with those systems.
+The controlled PoC demonstrates a complete rice distribution journey using
+mock data and simulated integrations. The platform is not intended to replace
+SMART-PDS/RCMS, state-SCM, or AePDS/ePoS. It provides a complementary audit and
+reconciliation layer with provisional integration seams.
 
 ## Business Problem
 
@@ -41,16 +48,21 @@ The core requirement is to enhance transparency, accountability, and efficiency 
 - Beneficiary.
 - Inspector or auditor.
 - System administrator.
-- Future integration owners for SMART-PDS, state PDS, ePoS, and authentication systems.
+- Integration owners for SMART-PDS/RCMS, IAeSCM or another state SCM, and
+  AePDS/ePoS. The repository provides provisional fixture contracts only;
+  department/NIC approval is still required.
 
 ## Proposed Solution
 
 ViksitPDS will maintain:
 
 - Operational state in PostgreSQL for current stock, workflows, users, dashboard queries, and mock beneficiary records.
-- Immutable transaction proofs and custody history in Hyperledger Fabric.
+- Privacy-approved immutable proofs in Hyperledger Fabric, submitted
+  asynchronously from the operational outbox.
 - Rule-based audit alerts for mismatches, duplicate claims, shortages, delayed receipt, unauthorized actions, and tampering.
-- API-first integration adapters for demo data, CSV imports, batch feeds, and future SMART-PDS/state system events.
+- API-first canonical source-event adapters for fixture-backed SMART-PDS/RCMS,
+  state-SCM, and AePDS/ePoS events, with provenance, replay protection,
+  quarantine, reconciliation, and asynchronous proof status.
 
 ## MVP Scope
 
@@ -65,7 +77,6 @@ MVP example:
 - Commodity: Rice.
 - Procurement lot: `LOT-RICE-2026-001`.
 - Procured quantity: `10,000 kg`.
-- Processed quantity: `9,700 kg`.
 - FPS allocation: `1,000 kg`.
 - Beneficiary entitlement: `25 kg`.
 - Delivered quantity: `25 kg`.
@@ -80,15 +91,21 @@ MVP business capabilities:
 - Simulate beneficiary authentication.
 - Validate monthly entitlement.
 - Prevent duplicate monthly lifting.
-- Record privacy-preserving distribution receipt on blockchain.
+- Record a privacy-preserving distribution operation and asynchronously anchor
+  its proof on Fabric.
 - Generate verification ID or QR trace.
 - Show command-centre audit dashboard.
+- Bind the controlled FPS identity to one active shop and prevent cross-shop
+  reads or mutations.
+- Show authoritative source provenance separately from operational acceptance
+  and Fabric proof completion.
 
 ## Out Of Scope For MVP
 
 - Real Aadhaar/UIDAI integration.
 - Real biometric capture or verification.
 - Real SMART-PDS or ePoS integration.
+- Department/NIC-approved Maharashtra or J&K source contracts.
 - PFMS/DBT integration.
 - IoT-GPS hardware integration.
 - AI/ML model training.
@@ -99,7 +116,9 @@ MVP business capabilities:
 ## Success Metrics
 
 - The full commodity journey can be demonstrated with seeded data.
-- Every critical transaction has a blockchain transaction reference.
+- Every accepted critical operation has durable proof intent and exposes its
+  independent proof state. A controlled Fabric demonstration succeeds only
+  when all expected proofs reach `COMMITTED` with Fabric transaction IDs.
 - Duplicate monthly beneficiary claim is blocked.
 - Short receipt creates an audit alert.
 - DB-ledger mismatch creates an audit alert.
@@ -117,7 +136,8 @@ MVP business capabilities:
 
 ## Expected Benefits
 
-- Shared source of truth for high-risk PDS events.
+- Shared, tamper-evident evidence for high-risk PDS events while each
+  authoritative system retains ownership of its workflow.
 - Tamper-evident audit trail across multiple organizations.
 - Faster detection of leakage and stock mismatch.
 - Better accountability for dispatch and receipt events.

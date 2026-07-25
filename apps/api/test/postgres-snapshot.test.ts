@@ -9,7 +9,7 @@ describe('postgres snapshot mapper', () => {
     const plan = buildSnapshotWritePlan(engine.exportState());
 
     expect(plan[0]?.text).toBe('BEGIN');
-    expect(plan.some((statement) => statement.text.includes('TRUNCATE stakeholders, commodity_lots'))).toBe(true);
+    expect(plan.some((statement) => statement.text.includes('TRUNCATE') && statement.text.includes('stakeholders'))).toBe(true);
     expect(plan.at(-1)?.text).toBe('COMMIT');
     expect(plan.some((statement) => statement.text.includes('ledger_events'))).toBe(true);
   });
@@ -46,9 +46,9 @@ describe('postgres snapshot mapper', () => {
 
   it('hydrates stock positions from postgres-shaped rows', () => {
     const state = hydratePdsState({
-      stock: [['PROC-001:Rice', 10000]]
+      stock: [['FCI-001:Rice', 10000]]
     });
 
-    expect(state.stock).toEqual([['PROC-001:Rice', 10000]]);
+    expect(state.stock).toEqual([['FCI-001:Rice', 10000]]);
   });
 });

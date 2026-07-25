@@ -12,8 +12,11 @@ This folder defines the Hyperledger Fabric topology for the ViksitPDS MVP and sh
 
 ## Bootstrap
 
+The full local bootstrap resets in-container Fabric ledger state. Run it only
+when that reset is explicitly authorized:
+
 ```bash
-./scripts/bootstrap-network.sh
+./scripts/bootstrap-fabric-full.sh
 ```
 
 Individual steps:
@@ -30,7 +33,9 @@ Individual steps:
 
 ## Verifying ledger writes
 
-See [fabric-deployment.md](../../fabric-deployment.md#verifying-fabric-writes) for the full guide. Quick checks:
+See [fabric-deployment.md](../../fabric-deployment.md#verify-operational-and-proof-completion)
+for the full guide. A valid PostgreSQL operation is not proof-complete until its
+outbox row is `COMMITTED`. Quick checks:
 
 - `curl localhost:3000/health` → `ledgerMode: "fabric"`
 - `curl localhost:3000/trace/lots/LOT-RICE-2026-001` → `verificationSource: "chaincode"`
@@ -48,7 +53,11 @@ Then open http://localhost:5984/_utils (food peer) or http://localhost:6984/_uti
 
 ## API integration
 
-Set `PDS_LEDGER_MODE=fabric` on the NestJS API. The API uses `@hyperledger/fabric-gateway` to submit and evaluate transactions on `pds-chaincode` while continuing to persist operational snapshots in PostgreSQL.
+Set `PDS_LEDGER_MODE=fabric` on the NestJS API. The API uses
+`@hyperledger/fabric-gateway` to submit privacy-approved
+`RecordLedgerProof` transactions asynchronously from the PostgreSQL outbox.
+Operational state remains in PostgreSQL. Named chaincode business transactions
+are compatibility functions, not new API submission points.
 
 Legacy `PDS_LEDGER_BACKEND=fabric-gateway` is mapped to fabric mode. Demo mode (`PDS_LEDGER_MODE=demo`, default) keeps the in-process `PdsChaincodeInvoker` path.
 
@@ -56,10 +65,13 @@ Legacy `PDS_LEDGER_BACKEND=fabric-gateway` is mapped to fabric mode. Demo mode (
 
 - `network-manifest.json` — intended consortium layout (5 orgs documented; 2 orgs deployed in demo)
 - `fabric-contract.json` — chaincode operation manifest
-- `docker-compose.fabric.yml` — Fabric 3.x services (orderer, peers, CouchDB, CA)
+- `docker-compose.fabric.yml` — Fabric 2.5.15 services (orderer, peers, CouchDB, CA)
 - `connection-profiles/*.json` — client connectivity targets
 - `fabric-env.example` — gateway env contract
 
 ## Status
 
-The Docker stack and bootstrap scripts are implemented for local demo. Full lifecycle deployment requires Fabric CLI binaries (`peer`, `osnadmin`, `configtxgen`) and enrolled admin identities on your host.
+The Docker stack and scripts are implemented for a local two-peer demo. The
+maintained bootstrap runs pinned Fabric 2.5.15 tooling in Docker, so host Fabric
+CLI binaries are not required. Generated crypto, channel artifacts, and
+chaincode packages are local runtime material and must not be committed.

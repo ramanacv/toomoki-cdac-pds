@@ -26,7 +26,7 @@ export class TransfersController {
   }
 
   @Post('/transfers')
-  @Roles('procurement', 'fci', 'godown')
+  @Roles('fci', 'godown')
   dispatch(@Body() body: DispatchDto) {
     return this.ledger.dispatchLotPersisted(body);
   }

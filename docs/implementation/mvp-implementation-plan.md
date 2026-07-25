@@ -1,5 +1,10 @@
 # ViksitPDS MVP Implementation Plan
 
+> Historical two-week implementation baseline, last statused 24 June 2026.
+> Current release and pilot gates are maintained in
+> [J&K/Maharashtra implementation plan](jkmaha-epos-smartpds-implementation-plan.md)
+> and [MVP hardening plan](mvp-hardening-plan.md).
+
 ## Objective
 
 Build a working 2-week MVP of ViksitPDS that demonstrates a complete commodity journey:
@@ -34,7 +39,9 @@ Ledger modes:
 - **Demo** (`PDS_LEDGER_MODE=demo`, default): in-process chaincode + PostgreSQL — unchanged POC behavior.
 - **Fabric** (`PDS_LEDGER_MODE=fabric`): `@hyperledger/fabric-gateway` to `pds-chaincode` on `pdschannel` via Fabric 2.5.15 two-organization stack.
 
-See [fabric-gateway-plus-refactor.md](fabric-gateway-plus-refactor.md) and [DEPLOYMENT.md](../../DEPLOYMENT.md) for bootstrap and compose profiles.
+See [fabric-gateway-plus-refactor.md](fabric-gateway-plus-refactor.md) for the
+dated refactor record and the [current deployment guide](../../fabric-deployment.md)
+for bootstrap and Compose profiles.
 
 ## Delivery Target
 

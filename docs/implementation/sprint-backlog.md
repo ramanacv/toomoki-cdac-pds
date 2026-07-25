@@ -1,5 +1,9 @@
 # ViksitPDS MVP Sprint Backlog
 
+> Historical two-week build backlog. Use the
+> [J&K/Maharashtra implementation plan](jkmaha-epos-smartpds-implementation-plan.md)
+> and [MVP hardening plan](mvp-hardening-plan.md) for current gates.
+
 This backlog turns the implementation plan into an execution sequence. The order is intentional: foundation first, then ledger and backend, then UI and demo tooling.
 
 ## Sprint 0: Workspace And Tooling

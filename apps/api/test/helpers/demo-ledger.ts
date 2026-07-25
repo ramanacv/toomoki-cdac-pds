@@ -5,6 +5,7 @@ import type { Type } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { PdsLedgerFacade } from '../../src/modules/core/pds-ledger.facade.js';
 import { FilePdsLedgerPort } from '../../src/infrastructure/ledger-port.js';
+import type { AuthenticatedRequest } from '../../src/modules/auth/identity-provider.js';
 
 export type DemoLedgerFixture = {
   facade: PdsLedgerFacade;
@@ -42,22 +43,37 @@ export const createControllerWithFacade = async <T>(
   return moduleRef.get(Controller);
 };
 
-export const moveLotToIssuePoint = (
+export const moveLotToBlockGodown = (
   facade: PdsLedgerFacade,
   quantityKg = 1000
 ): void => {
-  facade.addStockForTest('ISSUE-001', 'Rice', quantityKg);
+  facade.addStockForTest('GODOWN-B-001', 'Rice', quantityKg);
 };
 
 export const prepareFpsStock = (facade: PdsLedgerFacade, allocationId: string, quantityKg = 100): void => {
-  moveLotToIssuePoint(facade);
+  moveLotToBlockGodown(facade);
   facade.allocateToFps({
     allocationId,
     fpsId: 'FPS-101',
     commodity: 'Rice',
     allocatedQtyKg: quantityKg,
     month: '2026-06',
-    sourceGodownId: 'ISSUE-001'
+    sourceGodownId: 'GODOWN-B-001',
+    transporterId: 'TRANS-001',
+    vehicleNo: 'KA01AB9999'
   });
   facade.recordFpsReceipt({ allocationId, receivedQtyKg: quantityKg });
 };
+
+export const asFpsRequest = (
+  stakeholderId = 'FPS-101',
+  subject = 'demo-fps'
+): AuthenticatedRequest => ({
+  headers: {},
+  user: {
+    subject,
+    stakeholderId,
+    roles: ['fps'],
+    claims: { sub: subject, pds_stakeholder_id: stakeholderId }
+  }
+});

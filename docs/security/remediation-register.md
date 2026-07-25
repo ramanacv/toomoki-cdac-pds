@@ -3,7 +3,7 @@
 | Severity | Finding | Owner | Due gate | State / accepted PoC limitation |
 |---|---|---|---|---|
 | Critical | Business/outbox atomicity and multi-command concurrency are not proven for all operations | API engineering | Before pilot | Open; single API replica and deterministic reset/reseed only. |
-| High | Organization/stakeholder claims are not yet enforced against resource ownership | API/IAM | Month 1 | Open; role policy is implemented. |
+| High | Complete organization/geography/facility ownership enforcement beyond the implemented FPS and integration-source boundaries | API/IAM | Before pilot | Partial; `FPS-101` and integration-service assignments are database-enforced, with two-shop isolation tests. |
 | High | Local Fabric identities lack managed enrolment, revocation, rotation and HSM/vault custody | Platform/security | Before pilot data | Open; generated demo crypto only. |
 | High | Independent VAPT and authenticated OWASP ZAP assessment not completed | Security lead | Before pilot go-live | Open; automated controls are not a penetration test. |
 | High | HA, backup/restore, DR and zero-downtime chaincode upgrades unproven | Platform | Month 3 | Open; controlled local topology only. |

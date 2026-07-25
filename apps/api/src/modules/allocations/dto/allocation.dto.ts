@@ -1,11 +1,12 @@
-import { IsInt, IsString, Min } from 'class-validator';
+import { IsInt, IsISO8601, IsOptional, IsString, Min } from 'class-validator';
 
 export class AllocationDto {
   @IsString()
   allocationId!: string;
 
+  @IsOptional()
   @IsString()
-  fpsId!: string;
+  fpsId?: string;
 
   @IsString()
   commodity!: string;
@@ -19,4 +20,14 @@ export class AllocationDto {
 
   @IsString()
   sourceGodownId!: string;
+
+  @IsString()
+  transporterId!: string;
+
+  @IsString()
+  vehicleNo!: string;
+
+  @IsOptional()
+  @IsISO8601()
+  dispatchTimestamp?: string;
 }

@@ -11,9 +11,9 @@ describe('dto validation', () => {
       season: 'Kharif 2026',
       quantityKg: 0,
       qualityGrade: 'A',
-      source: 'Procurement Centre 01',
-      currentOwner: 'PROC-001',
-      currentLocation: 'Procurement Yard'
+      source: 'FCI Central Depot',
+      currentOwner: 'FCI-001',
+      currentLocation: 'FCI Depot'
     });
 
     expect(validateSync(dto).length).toBeGreaterThan(0);

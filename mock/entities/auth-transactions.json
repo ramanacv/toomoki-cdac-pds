@@ -6,6 +6,18 @@
     "authMode": "MOCK_OTP",
     "authResult": "SUCCESS",
     "authTxnRefHash": "auth-ref-2026-001",
-    "timestamp": "2026-06-09T10:05:00.000Z"
+    "timestamp": "2026-06-09T10:05:00.000Z",
+    "fpsId": "FPS-101",
+    "operatorRef": "fixture-operator-ref-101",
+    "provenance": {
+      "sourceSystem": "VIKSITPDS_DEMO",
+      "sourceEventId": "FIXTURE-DEMO-AUTH-2026-001",
+      "schemaVersion": "fixture-1",
+      "occurredAt": "2026-06-09T10:05:00.000Z",
+      "ingestedAt": "2026-06-09T10:05:01.000Z",
+      "approvedPayloadHash": "fa4273cbb8dd280fbc995665319c162051e8af667d1c1fc98f820510c14f4c03",
+      "operationId": "fixture-demo-auth-001",
+      "status": "ACCEPTED"
+    }
   }
 ]

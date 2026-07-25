@@ -49,6 +49,7 @@ describe('demo model', () => {
   it('maps each role to a navigable screen set', () => {
     expect(getDefaultScreen('AUDITOR')).toBe('dashboard');
     expect(getRoleScreens('FPS')).toContain('distribution');
-    expect(getRoleScreens('PROCUREMENT')).toContain('lots');
+    expect(getRoleScreens('FCI_DEPOT')).toContain('lots');
+    expect(getRoleScreens('BLOCK_OFFICE')).toContain('allocations');
   });
 });

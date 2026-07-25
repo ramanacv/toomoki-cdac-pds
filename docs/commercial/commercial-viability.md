@@ -10,7 +10,12 @@ ViksitPDS is a complementary trust, reconciliation and audit layer. It does not 
 
 ## Reference paid pilot
 
-One district, one commodity, two upstream custody sites, ten FPS sites, and department/audit users. Until formal data approval, integration is limited to mock data, controlled CSV, or non-sensitive versioned APIs. The pilot does not process Aadhaar numbers, biometric material, OTP values or unapproved beneficiary data.
+One district, one commodity, two upstream custody sites, ten FPS sites, and
+department/audit users. The PoC uses fixture-backed canonical adapters. A pilot
+requires department/NIC-approved versioned SMART-PDS/RCMS, state-SCM, and
+AePDS/ePoS contracts; provisional fixture mappings are not acceptable evidence.
+The pilot does not process Aadhaar numbers, biometric material, OTP values, or
+unapproved beneficiary data.
 
 Deliverables are workflow/integration discovery; hosted or state-data-centre deployment; IAM and role configuration; training and operating procedures; an eight-to-twelve-week monitored run; and a KPI/pilot-conversion report.
 

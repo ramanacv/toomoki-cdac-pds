@@ -10,7 +10,12 @@ The proposition is deliberately complementary. Existing SMART-PDS, state PDS, eP
 
 ### Reference pilot and outcomes
 
-The proposed paid reference pilot covers one district, one commodity, two upstream custody sites, ten FPS sites, department and audit users, and mock/CSV/non-sensitive API integration until formal data approval. An eight-to-twelve-week monitored run follows discovery, deployment, IAM setup, operating-procedure agreement and training.
+The proposed paid reference pilot covers one district, one commodity, two
+upstream custody sites, ten FPS sites, department and audit users. The PoC uses
+fixture-backed canonical adapters; pilot ingestion requires department/NIC-
+approved versioned SMART-PDS/RCMS, state-SCM, and AePDS/ePoS contracts. An
+eight-to-twelve-week monitored run follows discovery, deployment, IAM setup,
+contract approval, operating-procedure agreement, and training.
 
 Outcomes are measured through proof completeness, custody-mismatch detection/investigation time, reconciliation turnaround, manual touches per exception, duplicate/excess attempt detection, user task time, and infrastructure/support cost per site. Pilot evidence includes workload definitions, success rates, latency percentiles, outbox state and limitations—not unsupported scale claims.
 
@@ -42,7 +47,8 @@ ViksitPDS is currently a controlled near-MVP demonstration. It has no government
 | Allocation/receipt | Opaque allocation/FPS/site IDs, commodity, month, quantity, status | Site mapping approved by department. |
 | Entitlement/distribution sandbox | Approved hashes/opaque references, commodity, month, quantity, result | No Aadhaar, biometric, OTP, mobile, name/address or full ration-card value. |
 | Exceptions/audit | Opaque entity reference, category, severity, status, timestamps, resolution | Free text must be constrained/redacted. |
-| IAM | Subject, application roles, optional organization/stakeholder/MSP claims | Government IAM federation only after security approval. |
+| Source-event provenance | Source system/event ID, schema version, occurrence/device-sync/ingestion times, approved-payload hash, operation and parent/amendment references | No raw upstream payload or prohibited identity/device credential data. |
+| IAM | Subject, database roles and organization/geography/stakeholder/FPS/facility/source assignments | Government IAM federation only after security approval. |
 
 For every dataset record owner, source system, legal/policy basis, classification, volume, update frequency, quality rules, retention, permitted environments, encryption, access roles and deletion/export requirements.
 

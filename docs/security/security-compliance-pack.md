@@ -7,7 +7,7 @@ This document is technical preparation for a controlled demonstration and prospe
 | Threat | Current controls | Residual risk / next action |
 |---|---|---|
 | API impersonation | Keycloak RS256 validation against pinned issuer, API audience, expiry/not-before and JWKS; bearer header only | Protect IAM/TLS and validate browser/service flows in the deployed environment. |
-| Role escalation | Canonical realm roles plus explicit controller policies; `401` and `403` are distinct; admin/metrics/reset roles are independent | Enforce `pds_org_id` and `pds_stakeholder_id` against every mutation resource. |
+| Role escalation | Canonical realm roles, active database assignments, FPS-101 ownership checks, integration-source restrictions, and distinct `401`/`403`; platform administration grants no operational authority | Extend organization/geography/facility scope consistently through every pilot command and complete access-review evidence. |
 | Token theft | Authorization Code + PKCE; five-minute access tokens; session-storage web state; explicit logout; no auth cookie | Session storage remains readable by injected script; complete CSP review, dependency remediation and penetration testing. |
 | Proof tampering | SHA-256 canonical payload hash, immutable Fabric record, deterministic chaincode and conflicting replay rejection | Key/certificate compromise and peer collusion require managed enrolment, revocation and HSM-backed keys. |
 | Replay | Event/idempotency uniqueness; identical proof replay succeeds, conflicting reuse fails | Extend idempotency enforcement consistently to every API command and adapter. |
@@ -21,7 +21,7 @@ This document is technical preparation for a controlled demonstration and prospe
 | Location | Data | Explicit exclusions / handling |
 |---|---|---|
 | Fabric | Event/operation IDs, entity references, actor subject/role/MSP, payload hash, schema version, API business timestamp and privacy-validated proof payload | No Aadhaar number/image, biometric, OTP, mobile/phone, name/address or full ration-card value. |
-| PostgreSQL | Operational stakeholder, lot, movement, entitlement, hashed beneficiary/card references, simulated-auth result, distribution, alert, event and outbox state | Controlled demo dataset; row-scoped retention/deletion and pilot data classification remain required. |
+| PostgreSQL | Operational stakeholder, lot, movement, entitlement, hashed beneficiary/card references, simulated-auth result, distribution, authorization assignments, canonical source events/correlations, reconciliation, alert and outbox state | Controlled demo dataset; source payloads are privacy-approved, but row-scoped retention/deletion and pilot data classification remain required. |
 | Logs | Request ID, subject, roles, organization claims, normalized route, decision, status, duration and safe error category | No bearer token, OTP, biometric, raw beneficiary identity or unmasked card value. |
 | Metrics | Normalized route, method, plane, status class, operation/result and aggregate proof state/latency | No beneficiary, ration-card, transaction, event, lot or stakeholder identifier labels. |
 | Transient authentication | Browser OIDC code/verifier and access/refresh session state; simulated authentication inputs at API boundary | Browser state is session-scoped. Real Aadhaar PID/OTP/biometric capture is not implemented and must not be introduced without formal approval and compliant architecture. |
@@ -31,7 +31,7 @@ This document is technical preparation for a controlled demonstration and prospe
 | Domain | State | Evidence / gap |
 |---|---|---|
 | Authentication | Implemented for competition | Keycloak OIDC, PKCE and client credentials; future federation to approved government IAM. |
-| Authorization | Partial | Least-privilege roles are implemented; organization/resource scope is planned. |
+| Authorization | Partial | Database roles, FPS ownership and integration-source assignments are implemented; complete pilot organization/geography/facility policy and periodic access review remain. |
 | Encryption | Partial | Cryptographic token/proof validation exists; production TLS, database/storage encryption and key ownership need deployment evidence. |
 | Privacy | Partial | Proof denylist and hashes are implemented; DPIA, retention and approved pilot data mapping remain. |
 | Key management | Planned | Local Fabric demo crypto is not pilot key management; vault/HSM, enrolment, rotation and revocation are required. |

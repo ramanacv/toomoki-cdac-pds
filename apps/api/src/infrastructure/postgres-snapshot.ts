@@ -70,11 +70,12 @@ export const mapTransferRow = (row: Record<string, unknown>, toIsoString = toIso
   ...(row.authorized_by == null ? {} : { authorizedBy: asString(row.authorized_by) }),
   ...(row.authorized_at == null ? {} : { authorizedAt: toIsoString(row.authorized_at) }),
   ...(row.approval_status == null ? {} : { approvalStatus: asString(row.approval_status) as 'PENDING' | 'APPROVED' | 'REJECTED' | 'BLOCKED' }),
-  ...(row.transporter_id == null ? {} : { transporterId: asString(row.transporter_id) }),
+  transporterId: asString(row.transporter_id),
+  transporterName: asString(row.transporter_name),
   ...(row.transformed_from_lot_id == null ? {} : { transformedFromLotId: asString(row.transformed_from_lot_id) })
 });
 
-export const mapAllocationRow = (row: Record<string, unknown>): FPSAllocation => ({
+export const mapAllocationRow = (row: Record<string, unknown>, toIsoString = toIsoStringDefault): FPSAllocation => ({
   allocationId: asString(row.allocation_id),
   fpsId: asString(row.fps_id),
   commodity: asString(row.commodity),
@@ -83,7 +84,12 @@ export const mapAllocationRow = (row: Record<string, unknown>): FPSAllocation =>
   ...(row.shortage_qty_kg == null ? {} : { shortageQtyKg: asNumber(row.shortage_qty_kg) }),
   month: asString(row.month),
   sourceGodownId: asString(row.source_godown_id),
-  status: asString(row.status) as FPSAllocation['status']
+  status: asString(row.status) as FPSAllocation['status'],
+  transporterId: asString(row.transporter_id),
+  transporterName: asString(row.transporter_name),
+  vehicleNo: asString(row.vehicle_no),
+  dispatchTimestamp: toIsoString(row.dispatch_timestamp),
+  ...(row.receive_timestamp == null ? {} : { receiveTimestamp: toIsoString(row.receive_timestamp) })
 });
 
 export const mapEntitlementRow = (row: Record<string, unknown>): MonthlyEntitlement => ({
@@ -98,6 +104,8 @@ export const mapEntitlementRow = (row: Record<string, unknown>): MonthlyEntitlem
 
 export const mapAuthTransactionRow = (row: Record<string, unknown>, toIsoString = toIsoStringDefault): AuthTransaction => ({
   authTxnId: asString(row.auth_txn_id),
+  ...(row.fps_id == null ? {} : { fpsId: asString(row.fps_id) }),
+  ...(row.operator_ref == null ? {} : { operatorRef: asString(row.operator_ref) }),
   beneficiaryRefHash: asString(row.beneficiary_ref_hash),
   rationCardHash: asString(row.ration_card_hash),
   authMode: asString(row.auth_mode) as AuthMode,
@@ -168,7 +176,7 @@ export const buildSnapshotWritePlan = (state: PdsLedgerState): SqlStatement[] =>
       values: []
     },
     {
-      text: 'TRUNCATE stakeholders, commodity_lots, stock_positions, transfer_orders, fps_allocations, monthly_entitlements, auth_transactions, distribution_transactions, audit_alerts, ledger_events, ledger_tx_index RESTART IDENTITY CASCADE',
+      text: 'TRUNCATE integration_event_attempts, integration_events, stakeholders, commodity_lots, stock_positions, transfer_orders, fps_allocations, monthly_entitlements, auth_transactions, distribution_transactions, audit_alerts, ledger_events, ledger_tx_index RESTART IDENTITY CASCADE',
       values: []
     }
   ];
@@ -189,7 +197,7 @@ export const buildSnapshotWritePlan = (state: PdsLedgerState): SqlStatement[] =>
 
   for (const transfer of state.transfers) {
     statements.push({
-      text: 'INSERT INTO transfer_orders (transfer_id, lot_id, from_org, to_org, dispatched_qty_kg, received_qty_kg, shortage_qty_kg, vehicle_no, status, dispatch_timestamp, receive_timestamp, stage, ro_ref, authorized_by, authorized_at, approval_status, transporter_id, transformed_from_lot_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18) ON CONFLICT (transfer_id) DO UPDATE SET lot_id = EXCLUDED.lot_id, from_org = EXCLUDED.from_org, to_org = EXCLUDED.to_org, dispatched_qty_kg = EXCLUDED.dispatched_qty_kg, received_qty_kg = EXCLUDED.received_qty_kg, shortage_qty_kg = EXCLUDED.shortage_qty_kg, vehicle_no = EXCLUDED.vehicle_no, status = EXCLUDED.status, dispatch_timestamp = EXCLUDED.dispatch_timestamp, receive_timestamp = EXCLUDED.receive_timestamp, stage = EXCLUDED.stage, ro_ref = EXCLUDED.ro_ref, authorized_by = EXCLUDED.authorized_by, authorized_at = EXCLUDED.authorized_at, approval_status = EXCLUDED.approval_status, transporter_id = EXCLUDED.transporter_id, transformed_from_lot_id = EXCLUDED.transformed_from_lot_id',
+      text: 'INSERT INTO transfer_orders (transfer_id, lot_id, from_org, to_org, dispatched_qty_kg, received_qty_kg, shortage_qty_kg, vehicle_no, status, dispatch_timestamp, receive_timestamp, stage, ro_ref, authorized_by, authorized_at, approval_status, transporter_id, transporter_name, transformed_from_lot_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19) ON CONFLICT (transfer_id) DO UPDATE SET lot_id = EXCLUDED.lot_id, from_org = EXCLUDED.from_org, to_org = EXCLUDED.to_org, dispatched_qty_kg = EXCLUDED.dispatched_qty_kg, received_qty_kg = EXCLUDED.received_qty_kg, shortage_qty_kg = EXCLUDED.shortage_qty_kg, vehicle_no = EXCLUDED.vehicle_no, status = EXCLUDED.status, dispatch_timestamp = EXCLUDED.dispatch_timestamp, receive_timestamp = EXCLUDED.receive_timestamp, stage = EXCLUDED.stage, ro_ref = EXCLUDED.ro_ref, authorized_by = EXCLUDED.authorized_by, authorized_at = EXCLUDED.authorized_at, approval_status = EXCLUDED.approval_status, transporter_id = EXCLUDED.transporter_id, transporter_name = EXCLUDED.transporter_name, transformed_from_lot_id = EXCLUDED.transformed_from_lot_id',
       values: [
         transfer.transferId,
         transfer.lotId,
@@ -207,7 +215,8 @@ export const buildSnapshotWritePlan = (state: PdsLedgerState): SqlStatement[] =>
         transfer.authorizedBy ?? null,
         transfer.authorizedAt ?? null,
         transfer.approvalStatus ?? null,
-        transfer.transporterId ?? null,
+        transfer.transporterId,
+        transfer.transporterName,
         transfer.transformedFromLotId ?? null
       ]
     });
@@ -215,7 +224,7 @@ export const buildSnapshotWritePlan = (state: PdsLedgerState): SqlStatement[] =>
 
   for (const allocation of state.allocations) {
     statements.push({
-      text: 'INSERT INTO fps_allocations (allocation_id, fps_id, commodity, allocated_qty_kg, received_qty_kg, shortage_qty_kg, month, source_godown_id, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) ON CONFLICT (allocation_id) DO UPDATE SET fps_id = EXCLUDED.fps_id, commodity = EXCLUDED.commodity, allocated_qty_kg = EXCLUDED.allocated_qty_kg, received_qty_kg = EXCLUDED.received_qty_kg, shortage_qty_kg = EXCLUDED.shortage_qty_kg, month = EXCLUDED.month, source_godown_id = EXCLUDED.source_godown_id, status = EXCLUDED.status',
+      text: 'INSERT INTO fps_allocations (allocation_id, fps_id, commodity, allocated_qty_kg, received_qty_kg, shortage_qty_kg, month, source_godown_id, status, transporter_id, transporter_name, vehicle_no, dispatch_timestamp, receive_timestamp) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) ON CONFLICT (allocation_id) DO UPDATE SET fps_id = EXCLUDED.fps_id, commodity = EXCLUDED.commodity, allocated_qty_kg = EXCLUDED.allocated_qty_kg, received_qty_kg = EXCLUDED.received_qty_kg, shortage_qty_kg = EXCLUDED.shortage_qty_kg, month = EXCLUDED.month, source_godown_id = EXCLUDED.source_godown_id, status = EXCLUDED.status, transporter_id = EXCLUDED.transporter_id, transporter_name = EXCLUDED.transporter_name, vehicle_no = EXCLUDED.vehicle_no, dispatch_timestamp = EXCLUDED.dispatch_timestamp, receive_timestamp = EXCLUDED.receive_timestamp',
       values: [
         allocation.allocationId,
         allocation.fpsId,
@@ -225,7 +234,12 @@ export const buildSnapshotWritePlan = (state: PdsLedgerState): SqlStatement[] =>
         allocation.shortageQtyKg ?? null,
         allocation.month,
         allocation.sourceGodownId,
-        allocation.status
+        allocation.status,
+        allocation.transporterId,
+        allocation.transporterName,
+        allocation.vehicleNo,
+        allocation.dispatchTimestamp,
+        allocation.receiveTimestamp ?? null
       ]
     });
   }
@@ -247,9 +261,11 @@ export const buildSnapshotWritePlan = (state: PdsLedgerState): SqlStatement[] =>
 
   for (const authTransaction of state.authTransactions) {
     statements.push({
-      text: 'INSERT INTO auth_transactions (auth_txn_id, beneficiary_ref_hash, ration_card_hash, auth_mode, auth_result, auth_txn_ref_hash, approved_by, timestamp) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (auth_txn_id) DO UPDATE SET beneficiary_ref_hash = EXCLUDED.beneficiary_ref_hash, ration_card_hash = EXCLUDED.ration_card_hash, auth_mode = EXCLUDED.auth_mode, auth_result = EXCLUDED.auth_result, auth_txn_ref_hash = EXCLUDED.auth_txn_ref_hash, approved_by = EXCLUDED.approved_by, timestamp = EXCLUDED.timestamp',
+      text: 'INSERT INTO auth_transactions (auth_txn_id, fps_id, operator_ref, beneficiary_ref_hash, ration_card_hash, auth_mode, auth_result, auth_txn_ref_hash, approved_by, timestamp) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) ON CONFLICT (auth_txn_id) DO UPDATE SET fps_id = EXCLUDED.fps_id, operator_ref = EXCLUDED.operator_ref, beneficiary_ref_hash = EXCLUDED.beneficiary_ref_hash, ration_card_hash = EXCLUDED.ration_card_hash, auth_mode = EXCLUDED.auth_mode, auth_result = EXCLUDED.auth_result, auth_txn_ref_hash = EXCLUDED.auth_txn_ref_hash, approved_by = EXCLUDED.approved_by, timestamp = EXCLUDED.timestamp',
       values: [
         authTransaction.authTxnId,
+        authTransaction.fpsId ?? null,
+        authTransaction.operatorRef ?? null,
         authTransaction.beneficiaryRefHash,
         authTransaction.rationCardHash,
         authTransaction.authMode,

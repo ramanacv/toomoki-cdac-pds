@@ -9,6 +9,7 @@ export const screenRoutes: Record<DemoScreen, string> = {
   allocations: 'allocations',
   distribution: 'distribution',
   'audit-alerts': 'audit',
+  'eligibility-review': 'eligibility',
   verify: 'verify'
 };
 

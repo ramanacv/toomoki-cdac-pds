@@ -34,19 +34,20 @@ const receivedTransfer = (transferId: string, fromOrg: string, toOrg: string, lo
   vehicleNo: 'KA01AB2000',
   status: TransferStatus.RECEIVED,
   dispatchTimestamp: '2026-06-09T10:00:00.000Z',
-  receiveTimestamp: '2026-06-09T11:00:00.000Z'
+  receiveTimestamp: '2026-06-09T11:00:00.000Z',
+  transporterId: 'TRANS-001',
+  transporterName: 'Transport Contractor 01'
 });
 
 const completedTransfers = [
-  receivedTransfer('TR-POC-RICE-PROC-FCI', 'PROC-001', 'FCI-001'),
   receivedTransfer('TR-POC-RICE-FCI-DEPOT', 'FCI-001', 'GODOWN-S-001'),
-  receivedTransfer('TR-POC-RICE-DEPOT-ISSUE', 'GODOWN-S-001', 'ISSUE-001')
+  receivedTransfer('TR-POC-RICE-DEPOT-BLOCK', 'GODOWN-S-001', 'GODOWN-B-001')
 ];
 
 const roEvent = {
   ledgerTxId: 'MOCK-RO',
   entityType: 'workflow' as const,
-  entityId: 'TR-POC-RICE-DEPOT-ISSUE',
+  entityId: 'TR-POC-RICE-DEPOT-BLOCK',
   eventType: 'RO_LITE_APPROVED',
   payload: {},
   timestamp: '2026-06-09T10:00:00.000Z'
@@ -59,50 +60,29 @@ const completedFpsAllocation = {
   allocatedQtyKg: demoQuantities.fpsAllocationKg,
   receivedQtyKg: demoQuantities.fpsReceiptKg,
   month: '2026-06',
-  sourceGodownId: 'ISSUE-001',
-  status: 'RECEIVED' as const
+  sourceGodownId: 'GODOWN-B-001',
+  status: 'RECEIVED' as const,
+  transporterId: 'TRANS-001',
+  transporterName: 'Transport Contractor 01',
+  vehicleNo: 'KA01AB1204',
+  dispatchTimestamp: '2026-06-09T12:00:00.000Z',
+  receiveTimestamp: '2026-06-09T13:00:00.000Z'
 };
 
 describe('workflow actions', () => {
-  it('starts with procurement dispatch to FCI', () => {
+  it('starts with FCI Stage-I dispatch to state godown', () => {
     const action = getNextWorkflowAction(emptyContext);
 
     expect(action?.request.kind).toBe('dispatch');
-    expect(action?.id).toBe('TR-POC-RICE-PROC-FCI');
-    expect(getRoleQueue(emptyContext, 'PROCUREMENT')).toHaveLength(1);
+    expect(action?.id).toBe('TR-POC-RICE-FCI-DEPOT');
+    expect(getRoleQueue(emptyContext, 'FCI_DEPOT')).toHaveLength(1);
     expect(getRoleQueue(emptyContext, 'CONTROL_OFFICE')).toHaveLength(0);
   });
 
-  it('requires FCI receipt before FCI can dispatch downstream', () => {
+  it('requires state godown receipt before Stage-II approval or block-godown dispatch', () => {
     const context: WorkflowContext = {
       ...emptyContext,
       transfers: [
-        {
-          transferId: 'TR-POC-RICE-PROC-FCI',
-          lotId: 'LOT-RICE-2026-001',
-          fromOrg: 'PROC-001',
-          toOrg: 'FCI-001',
-          dispatchedQtyKg: demoQuantities.stageOneTransferKg,
-          vehicleNo: 'KA01AB2000',
-          status: TransferStatus.DISPATCHED,
-          dispatchTimestamp: '2026-06-09T10:00:00.000Z'
-        }
-      ]
-    };
-
-    const action = getNextWorkflowAction(context);
-
-    expect(action?.id).toBe('TR-POC-RICE-PROC-FCI-receive');
-    expect(action?.request.kind).toBe('receive');
-    expect(getRoleQueue(context, 'FCI_DEPOT')[0]?.id).toBe('TR-POC-RICE-PROC-FCI-receive');
-    expect(getRoleQueue(context, 'DEPOT')).toHaveLength(0);
-  });
-
-  it('requires state depot receipt before Stage-II approval or issue-point dispatch', () => {
-    const context: WorkflowContext = {
-      ...emptyContext,
-      transfers: [
-        completedTransfers[0]!,
         {
           transferId: 'TR-POC-RICE-FCI-DEPOT',
           lotId: 'LOT-RICE-2026-001',
@@ -111,7 +91,9 @@ describe('workflow actions', () => {
           dispatchedQtyKg: demoQuantities.stageOneTransferKg,
           vehicleNo: 'KA01AB2000',
           status: TransferStatus.DISPATCHED,
-          dispatchTimestamp: '2026-06-09T10:00:00.000Z'
+          dispatchTimestamp: '2026-06-09T10:00:00.000Z',
+          transporterId: 'TRANS-001',
+          transporterName: 'Transport Contractor 01'
         }
       ]
     };
@@ -120,7 +102,7 @@ describe('workflow actions', () => {
 
     expect(action?.id).toBe('TR-POC-RICE-FCI-DEPOT-receive');
     expect(action?.request.kind).toBe('receive');
-    expect(getRoleQueue(context, 'DEPOT')[0]?.id).toBe('TR-POC-RICE-FCI-DEPOT-receive');
+    expect(getRoleQueue(context, 'GODOWN')[0]?.id).toBe('TR-POC-RICE-FCI-DEPOT-receive');
     expect(getRoleQueue(context, 'CONTROL_OFFICE')).toHaveLength(0);
     expect(getRoleQueue(context, 'FCI_DEPOT')).toHaveLength(0);
   });
@@ -128,46 +110,45 @@ describe('workflow actions', () => {
   it('queues DSO approval when stock reaches the state godown', () => {
     const readyContext: WorkflowContext = {
       ...emptyContext,
-      transfers: completedTransfers.slice(0, 2)
+      transfers: completedTransfers.slice(0, 1)
     };
 
     const action = getNextWorkflowAction(readyContext);
 
     expect(action?.request.kind).toBe('authorize-movement');
-    expect(action?.request).toMatchObject({ transferId: 'TR-POC-RICE-DEPOT-ISSUE' });
+    expect(action?.request).toMatchObject({ transferId: 'TR-POC-RICE-DEPOT-BLOCK' });
     expect(getRoleQueue(readyContext, 'CONTROL_OFFICE')).toHaveLength(1);
   });
 
   it('advances to depot dispatch after DSO approval', () => {
     const readyContext: WorkflowContext = {
       ...emptyContext,
-      transfers: completedTransfers.slice(0, 2)
+      transfers: completedTransfers.slice(0, 1)
     };
     const result = applyMockWorkflowAction(readyContext, {
       kind: 'authorize-movement',
-      transferId: 'TR-POC-RICE-DEPOT-ISSUE',
+      transferId: 'TR-POC-RICE-DEPOT-BLOCK',
       authorizedBy: 'DSO-001',
       roRef: 'RO-DSO-POC-001'
     });
 
     const action = getNextWorkflowAction(result.context);
 
-    expect(action?.id).toBe('TR-POC-RICE-DEPOT-ISSUE');
+    expect(action?.id).toBe('TR-POC-RICE-DEPOT-BLOCK');
     expect(action?.request.kind).toBe('dispatch');
-    expect(getRoleQueue(result.context, 'DEPOT')).toHaveLength(1);
+    expect(getRoleQueue(result.context, 'GODOWN')).toHaveLength(1);
   });
 
-  it('requires issue-point receipt before FPS allocation', () => {
+  it('requires block-godown receipt before FPS allocation', () => {
     const context: WorkflowContext = {
       ...emptyContext,
       transfers: [
         completedTransfers[0]!,
-        completedTransfers[1]!,
         {
-          transferId: 'TR-POC-RICE-DEPOT-ISSUE',
+          transferId: 'TR-POC-RICE-DEPOT-BLOCK',
           lotId: 'LOT-RICE-2026-001',
           fromOrg: 'GODOWN-S-001',
-          toOrg: 'ISSUE-001',
+          toOrg: 'GODOWN-B-001',
           dispatchedQtyKg: demoQuantities.stageOneTransferKg,
           vehicleNo: 'KA01AB2000',
           status: TransferStatus.DISPATCHED,
@@ -175,7 +156,9 @@ describe('workflow actions', () => {
           stage: 'II',
           authorizedBy: 'DSO-001',
           approvalStatus: 'APPROVED',
-          roRef: 'RO-DSO-POC-001'
+          roRef: 'RO-DSO-POC-001',
+          transporterId: 'TRANS-001',
+          transporterName: 'Transport Contractor 01'
         }
       ],
       ledgerEvents: [roEvent]
@@ -183,13 +166,13 @@ describe('workflow actions', () => {
 
     const action = getNextWorkflowAction(context);
 
-    expect(action?.id).toBe('TR-POC-RICE-DEPOT-ISSUE-receive');
+    expect(action?.id).toBe('TR-POC-RICE-DEPOT-BLOCK-receive');
     expect(action?.request.kind).toBe('receive');
-    expect(getRoleQueue(context, 'DEPOT')[0]?.id).toBe('TR-POC-RICE-DEPOT-ISSUE-receive');
+    expect(getRoleQueue(context, 'GODOWN')[0]?.id).toBe('TR-POC-RICE-DEPOT-BLOCK-receive');
     expect(getRoleQueue(context, 'FPS')).toHaveLength(0);
   });
 
-  it('offers FPS allocation after issue point receipt', () => {
+  it('offers FPS allocation after block godown receipt', () => {
     const action = getNextWorkflowAction({
       ...emptyContext,
       transfers: completedTransfers,
@@ -198,6 +181,7 @@ describe('workflow actions', () => {
 
     expect(action?.request.kind).toBe('allocate');
     expect(action?.id).toBe('ALLOC-POC-RICE-FPS');
+    expect(action?.roles).toEqual(['BLOCK_OFFICE']);
   });
 
   it('offers distribution after FPS receipt and first distribution exists for duplicate probe', () => {
@@ -239,8 +223,12 @@ describe('workflow actions', () => {
             commodity: 'Rice',
             allocatedQtyKg: 300,
             month: '2026-06',
-            sourceGodownId: 'ISSUE-001',
-            status: 'ALLOCATED'
+            sourceGodownId: 'GODOWN-B-001',
+            status: 'ALLOCATED',
+            transporterId: 'TRANS-001',
+            transporterName: 'Transport Contractor 01',
+            vehicleNo: 'KA01AB1204',
+            dispatchTimestamp: '2026-06-09T12:00:00.000Z'
           }
         ],
         ledgerEvents: [roEvent]
@@ -265,22 +253,21 @@ describe('workflow actions', () => {
   it('keeps the planned workflow free of removed stakeholder IDs', () => {
     const serialized = JSON.stringify(getWorkflowActions(emptyContext));
 
-    expect(serialized).not.toMatch(/FCI-BUF|MLL-001|GODOWN-B|DFPD|FDO|TSO|FOOD-001/);
-    expect(getWorkflowProgress(emptyContext)).toEqual({ completed: 0, total: 9 });
+    expect(serialized).not.toMatch(/FCI-BUF|MLL-001|PROC-001|ISSUE-001|DFPD|FOOD-001/);
+    expect(getWorkflowProgress(emptyContext)).toEqual({ completed: 0, total: 8 });
   });
 
   it('aggregates workflow actions for all commodities on the canonical chain', () => {
     const groups = getAllCommoditiesWorkflowActions(emptyContext);
 
     expect(groups.map((group) => group.commodity)).toEqual(COMMODITIES.map((commodity) => commodity.name));
-    expect(groups.every((group) => group.actions[0]?.id.endsWith('PROC-FCI'))).toBe(true);
+    expect(groups.every((group) => group.actions[0]?.id.endsWith('FCI-DEPOT'))).toBe(true);
   });
 
   it('surfaces pending per-leg approvals across commodities', () => {
     const wheatReady: WorkflowContext = {
       ...emptyContext,
       transfers: [
-        receivedTransfer('TR-POC-WHEAT-PROC-FCI', 'PROC-001', 'FCI-001', 'LOT-WHEAT-2026-001'),
         receivedTransfer('TR-POC-WHEAT-FCI-DEPOT', 'FCI-001', 'GODOWN-S-001', 'LOT-WHEAT-2026-001')
       ]
     };
@@ -288,7 +275,7 @@ describe('workflow actions', () => {
 
     expect(groups.find((group) => group.commodity === 'Wheat')?.actions[0]?.request).toMatchObject({
       kind: 'authorize-movement',
-      transferId: 'TR-POC-WHEAT-DEPOT-ISSUE'
+      transferId: 'TR-POC-WHEAT-DEPOT-BLOCK'
     });
   });
 
@@ -307,11 +294,11 @@ describe('workflow actions', () => {
     };
 
     const action = getWorkflowActions(seriesContext, 'Kerosene')[0];
-    expect(action?.id).toBe(`TR-${seriesId}-KEROSENE-PROC-FCI`);
+    expect(action?.id).toBe(`TR-${seriesId}-KEROSENE-FCI-DEPOT`);
     expect(action?.request).toMatchObject({
       kind: 'dispatch',
       payload: {
-        transferId: `TR-${seriesId}-KEROSENE-PROC-FCI`,
+        transferId: `TR-${seriesId}-KEROSENE-FCI-DEPOT`,
         lotId: `LOT-KEROSENE-${seriesId}-001`
       }
     });

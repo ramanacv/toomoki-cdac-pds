@@ -76,7 +76,7 @@ describe('FilePdsLedgerPort (T2.1 / T2.2)', () => {
         quantityKg: 10,
         qualityGrade: 'A',
         source: 's',
-        currentOwner: 'PROC-001',
+        currentOwner: 'FCI-001',
         currentLocation: 'yard',
         status: 'CREATED'
       } as never

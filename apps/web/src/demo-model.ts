@@ -20,18 +20,18 @@ export type { DemoScenario } from '@pds/fixtures';
 export type DemoRole =
   | 'MANAGEMENT'
   | 'CONTROL_OFFICE'
+  | 'BLOCK_OFFICE'
   | 'FCI_DEPOT'
-  | 'DEPOT'
   | 'FPS'
   | 'AUDITOR'
-  | 'PROCUREMENT'
   | 'GODOWN';
 
 export const oidcRoleToDemoRole = (roles: readonly string[]): DemoRole | null => {
   const mappings: Array<[string, DemoRole]> = [
     ['management', 'MANAGEMENT'],
     ['department', 'CONTROL_OFFICE'],
-    ['procurement', 'PROCUREMENT'],
+    ['block-office', 'BLOCK_OFFICE'],
+    ['procurement', 'FCI_DEPOT'],
     ['fci', 'FCI_DEPOT'],
     ['godown', 'GODOWN'],
     ['fps', 'FPS'],
@@ -48,6 +48,7 @@ export type DemoScreen =
   | 'allocations'
   | 'distribution'
   | 'audit-alerts'
+  | 'eligibility-review'
   | 'verify';
 export type WorkflowState = 'complete' | 'active' | 'blocked' | 'pending';
 
@@ -96,37 +97,32 @@ export const roleProfiles: Record<DemoRole, RoleProfile> = {
     modules: ['Workflow status', 'Endpoint receipts', 'Audit evidence']
   },
   CONTROL_OFFICE: {
-    title: 'DSO / FDO / TSO',
-    summary: 'Authorize RO-lite Stage-II movement and review blocked dispatches.',
-    modules: ['Pending approvals', 'RO-lite stamping', 'Movement blocks']
+    title: 'District Supply Officer (DSO)',
+    summary: 'Authorize Stage-II Release Orders from the state godown to the block godown.',
+    modules: ['Pending RO approvals', 'Stage-II movement review', 'Blocked dispatches']
+  },
+  BLOCK_OFFICE: {
+    title: 'Block Supply Officer (BSO)',
+    summary: 'Allot block-godown stock to Fair Price Shops and monitor block supply.',
+    modules: ['FPS allotment', 'Block monitoring', 'Allocation status']
   },
   FCI_DEPOT: {
-    title: 'FCI / Central Depot',
-    summary: 'Move central stock into the state lifting chain.',
-    modules: ['Central dispatch', 'Buffer receipt', 'Transport proof']
-  },
-  DEPOT: {
-    title: 'Depot / Issue Point',
-    summary: 'Dispatch approved stock to issue points and reserve FPS allocations.',
-    modules: ['Stage-I/II dispatch', 'Transporter evidence', 'FPS allocations']
-  },
-  PROCUREMENT: {
-    title: 'Procurement Center',
-    summary: 'Create lots and dispatch them into the supply chain.',
-    modules: ['Lot creation', 'Dispatch proof', 'Transfer history']
+    title: 'FCI Depot Officer',
+    summary: 'Originate central lots and dispatch Stage-I stock to the state godown.',
+    modules: ['Lot creation', 'Stage-I dispatch', 'Transport proof']
   },
   GODOWN: {
     title: 'Godown Operator',
-    summary: 'Receive stock, confirm shortages, and maintain custody.',
-    modules: ['Receipt confirmation', 'Shortage alerts', 'Stock reconciliation']
+    summary: 'Receive and dispatch stock at state and block godowns.',
+    modules: ['Receipt confirmation', 'Stage-I/II dispatch', 'Shortage alerts']
   },
   FPS: {
-    title: 'Fair Price Shop',
-    summary: 'Receive allocations, authenticate beneficiaries, and distribute rations.',
-    modules: ['FPS stock', 'Auth checks', 'Citizen receipt']
+    title: 'FPS Dealer',
+    summary: 'Confirm shop receipt and simulate AePDS/ePoS authentication and distribution for the assigned shop.',
+    modules: ['Assigned FPS stock', 'Simulated ePoS events', 'Proof status']
   },
   AUDITOR: {
-    title: 'Audit Authority',
+    title: 'Auditor',
     summary: 'Inspect traceability, anomalies, and tamper evidence.',
     modules: ['Trace explorer', 'Open alerts', 'Resolution log']
   }
@@ -138,21 +134,21 @@ export const screenDefinitions: ScreenDefinition[] = [
   { id: 'stakeholders', label: 'Stakeholders', description: 'Registered PDS actors and identities.' },
   { id: 'lots', label: 'Lots', description: 'Commodity lots and custody history.' },
   { id: 'transfers', label: 'Transfers', description: 'Movement log across the supply chain.' },
-  { id: 'allocations', label: 'Allocations', description: 'FPS allocation and receipt tracking.' },
+  { id: 'allocations', label: 'Allocations', description: 'FPS allotment and receipt tracking.' },
   { id: 'distribution', label: 'Distribution', description: 'Beneficiary issue and receipt proof.' },
   { id: 'audit-alerts', label: 'Audit alerts', description: 'Exceptions, severity, and resolution.' },
+  { id: 'eligibility-review', label: 'Eligibility review', description: 'Synthetic external screening and guided RCMS review.' },
   { id: 'verify', label: 'Verify', description: 'Trace and receipt lookup views.' }
 ];
 
 export const roleScreens: Record<DemoRole, DemoScreen[]> = {
-  MANAGEMENT: ['dashboard', 'workbench', 'stakeholders', 'transfers', 'distribution', 'audit-alerts', 'verify'],
+  MANAGEMENT: ['dashboard', 'workbench', 'stakeholders', 'transfers', 'distribution', 'audit-alerts', 'eligibility-review', 'verify'],
   CONTROL_OFFICE: ['dashboard', 'workbench', 'transfers', 'audit-alerts', 'verify'],
+  BLOCK_OFFICE: ['dashboard', 'workbench', 'allocations', 'transfers', 'verify'],
   FCI_DEPOT: ['dashboard', 'workbench', 'lots', 'transfers', 'verify'],
-  DEPOT: ['dashboard', 'workbench', 'lots', 'transfers', 'allocations', 'verify'],
-  PROCUREMENT: ['dashboard', 'workbench', 'stakeholders', 'lots', 'transfers', 'verify'],
-  GODOWN: ['dashboard', 'workbench', 'lots', 'transfers', 'allocations', 'audit-alerts', 'verify'],
+  GODOWN: ['dashboard', 'workbench', 'lots', 'transfers', 'audit-alerts', 'verify'],
   FPS: ['dashboard', 'workbench', 'allocations', 'distribution', 'verify'],
-  AUDITOR: ['dashboard', 'stakeholders', 'lots', 'transfers', 'allocations', 'distribution', 'audit-alerts', 'verify']
+  AUDITOR: ['dashboard', 'stakeholders', 'lots', 'transfers', 'allocations', 'distribution', 'audit-alerts', 'eligibility-review', 'verify']
 };
 
 export const getRoleScreens = (role: DemoRole): DemoScreen[] => roleScreens[role];
@@ -172,38 +168,44 @@ export const getDefaultScreen = (role: DemoRole): DemoScreen => {
 const baseWorkflow: WorkflowStep[] = [
   {
     id: 'central-tier',
-    title: 'Procurement / FCI origin',
-    detail: 'Procurement stock enters the FCI custody chain before state lifting.',
+    title: 'FCI origin',
+    detail: 'FCI Depot Officer originates the lot and dispatches Stage-I stock to the state godown.',
     state: 'complete'
   },
   {
     id: 'ro-lite',
-    title: 'RO-lite authorization',
-    detail: 'Control office stamps the Stage-II movement before issue-point dispatch.',
+    title: 'DSO Release Order',
+    detail: 'District Supply Officer (DSO) authorizes Stage-II movement to the block godown.',
+    state: 'complete'
+  },
+  {
+    id: 'block-receipt',
+    title: 'Block godown receipt',
+    detail: 'Godown Operator receives Stage-II stock at the block godown.',
+    state: 'complete'
+  },
+  {
+    id: 'fps-allocation',
+    title: 'BSO FPS allotment',
+    detail: 'Block Supply Officer (BSO) allots block-godown stock to the Fair Price Shop.',
     state: 'complete'
   },
   {
     id: 'fps-receipt',
     title: 'FPS receipt',
-    detail: 'The fair price shop confirms the allocated stock before beneficiary issue.',
-    state: 'complete'
-  },
-  {
-    id: 'fps-allocation',
-    title: 'FPS allocation',
-    detail: 'Allocation is reserved for the fair price shop.',
+    detail: 'FPS Dealer confirms receipt of the allotted stock at the shop.',
     state: 'complete'
   },
   {
     id: 'authentication',
     title: 'Beneficiary authentication',
-    detail: 'Mock OTP or supervised exception approval validates the claim.',
+    detail: 'A clearly labelled fixture simulates the non-sensitive outcome of authoritative AePDS/ePoS authentication.',
     state: 'complete'
   },
   {
     id: 'distribution',
     title: 'Commodity delivery',
-    detail: 'Entitlement is checked and ration is issued.',
+    detail: 'A simulated AePDS/ePoS distribution event is correlated; ViksitPDS is not the ration-sale terminal.',
     state: 'complete'
   }
 ];
@@ -217,17 +219,19 @@ export function buildWorkflowSteps(scenario: DemoScenario): WorkflowStep[] {
             state: 'blocked',
             detail: 'FPS receipt was short, which triggers an audit alert.'
           }
-        : step
+        : step.id === 'authentication' || step.id === 'distribution'
+          ? { ...step, state: 'pending' }
+          : step
     );
   }
 
   if (scenario === 'duplicate-claim') {
     return baseWorkflow.map((step) =>
-      step.id === 'authentication'
+      step.id === 'distribution'
         ? {
             ...step,
             state: 'blocked',
-            detail: 'The same ration card already lifted the monthly entitlement.'
+            detail: 'A second lift attempt in the same month is blocked with audit evidence.'
           }
         : step
     );

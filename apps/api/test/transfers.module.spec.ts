@@ -17,13 +17,16 @@ describe('TransfersModule', () => {
     const transfer = await controller.dispatch({
       transferId: 'TR-MOD-001',
       lotId: 'LOT-RICE-2026-001',
-      fromOrg: 'PROC-001',
-      toOrg: 'FCI-001',
+      fromOrg: 'FCI-001',
+      toOrg: 'GODOWN-S-001',
       dispatchedQtyKg: 250,
-      vehicleNo: 'KA01TR0001'
+      vehicleNo: 'KA01TR0001',
+      transporterId: 'TRANS-001'
     });
 
     expect(transfer.status).toBe(TransferStatus.DISPATCHED);
+    expect(transfer.transporterId).toBe('TRANS-001');
+    expect(transfer.transporterName).toBe('Transport Contractor 01');
     expect(controller.transfers().some((item: any) => item.transferId === 'TR-MOD-001')).toBe(true);
 
     const received = await controller.receive('TR-MOD-001', { receivedQtyKg: 250 });
@@ -49,7 +52,7 @@ describe('TransfersModule', () => {
       transferId: 'TR-MOD-STAGE-II',
       lotId: 'LOT-WHEAT-2026-001',
       fromOrg: 'GODOWN-S-001',
-      toOrg: 'ISSUE-001',
+      toOrg: 'GODOWN-B-001',
       dispatchedQtyKg: 250,
       vehicleNo: 'KA01TR0002',
       stage: 'II',
@@ -60,6 +63,26 @@ describe('TransfersModule', () => {
     expect(transfer.stage).toBe('II');
     expect(transfer.authorizedBy).toBe('DSO-001');
     expect(transfer.approvalStatus).toBe('APPROVED');
+    expect(transfer.transporterId).toBe('TRANS-001');
+    expect(transfer.transporterName).toBe('Transport Contractor 01');
+  });
+
+  it('rejects dispatch without an active transporter', async () => {
+    fixture = await createDemoLedgerFixture();
+    controller = await createControllerWithFacade(TransfersController, fixture.facade);
+
+    await expect(
+      controller.dispatch({
+        transferId: 'TR-MOD-NO-TRANS',
+        lotId: 'LOT-WHEAT-2026-001',
+        fromOrg: 'FCI-001',
+        toOrg: 'GODOWN-S-001',
+        dispatchedQtyKg: 50,
+        vehicleNo: 'KA01TR0009',
+        stage: 'I',
+        transporterId: 'FCI-001'
+      })
+    ).rejects.toThrow(/not a TRANSPORTER/);
   });
 
   it('rejects Stage-II dispatch without RO-lite authorization', async () => {
@@ -72,10 +95,11 @@ describe('TransfersModule', () => {
         transferId: 'TR-MOD-STAGE-II-BLOCK',
         lotId: 'LOT-WHEAT-2026-001',
         fromOrg: 'GODOWN-S-001',
-        toOrg: 'ISSUE-001',
+        toOrg: 'GODOWN-B-001',
         dispatchedQtyKg: 250,
         vehicleNo: 'KA01TR0003',
-        stage: 'II'
+        stage: 'II',
+        transporterId: 'TRANS-001'
       })
     ).rejects.toThrow(/Stage-II dispatch requires/);
   });

@@ -23,6 +23,7 @@ import {
   RationCardType,
   Stakeholder,
   StakeholderStatus,
+  StakeholderType,
   TransferOrder,
   TransferStatus,
   AuditAlert,
@@ -93,7 +94,23 @@ const ALLOWED_LEDGER_EVENT_TYPES = new Set([
   'ProposeEntitlementRule',
   'ApproveEntitlementRule',
   'RolloverUnclaimedQuota',
-  'ResetTransactionalData'
+  'ResetTransactionalData',
+  'EligibilityDecisionAuthorized',
+  'EligibilityDecisionReversed',
+  'BENEFICIARY_CREATED',
+  'MEMBER_ADDED',
+  'MEMBER_REMOVED',
+  'HOUSEHOLD_BIFURCATED',
+  'MIGRATION_RECORDED',
+  'CARD_TRANSFERRED',
+  'VERIFICATION_COMPLETED',
+  'STATUS_CHANGED',
+  'RECORD_DEACTIVATED',
+  'MASTER_REFERENCE',
+  'ALLOCATION',
+  'MOVEMENT',
+  'DISTRIBUTION',
+  'IntegrationReconciliation'
 ]);
 
 const assertAllowedLedgerEventType = (eventType: string): void => {
@@ -292,9 +309,9 @@ export class PdsLedgerEngine {
         season: defaultSeasonForCommodity(definition.name),
         quantityKg: definition.defaultTopUpQuantityKg,
         qualityGrade: definition.defaultQualityGrade,
-        source: 'Procurement Centre 01',
-        currentOwner: 'PROC-001',
-        currentLocation: 'Procurement Yard'
+        source: 'FCI Central Depot',
+        currentOwner: 'FCI-001',
+        currentLocation: 'FCI Depot'
       };
     });
   }
@@ -494,7 +511,7 @@ export class PdsLedgerEngine {
     stage?: 'I' | 'II';
     roRef?: string;
     authorizedBy?: string;
-    transporterId?: string;
+    transporterId: string;
     transformedFromLotId?: string;
   }): TransferOrder {
     if (this.transfers.has(input.transferId)) {
@@ -503,6 +520,7 @@ export class PdsLedgerEngine {
     const lot = this.mustGetLot(input.lotId);
     this.assertActiveStakeholder(input.fromOrg);
     this.assertActiveStakeholder(input.toOrg);
+    const transporter = this.resolveActiveTransporter(input.transporterId);
     if (lot.status === LotStatus.DISPATCHED) {
       throw new Error(`Lot ${lot.lotId} is already in transit (DISPATCHED); cannot re-dispatch until received`);
     }
@@ -551,6 +569,8 @@ export class PdsLedgerEngine {
       vehicleNo: input.vehicleNo,
       status: TransferStatus.DISPATCHED,
       dispatchTimestamp: input.dispatchTimestamp ?? this.timestamp(),
+      transporterId: transporter.stakeholderId,
+      transporterName: transporter.name,
       ...(input.stage ? { stage: input.stage } : {}),
       ...(input.roRef ? { roRef: input.roRef } : {}),
       ...(input.authorizedBy || priorAuthorization?.payload?.authorizedBy
@@ -562,7 +582,6 @@ export class PdsLedgerEngine {
               : {})
           }
         : {}),
-      ...(input.transporterId ? { transporterId: input.transporterId } : {}),
       ...(input.transformedFromLotId ? { transformedFromLotId: input.transformedFromLotId } : {})
     };
 
@@ -663,6 +682,9 @@ export class PdsLedgerEngine {
     allocatedQtyKg: number;
     month: string;
     sourceGodownId: string;
+    transporterId: string;
+    vehicleNo: string;
+    dispatchTimestamp?: string;
   }): FPSAllocation {
     if (this.allocations.has(input.allocationId)) {
       throw new Error(`Allocation ${input.allocationId} already exists`);
@@ -670,8 +692,12 @@ export class PdsLedgerEngine {
     if (input.allocatedQtyKg <= 0) {
       throw new Error('allocatedQtyKg must be positive');
     }
+    if (!input.vehicleNo?.trim()) {
+      throw new Error('vehicleNo is required for FPS doorstep transport');
+    }
     this.assertActiveStakeholder(input.fpsId);
     this.assertActiveStakeholder(input.sourceGodownId);
+    const transporter = this.resolveActiveTransporter(input.transporterId);
     const availableStockKg = this.stock.get(keyFor(input.sourceGodownId, input.commodity)) ?? 0;
     if (availableStockKg < input.allocatedQtyKg) {
       this.raiseAuditFlag({
@@ -689,7 +715,19 @@ export class PdsLedgerEngine {
       throw new Error(`Insufficient stock for ${input.sourceGodownId} ${input.commodity}`);
     }
     this.consumeStock(input.sourceGodownId, input.commodity, input.allocatedQtyKg);
-    const allocation: FPSAllocation = { ...input, status: 'ALLOCATED' };
+    const allocation: FPSAllocation = {
+      allocationId: input.allocationId,
+      fpsId: input.fpsId,
+      commodity: input.commodity,
+      allocatedQtyKg: input.allocatedQtyKg,
+      month: input.month,
+      sourceGodownId: input.sourceGodownId,
+      status: 'ALLOCATED',
+      transporterId: transporter.stakeholderId,
+      transporterName: transporter.name,
+      vehicleNo: input.vehicleNo,
+      dispatchTimestamp: input.dispatchTimestamp ?? this.timestamp()
+    };
     this.allocations.set(allocation.allocationId, allocation);
     this.recordEvent('allocation', allocation.allocationId, 'AllocateToFPS', allocation);
     return allocation;
@@ -723,6 +761,7 @@ export class PdsLedgerEngine {
     const updated: FPSAllocation = {
       ...allocation,
       receivedQtyKg: input.receivedQtyKg,
+      receiveTimestamp: input.receiveTimestamp ?? this.timestamp(),
       ...(shortageQtyKg > 0 ? { shortageQtyKg } : {}),
       status: shortageQtyKg > 0 ? 'RECEIVED_WITH_SHORTAGE' : 'RECEIVED'
     };
@@ -751,6 +790,8 @@ export class PdsLedgerEngine {
 
   simulateAuthentication(input: {
     authTxnId: string;
+    fpsId?: string;
+    operatorRef?: string;
     beneficiaryRefHash: string;
     rationCardHash: string;
     authMode: AuthMode;
@@ -1468,6 +1509,18 @@ export class PdsLedgerEngine {
     }
   }
 
+  private resolveActiveTransporter(transporterId: string): Stakeholder {
+    if (!transporterId?.trim()) {
+      throw new Error('transporterId is required for transport evidence');
+    }
+    this.assertActiveStakeholder(transporterId);
+    const stakeholder = this.stakeholders.get(transporterId)!;
+    if (stakeholder.stakeholderType !== StakeholderType.TRANSPORTER) {
+      throw new Error(`Stakeholder ${transporterId} is not a TRANSPORTER`);
+    }
+    return stakeholder;
+  }
+
   private consumeStock(entityId: string, commodity: string, qty: number): void {
     const current = this.stock.get(keyFor(entityId, commodity)) ?? 0;
     if (current < qty) {
@@ -1585,6 +1638,25 @@ export class PdsLedgerEngine {
       }
       case 'RolloverUnclaimedQuota':
         // Rollover updates multiple entitlements; projection not applicable for replay.
+        break;
+      case 'EligibilityDecisionAuthorized':
+      case 'EligibilityDecisionReversed':
+      case 'BENEFICIARY_CREATED':
+      case 'MEMBER_ADDED':
+      case 'MEMBER_REMOVED':
+      case 'HOUSEHOLD_BIFURCATED':
+      case 'MIGRATION_RECORDED':
+      case 'CARD_TRANSFERRED':
+      case 'VERIFICATION_COMPLETED':
+      case 'STATUS_CHANGED':
+      case 'RECORD_DEACTIVATED':
+      case 'MASTER_REFERENCE':
+      case 'ALLOCATION':
+      case 'MOVEMENT':
+      case 'DISTRIBUTION':
+      case 'IntegrationReconciliation':
+        // These are privacy-safe evidence events. Their authoritative
+        // operational projections remain in PostgreSQL/source systems.
         break;
       case 'ResetTransactionalData': {
         const commodity = typeof payload.commodity === 'string' ? payload.commodity : undefined;

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { AuthMode, AuthResult } from '@pds/shared-types';
 import { AuthController } from '../src/modules/auth/auth.controller.js';
-import { createControllerWithFacade, createDemoLedgerFixture, type DemoLedgerFixture } from './helpers/demo-ledger.js';
+import { asFpsRequest, createControllerWithFacade, createDemoLedgerFixture, type DemoLedgerFixture } from './helpers/demo-ledger.js';
 
 describe('AuthModule', () => {
   let fixture: DemoLedgerFixture;
@@ -18,17 +18,17 @@ describe('AuthModule', () => {
       beneficiaryRefHash: 'beneficiary-hash',
       rationCardHash: 'demo-ration-card-hash',
       authResult: AuthResult.SUCCESS
-    });
+    }, asFpsRequest());
 
     expect(otp.authMode).toBe(AuthMode.MOCK_OTP);
-    expect(controller.authTransaction('AUTH-MOD-001').authTxnId).toBe('AUTH-MOD-001');
+    expect((await controller.authTransaction('AUTH-MOD-001', asFpsRequest())).authTxnId).toBe('AUTH-MOD-001');
 
     const biometric = await controller.authBiometric({
       authTxnId: 'AUTH-MOD-002',
       beneficiaryRefHash: 'beneficiary-hash',
       rationCardHash: 'demo-ration-card-hash',
       authResult: AuthResult.SUCCESS
-    });
+    }, asFpsRequest());
     expect(biometric.authMode).toBe(AuthMode.SIMULATED_BIOMETRIC);
 
     const exception = await controller.authException({
@@ -37,8 +37,8 @@ describe('AuthModule', () => {
       rationCardHash: 'demo-ration-card-hash',
       authResult: AuthResult.SUCCESS,
       approvedBy: 'SUP-001'
-    });
+    }, asFpsRequest());
     expect(exception.authMode).toBe(AuthMode.SUPERVISOR_EXCEPTION);
-    expect(controller.authTransactions().length).toBeGreaterThanOrEqual(3);
+    expect((await controller.authTransactions(asFpsRequest())).length).toBeGreaterThanOrEqual(3);
   });
 });

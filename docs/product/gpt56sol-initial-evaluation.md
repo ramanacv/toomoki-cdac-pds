@@ -1,5 +1,10 @@
 # Initial PoC Evaluation
 
+> Dated evaluation snapshot retained for score progression. It is not the
+> current product or deployment specification; see the
+> [current evaluation](gpt56sol-current-evaluation.md) and maintained
+> [documentation index](../README.md).
+
 ## Bottom line
 
 ViksitPDS has a credible, genuinely working blockchain PoC underneath it. Its strongest assets are the live two-organization Fabric deployment, privacy-preserving proof design, PostgreSQL/Fabric separation, deterministic chaincode, traceability, and realistic PDS workflow.
@@ -349,4 +354,3 @@ Those are roadmap items. Demo stability, measurements, commercial evidence and c
 - Outbox inspection: 549 committed rows, all with unique Fabric transaction IDs; no current pending/failed/dead-letter rows.
 - Actual runtime defect observed: `/admin/overview` returned HTTP 500 in PostgreSQL/Fabric mode.
 - No destructive reset, live lifecycle, chaincode upgrade or data mutation was performed.
-

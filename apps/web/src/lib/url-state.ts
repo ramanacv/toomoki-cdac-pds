@@ -3,11 +3,10 @@ import type { DemoRole, DemoScenario } from '@/demo-model.js';
 export const VALID_ROLES: DemoRole[] = [
   'MANAGEMENT',
   'CONTROL_OFFICE',
+  'BLOCK_OFFICE',
   'FCI_DEPOT',
-  'DEPOT',
   'FPS',
   'AUDITOR',
-  'PROCUREMENT',
   'GODOWN'
 ];
 

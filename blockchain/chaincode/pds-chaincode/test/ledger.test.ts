@@ -16,7 +16,8 @@ const dispatchAndReceive = (
     fromOrg,
     toOrg,
     dispatchedQtyKg: quantityKg,
-    vehicleNo: 'KA01AB0001'
+    vehicleNo: 'KA01AB0001',
+    transporterId: 'TRANS-001'
   });
   engine.receiveLot({ transferId, receivedQtyKg: quantityKg });
 };
@@ -34,12 +35,12 @@ describe('PdsLedgerEngine', () => {
     );
     expect(engine.exportState().stock).toEqual(
       expect.arrayContaining([
-        ['PROC-001:Rice', 10000],
-        ['PROC-001:Wheat', 7000],
-        ['PROC-001:Dal', 2000],
-        ['PROC-001:Sugar', 2000],
-        ['PROC-001:Cooking Oil', 1000],
-        ['PROC-001:Kerosene', 1000]
+        ['FCI-001:Rice', 10000],
+        ['FCI-001:Wheat', 7000],
+        ['FCI-001:Dal', 2000],
+        ['FCI-001:Sugar', 2000],
+        ['FCI-001:Cooking Oil', 1000],
+        ['FCI-001:Kerosene', 1000]
       ])
     );
   });
@@ -53,12 +54,12 @@ describe('PdsLedgerEngine', () => {
     );
     expect(engine.exportState().stock).toEqual(
       expect.arrayContaining([
-        ['PROC-001:Rice', 10000],
-        ['PROC-001:Wheat', 7000],
-        ['PROC-001:Dal', 2000],
-        ['PROC-001:Sugar', 2000],
-        ['PROC-001:Cooking Oil', 1000],
-        ['PROC-001:Kerosene', 1000]
+        ['FCI-001:Rice', 10000],
+        ['FCI-001:Wheat', 7000],
+        ['FCI-001:Dal', 2000],
+        ['FCI-001:Sugar', 2000],
+        ['FCI-001:Cooking Oil', 1000],
+        ['FCI-001:Kerosene', 1000]
       ])
     );
     const eventTypes = engine.exportState().events.map((event) => event.eventType);
@@ -111,10 +112,12 @@ describe('PdsLedgerEngine', () => {
       engine.dispatchLot({
         transferId: 'TR-KEROSENE-INVALID-DSO',
         lotId: 'LOT-KEROSENE-2026-001',
-        fromOrg: 'PROC-001',
+        fromOrg: 'FCI-001',
         toOrg: 'DSO-001',
         dispatchedQtyKg: 100,
-        vehicleNo: 'KA01AB8001'
+        vehicleNo: 'KA01AB8001',
+        transporterId: 'TRANS-001'
+      
       })
     ).toThrow(/Kerosene route does not allow movement/);
   });
@@ -132,15 +135,17 @@ describe('PdsLedgerEngine', () => {
 
   it('returns direct lot, transfer, and allocation lookups', () => {
     const engine = new PdsLedgerEngine(true);
-    dispatchAndReceive(engine, 'TR-LOOKUP-001', 'LOT-RICE-2026-001', 'PROC-001', 'FCI-001', 100);
-    engine.addStockForTest('ISSUE-001', 'Rice', 100);
+    dispatchAndReceive(engine, 'TR-LOOKUP-001', 'LOT-RICE-2026-001', 'FCI-001', 'GODOWN-S-001', 100);
+    engine.addStockForTest('GODOWN-B-001', 'Rice', 100);
     engine.allocateToFps({
       allocationId: 'ALLOC-LOOKUP-001',
       fpsId: 'FPS-101',
       commodity: 'Rice',
       allocatedQtyKg: 50,
       month: '2026-06',
-      sourceGodownId: 'ISSUE-001'
+      sourceGodownId: 'GODOWN-B-001',
+      transporterId: 'TRANS-001',
+      vehicleNo: 'KA01AB9999'
     });
     const auth = engine.simulateAuthentication({
       authTxnId: 'AUTH-LOOKUP-001',
@@ -159,14 +164,16 @@ describe('PdsLedgerEngine', () => {
 
   it('records a happy-path distribution', () => {
     const engine = new PdsLedgerEngine(true);
-    engine.addStockForTest('ISSUE-001', 'Rice', 200);
+    engine.addStockForTest('GODOWN-B-001', 'Rice', 200);
     engine.allocateToFps({
       allocationId: 'ALLOC-001',
       fpsId: 'FPS-101',
       commodity: 'Rice',
       allocatedQtyKg: 200,
       month: '2026-06',
-      sourceGodownId: 'ISSUE-001'
+      sourceGodownId: 'GODOWN-B-001',
+      transporterId: 'TRANS-001',
+      vehicleNo: 'KA01AB9999'
     });
     engine.recordFpsReceipt({
       allocationId: 'ALLOC-001',
@@ -202,10 +209,11 @@ describe('PdsLedgerEngine', () => {
     engine.dispatchLot({
       transferId: 'TR-002',
       lotId: 'LOT-RICE-2026-001',
-      fromOrg: 'PROC-001',
-      toOrg: 'FCI-001',
+      fromOrg: 'FCI-001',
+      toOrg: 'GODOWN-S-001',
       dispatchedQtyKg: 1000,
-      vehicleNo: 'KA01AB5678'
+      vehicleNo: 'KA01AB5678',
+      transporterId: 'TRANS-001'
     });
     engine.receiveLot({
       transferId: 'TR-002',
@@ -219,7 +227,7 @@ describe('PdsLedgerEngine', () => {
     const engine = new PdsLedgerEngine(false);
     engine.registerStakeholder({
       stakeholderId: 'PROC-001',
-      stakeholderType: StakeholderType.PROCUREMENT_CENTER,
+      stakeholderType: StakeholderType.FCI,
       name: 'Proc',
       district: 'X',
       licenseNo: 'L',
@@ -263,6 +271,30 @@ describe('PdsLedgerEngine', () => {
     ).toThrow(/Unsupported ledger event type/);
   });
 
+  it.each([
+    'EligibilityDecisionAuthorized',
+    'EligibilityDecisionReversed',
+    'BENEFICIARY_CREATED',
+    'MEMBER_REMOVED',
+    'HOUSEHOLD_BIFURCATED',
+    'MIGRATION_RECORDED',
+    'RECORD_DEACTIVATED'
+  ])('accepts privacy-safe beneficiary proof event %s without projecting identity state', (eventType) => {
+    const engine = new PdsLedgerEngine(false);
+    expect(() => engine.applyLedgerEvent({
+      ledgerTxId: `TX-${eventType}`,
+      entityType: 'beneficiary-registry',
+      entityId: 'beneficiary-demo-hash',
+      eventType,
+      payload: {
+        beneficiaryRefHash: 'beneficiary-demo-hash',
+        rationCardHash: 'ration-card-demo-hash',
+        evidenceDigest: 'a'.repeat(64)
+      },
+      timestamp: '2026-07-23T00:00:00.000Z'
+    })).not.toThrow();
+  });
+
   it('rejects PII-bearing payloads and raw numeric hashes (T6.4)', () => {
     const engine = new PdsLedgerEngine(false);
     expect(() =>
@@ -290,7 +322,7 @@ describe('PdsLedgerEngine', () => {
     const engine = new PdsLedgerEngine(false);
     engine.registerStakeholder({
       stakeholderId: 'PROC-001',
-      stakeholderType: StakeholderType.PROCUREMENT_CENTER,
+      stakeholderType: StakeholderType.FCI,
       name: 'Proc',
       district: 'X',
       licenseNo: 'L',
@@ -314,7 +346,7 @@ describe('PdsLedgerEngine', () => {
     const engine = new PdsLedgerEngine(false);
     engine.registerStakeholder({
       stakeholderId: 'PROC-001',
-      stakeholderType: StakeholderType.PROCUREMENT_CENTER,
+      stakeholderType: StakeholderType.FCI,
       name: 'Proc',
       district: 'X',
       licenseNo: 'L',
@@ -326,6 +358,15 @@ describe('PdsLedgerEngine', () => {
       name: 'Miller',
       district: 'X',
       licenseNo: 'L2',
+      status: StakeholderStatus.ACTIVE
+    });
+
+    engine.registerStakeholder({
+      stakeholderId: 'TRANS-001',
+      stakeholderType: StakeholderType.TRANSPORTER,
+      name: 'Transport Contractor 01',
+      district: 'X',
+      licenseNo: 'LT',
       status: StakeholderStatus.ACTIVE
     });
     engine.createCommodityLot({
@@ -351,7 +392,8 @@ describe('PdsLedgerEngine', () => {
       fromOrg: 'PROC-001',
       toOrg: 'FCI-001',
       dispatchedQtyKg: 60,
-      vehicleNo: 'KA01AB0001'
+      vehicleNo: 'KA01AB0001',
+      transporterId: 'TRANS-001'
     });
     // Sender stock deducted; receiver not yet credited (in-transit model).
     expect(stockOf('PROC-001', 'Test Grain')).toBe(40);
@@ -371,7 +413,8 @@ describe('PdsLedgerEngine', () => {
       fromOrg: 'PROC-001',
       toOrg: 'FCI-001',
       dispatchedQtyKg: 40,
-      vehicleNo: 'KA01AB0002'
+      vehicleNo: 'KA01AB0002',
+      transporterId: 'TRANS-001'
     });
     expect(stockOf('PROC-001', 'Test Grain')).toBe(0);
     engine.receiveLot({ transferId: 'TR-CONSERVE-2', receivedQtyKg: 40 });
@@ -384,7 +427,9 @@ describe('PdsLedgerEngine', () => {
         fromOrg: 'PROC-001',
         toOrg: 'FCI-001',
         dispatchedQtyKg: 10,
-        vehicleNo: 'KA01AB0002'
+        vehicleNo: 'KA01AB0002',
+        transporterId: 'TRANS-001'
+      
       })
     ).toThrow(/owned by/);
   });
@@ -393,7 +438,7 @@ describe('PdsLedgerEngine', () => {
     const engine = new PdsLedgerEngine(false);
     engine.registerStakeholder({
       stakeholderId: 'PROC-001',
-      stakeholderType: StakeholderType.PROCUREMENT_CENTER,
+      stakeholderType: StakeholderType.FCI,
       name: 'Proc',
       district: 'X',
       licenseNo: 'L',
@@ -405,6 +450,15 @@ describe('PdsLedgerEngine', () => {
       name: 'Miller',
       district: 'X',
       licenseNo: 'L2',
+      status: StakeholderStatus.ACTIVE
+    });
+
+    engine.registerStakeholder({
+      stakeholderId: 'TRANS-001',
+      stakeholderType: StakeholderType.TRANSPORTER,
+      name: 'Transport Contractor 01',
+      district: 'X',
+      licenseNo: 'LT',
       status: StakeholderStatus.ACTIVE
     });
     engine.createCommodityLot({
@@ -427,7 +481,8 @@ describe('PdsLedgerEngine', () => {
       fromOrg: 'PROC-001',
       toOrg: 'FCI-001',
       dispatchedQtyKg: 60,
-      vehicleNo: 'KA01AB0001'
+      vehicleNo: 'KA01AB0001',
+      transporterId: 'TRANS-001'
     });
 
     expect(() => engine.receiveLot({ transferId: 'TR-RECEIPT-QTY-OVER', receivedQtyKg: 0 })).toThrow(/must be positive/);
@@ -445,7 +500,7 @@ describe('PdsLedgerEngine', () => {
     const engine = new PdsLedgerEngine(false);
     engine.registerStakeholder({
       stakeholderId: 'PROC-001',
-      stakeholderType: StakeholderType.PROCUREMENT_CENTER,
+      stakeholderType: StakeholderType.FCI,
       name: 'Proc',
       district: 'X',
       licenseNo: 'L',
@@ -457,6 +512,15 @@ describe('PdsLedgerEngine', () => {
       name: 'Miller',
       district: 'X',
       licenseNo: 'L2',
+      status: StakeholderStatus.ACTIVE
+    });
+
+    engine.registerStakeholder({
+      stakeholderId: 'TRANS-001',
+      stakeholderType: StakeholderType.TRANSPORTER,
+      name: 'Transport Contractor 01',
+      district: 'X',
+      licenseNo: 'LT',
       status: StakeholderStatus.ACTIVE
     });
     engine.createCommodityLot({
@@ -477,7 +541,9 @@ describe('PdsLedgerEngine', () => {
         fromOrg: 'PROC-001',
         toOrg: 'FCI-001',
         dispatchedQtyKg: 0,
-        vehicleNo: 'KA01AB0001'
+        vehicleNo: 'KA01AB0001',
+        transporterId: 'TRANS-001'
+      
       })
     ).toThrow(/must be positive/);
 
@@ -488,7 +554,9 @@ describe('PdsLedgerEngine', () => {
         fromOrg: 'PROC-001',
         toOrg: 'FCI-001',
         dispatchedQtyKg: 999,
-        vehicleNo: 'KA01AB0002'
+        vehicleNo: 'KA01AB0002',
+        transporterId: 'TRANS-001'
+      
       })
     ).toThrow(/Insufficient stock/);
   });
@@ -499,23 +567,26 @@ describe('PdsLedgerEngine', () => {
     engine.dispatchLot({
       transferId: 'TR-DUP-1',
       lotId: 'LOT-RICE-2026-001',
-      fromOrg: 'PROC-001',
-      toOrg: 'FCI-001',
+      fromOrg: 'FCI-001',
+      toOrg: 'GODOWN-S-001',
       dispatchedQtyKg: 100,
-      vehicleNo: 'KA01AB0001'
+      vehicleNo: 'KA01AB0001',
+      transporterId: 'TRANS-001'
     });
     expect(() =>
       engine.dispatchLot({
         transferId: 'TR-DUP-1',
         lotId: 'LOT-RICE-2026-001',
-        fromOrg: 'PROC-001',
-        toOrg: 'FCI-001',
+        fromOrg: 'FCI-001',
+        toOrg: 'GODOWN-S-001',
         dispatchedQtyKg: 100,
-        vehicleNo: 'KA01AB0002'
+        vehicleNo: 'KA01AB0002',
+        transporterId: 'TRANS-001'
+      
       })
     ).toThrow(/already exists/);
 
-    engine.addStockForTest('ISSUE-001', 'Rice', 100);
+    engine.addStockForTest('GODOWN-B-001', 'Rice', 100);
 
     engine.allocateToFps({
       allocationId: 'ALLOC-DUP-1',
@@ -523,7 +594,9 @@ describe('PdsLedgerEngine', () => {
       commodity: 'Rice',
       allocatedQtyKg: 30,
       month: '2026-06',
-      sourceGodownId: 'ISSUE-001'
+      sourceGodownId: 'GODOWN-B-001',
+      transporterId: 'TRANS-001',
+      vehicleNo: 'KA01AB9999'
     });
     engine.recordFpsReceipt({ allocationId: 'ALLOC-DUP-1', receivedQtyKg: 30 });
     expect(() =>
@@ -533,7 +606,10 @@ describe('PdsLedgerEngine', () => {
         commodity: 'Rice',
         allocatedQtyKg: 30,
         month: '2026-06',
-        sourceGodownId: 'ISSUE-001'
+        sourceGodownId: 'GODOWN-B-001',
+        transporterId: 'TRANS-001',
+        vehicleNo: 'KA01AB9999'
+      
       })
     ).toThrow(/already exists/);
 
@@ -893,7 +969,7 @@ describe('Quota rollover', () => {
 
   it('rejects non-positive allocation quantities', () => {
     const engine = new PdsLedgerEngine(true);
-    engine.addStockForTest('ISSUE-001', 'Rice', 500);
+    engine.addStockForTest('GODOWN-B-001', 'Rice', 500);
     expect(() =>
       engine.allocateToFps({
         allocationId: 'ALLOC-NEG-1',
@@ -901,7 +977,10 @@ describe('Quota rollover', () => {
         commodity: 'Rice',
         allocatedQtyKg: 0,
         month: '2026-06',
-        sourceGodownId: 'ISSUE-001'
+        sourceGodownId: 'GODOWN-B-001',
+        transporterId: 'TRANS-001',
+        vehicleNo: 'KA01AB9999'
+      
       })
     ).toThrow(/allocatedQtyKg must be positive/);
     expect(() =>
@@ -911,14 +990,17 @@ describe('Quota rollover', () => {
         commodity: 'Rice',
         allocatedQtyKg: -50,
         month: '2026-06',
-        sourceGodownId: 'ISSUE-001'
+        sourceGodownId: 'GODOWN-B-001',
+        transporterId: 'TRANS-001',
+        vehicleNo: 'KA01AB9999'
+      
       })
     ).toThrow(/allocatedQtyKg must be positive/);
   });
 
   it('rejects allocation beyond available godown stock and raises an audit alert', () => {
     const engine = new PdsLedgerEngine(true);
-    engine.addStockForTest('ISSUE-001', 'Rice', 100);
+    engine.addStockForTest('GODOWN-B-001', 'Rice', 100);
     expect(() =>
       engine.allocateToFps({
         allocationId: 'ALLOC-OVER-1',
@@ -926,7 +1008,10 @@ describe('Quota rollover', () => {
         commodity: 'Rice',
         allocatedQtyKg: 500,
         month: '2026-06',
-        sourceGodownId: 'ISSUE-001'
+        sourceGodownId: 'GODOWN-B-001',
+        transporterId: 'TRANS-001',
+        vehicleNo: 'KA01AB9999'
+      
       })
     ).toThrow(/Insufficient stock/);
     expect(
@@ -936,14 +1021,16 @@ describe('Quota rollover', () => {
 
   it('rejects fps receipt quantities outside the allocated amount', () => {
     const engine = new PdsLedgerEngine(true);
-    engine.addStockForTest('ISSUE-001', 'Rice', 500);
+    engine.addStockForTest('GODOWN-B-001', 'Rice', 500);
     engine.allocateToFps({
       allocationId: 'ALLOC-RCPT-1',
       fpsId: 'FPS-101',
       commodity: 'Rice',
       allocatedQtyKg: 200,
       month: '2026-06',
-      sourceGodownId: 'ISSUE-001'
+      sourceGodownId: 'GODOWN-B-001',
+      transporterId: 'TRANS-001',
+      vehicleNo: 'KA01AB9999'
     });
     expect(() =>
       engine.recordFpsReceipt({ allocationId: 'ALLOC-RCPT-1', receivedQtyKg: 0 })
@@ -995,10 +1082,11 @@ describe('resetTransactionalData', () => {
     engine.dispatchLot({
       transferId: 'TR-RESET-SETUP',
       lotId: 'LOT-RICE-2026-001',
-      fromOrg: 'PROC-001',
-      toOrg: 'FCI-001',
+      fromOrg: 'FCI-001',
+      toOrg: 'GODOWN-S-001',
       dispatchedQtyKg: 1000,
-      vehicleNo: 'KA01AB0101'
+      vehicleNo: 'KA01AB0101',
+      transporterId: 'TRANS-001'
     });
     engine.createOrUpdateEntitlement({
       rationCardHash: 'demo-ration-card-hash',
@@ -1031,8 +1119,8 @@ describe('resetTransactionalData', () => {
     expect(state.allocations).toHaveLength(0);
     expect(state.distributions).toHaveLength(0);
     expect(state.alerts).toHaveLength(0);
-    expect(new Map(state.stock).get('PROC-001:Rice')).toBe(10000);
-    expect(new Map(state.stock).get('PROC-001:Wheat')).toBe(7000);
+    expect(new Map(state.stock).get('FCI-001:Rice')).toBe(10000);
+    expect(new Map(state.stock).get('FCI-001:Wheat')).toBe(7000);
     expect(state.events.some((event) => event.eventType === 'RegisterStakeholder')).toBe(true);
     expect(state.events.some((event) => event.eventType === 'ResetTransactionalData')).toBe(true);
     expect(state.events.filter((event) => event.eventType === 'CreateCommodityLot')).toHaveLength(6);
@@ -1052,11 +1140,11 @@ describe('resetTransactionalData', () => {
       quantityKg: 5000,
       qualityGrade: 'A',
       source: 'Manual top-up',
-      currentOwner: 'PROC-001',
-      currentLocation: 'Procurement Yard'
+      currentOwner: 'FCI-001',
+      currentLocation: 'FCI Central Depot'
     });
     const stockAfterTopUp = new Map(engine.exportState().stock);
-    expect(stockAfterTopUp.get('PROC-001:Rice')).toBe(15000);
+    expect(stockAfterTopUp.get('FCI-001:Rice')).toBe(15000);
   });
 
   // Regression: the fabric-chaincode-runtime persistence path replays every
@@ -1069,10 +1157,11 @@ describe('resetTransactionalData', () => {
     source.dispatchLot({
       transferId: 'TR-RESET-REPLAY',
       lotId: 'LOT-RICE-2026-001',
-      fromOrg: 'PROC-001',
-      toOrg: 'FCI-001',
+      fromOrg: 'FCI-001',
+      toOrg: 'GODOWN-S-001',
       dispatchedQtyKg: 1000,
-      vehicleNo: 'KA01AB0102'
+      vehicleNo: 'KA01AB0102',
+      transporterId: 'TRANS-001'
     });
     const resetResult = source.resetTransactionalData();
     const resetEvents = source.exportState().events;
@@ -1092,8 +1181,8 @@ describe('resetTransactionalData', () => {
       expect.arrayContaining(['Rice', 'Wheat', 'Dal', 'Sugar', 'Cooking Oil', 'Kerosene'])
     );
     expect(replayedState.lots.every((lot) => lot.lotId.includes(resetResult.seriesId))).toBe(true);
-    expect(new Map(replayedState.stock).get('PROC-001:Rice')).toBe(10000);
-    expect(new Map(replayedState.stock).get('PROC-001:Wheat')).toBe(7000);
+    expect(new Map(replayedState.stock).get('FCI-001:Rice')).toBe(10000);
+    expect(new Map(replayedState.stock).get('FCI-001:Wheat')).toBe(7000);
     expect(replayedState.events.some((event) => event.eventType === 'ResetTransactionalData')).toBe(true);
     expect(replayedState.stakeholders.length).toBeGreaterThan(0);
   });
@@ -1103,18 +1192,20 @@ describe('resetTransactionalData', () => {
     engine.dispatchLot({
       transferId: 'TR-RESET-RICE',
       lotId: 'LOT-RICE-2026-001',
-      fromOrg: 'PROC-001',
-      toOrg: 'FCI-001',
+      fromOrg: 'FCI-001',
+      toOrg: 'GODOWN-S-001',
       dispatchedQtyKg: 1000,
-      vehicleNo: 'KA01AB0101'
+      vehicleNo: 'KA01AB0101',
+      transporterId: 'TRANS-001'
     });
     engine.dispatchLot({
       transferId: 'TR-RESET-WHEAT',
       lotId: 'LOT-WHEAT-2026-001',
-      fromOrg: 'PROC-001',
-      toOrg: 'FCI-001',
+      fromOrg: 'FCI-001',
+      toOrg: 'GODOWN-S-001',
       dispatchedQtyKg: 500,
-      vehicleNo: 'KA01AB0103'
+      vehicleNo: 'KA01AB0103',
+      transporterId: 'TRANS-001'
     });
     engine.raiseAuditFlag({
       alertType: AlertType.SHORT_RECEIPT,
@@ -1159,7 +1250,7 @@ describe('resetTransactionalData', () => {
     expect(state.lots.find((lot) => lot.commodity === 'Rice')?.lotId).not.toBe('LOT-RICE-2026-001');
     expect(state.transfers.some((transfer) => transfer.transferId === 'TR-RESET-RICE')).toBe(false);
     expect(state.alerts.some((alert) => alert.entityId === 'TR-RESET-RICE')).toBe(false);
-    expect(stock.get('PROC-001:Rice')).toBe(10000);
+    expect(stock.get('FCI-001:Rice')).toBe(10000);
     const riceEntitlement = state.entitlements.find(
       (item) => item.rationCardHash === 'demo-ration-card-hash' && item.commodity === 'Rice'
     );
@@ -1169,7 +1260,7 @@ describe('resetTransactionalData', () => {
     // Wheat: untouched by the Rice-scoped reset.
     expect(state.transfers.some((transfer) => transfer.transferId === 'TR-RESET-WHEAT')).toBe(true);
     expect(state.alerts.some((alert) => alert.entityId === 'TR-RESET-WHEAT')).toBe(true);
-    expect(stock.get('PROC-001:Wheat')).toBe(6500);
+    expect(stock.get('FCI-001:Wheat')).toBe(6500);
     const wheatEntitlement = state.entitlements.find(
       (item) => item.rationCardHash === 'demo-ration-card-hash' && item.commodity === 'Wheat'
     );
@@ -1187,18 +1278,20 @@ describe('resetTransactionalData', () => {
     source.dispatchLot({
       transferId: 'TR-RESET-REPLAY-RICE',
       lotId: 'LOT-RICE-2026-001',
-      fromOrg: 'PROC-001',
-      toOrg: 'FCI-001',
+      fromOrg: 'FCI-001',
+      toOrg: 'GODOWN-S-001',
       dispatchedQtyKg: 1000,
-      vehicleNo: 'KA01AB0104'
+      vehicleNo: 'KA01AB0104',
+      transporterId: 'TRANS-001'
     });
     source.dispatchLot({
       transferId: 'TR-RESET-REPLAY-WHEAT',
       lotId: 'LOT-WHEAT-2026-001',
-      fromOrg: 'PROC-001',
-      toOrg: 'FCI-001',
+      fromOrg: 'FCI-001',
+      toOrg: 'GODOWN-S-001',
       dispatchedQtyKg: 500,
-      vehicleNo: 'KA01AB0105'
+      vehicleNo: 'KA01AB0105',
+      transporterId: 'TRANS-001'
     });
     const resetResult = source.resetTransactionalData('Rice');
     const resetEvents = source
@@ -1216,18 +1309,20 @@ describe('resetTransactionalData', () => {
     replayTarget.dispatchLot({
       transferId: 'TR-RESET-REPLAY-RICE',
       lotId: 'LOT-RICE-2026-001',
-      fromOrg: 'PROC-001',
-      toOrg: 'FCI-001',
+      fromOrg: 'FCI-001',
+      toOrg: 'GODOWN-S-001',
       dispatchedQtyKg: 1000,
-      vehicleNo: 'KA01AB0104'
+      vehicleNo: 'KA01AB0104',
+      transporterId: 'TRANS-001'
     });
     replayTarget.dispatchLot({
       transferId: 'TR-RESET-REPLAY-WHEAT',
       lotId: 'LOT-WHEAT-2026-001',
-      fromOrg: 'PROC-001',
-      toOrg: 'FCI-001',
+      fromOrg: 'FCI-001',
+      toOrg: 'GODOWN-S-001',
       dispatchedQtyKg: 500,
-      vehicleNo: 'KA01AB0105'
+      vehicleNo: 'KA01AB0105',
+      transporterId: 'TRANS-001'
     });
     for (const event of resetEvents) {
       expect(() => replayTarget.applyLedgerEvent(event)).not.toThrow();
@@ -1237,8 +1332,8 @@ describe('resetTransactionalData', () => {
     expect(replayedState.transfers.some((transfer) => transfer.transferId === 'TR-RESET-REPLAY-RICE')).toBe(false);
     expect(replayedState.transfers.some((transfer) => transfer.transferId === 'TR-RESET-REPLAY-WHEAT')).toBe(true);
     expect(replayedState.lots.find((lot) => lot.commodity === 'Rice')?.lotId).toContain(resetResult.seriesId);
-    expect(new Map(replayedState.stock).get('PROC-001:Rice')).toBe(10000);
-    expect(new Map(replayedState.stock).get('PROC-001:Wheat')).toBe(6500);
+    expect(new Map(replayedState.stock).get('FCI-001:Rice')).toBe(10000);
+    expect(new Map(replayedState.stock).get('FCI-001:Wheat')).toBe(6500);
   });
 
   it('uses a different series id on each full reset', () => {

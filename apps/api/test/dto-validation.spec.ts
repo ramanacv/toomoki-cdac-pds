@@ -55,7 +55,7 @@ describe('module DTO validation', () => {
         quantityKg: 100,
         qualityGrade: 'A',
         source: 'Source',
-        currentOwner: 'PROC-001',
+        currentOwner: 'FCI-001',
         currentLocation: 'Yard'
       })
     );
@@ -68,7 +68,7 @@ describe('module DTO validation', () => {
         quantityKg: 0,
         qualityGrade: 'A',
         source: 'Source',
-        currentOwner: 'PROC-001',
+        currentOwner: 'FCI-001',
         currentLocation: 'Yard'
       })
     );
@@ -79,8 +79,20 @@ describe('module DTO validation', () => {
       plainToInstance(DispatchDto, {
         transferId: 'TR-001',
         lotId: 'LOT-001',
-        fromOrg: 'PROC-001',
-        toOrg: 'FCI-001',
+        fromOrg: 'FCI-001',
+        toOrg: 'GODOWN-S-001',
+        dispatchedQtyKg: 50,
+        vehicleNo: 'KA01AB0001',
+        transporterId: 'TRANS-001'
+      })
+    );
+
+    expectInvalid(
+      plainToInstance(DispatchDto, {
+        transferId: 'TR-001',
+        lotId: 'LOT-001',
+        fromOrg: 'FCI-001',
+        toOrg: 'GODOWN-S-001',
         dispatchedQtyKg: 50,
         vehicleNo: 'KA01AB0001'
       })
@@ -101,7 +113,20 @@ describe('module DTO validation', () => {
         commodity: 'Rice',
         allocatedQtyKg: 25,
         month: '2026-06',
-        sourceGodownId: 'ISSUE-001'
+        sourceGodownId: 'GODOWN-B-001',
+        transporterId: 'TRANS-001',
+        vehicleNo: 'KA01AB9999'
+      })
+    );
+
+    expectInvalid(
+      plainToInstance(AllocationDto, {
+        allocationId: 'ALLOC-001',
+        fpsId: 'FPS-101',
+        commodity: 'Rice',
+        allocatedQtyKg: 25,
+        month: '2026-06',
+        sourceGodownId: 'GODOWN-B-001'
       })
     );
   });

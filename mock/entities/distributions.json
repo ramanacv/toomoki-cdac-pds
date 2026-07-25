@@ -11,6 +11,16 @@
     "authTxnRefHash": "auth-ref-2026-001",
     "dealerId": "FPS-DEALER-101",
     "timestamp": "2026-06-09T10:10:00.000Z",
-    "ledgerTxId": "ledger-tx-dist-001"
+    "ledgerTxId": "ledger-tx-dist-001",
+    "provenance": {
+      "sourceSystem": "VIKSITPDS_DEMO",
+      "sourceEventId": "FIXTURE-DEMO-EPOS-DIST-2026-001",
+      "schemaVersion": "fixture-1",
+      "occurredAt": "2026-06-09T10:10:00.000Z",
+      "ingestedAt": "2026-06-09T10:10:01.000Z",
+      "approvedPayloadHash": "2a0a5f956b35d93c64a86313edc2c0fc8af7a328623554856763006b2895e554",
+      "operationId": "fixture-demo-epos-distribution-001",
+      "status": "RECONCILED"
+    }
   }
 ]

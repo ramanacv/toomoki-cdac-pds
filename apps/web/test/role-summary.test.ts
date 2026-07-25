@@ -17,12 +17,14 @@ const liveSummary: DashboardSummary = {
 const transfer = (overrides: Partial<TransferOrder>): TransferOrder => ({
   transferId: 'TR-1',
   lotId: 'LOT-1',
-  fromOrg: 'ISSUE-001',
+  fromOrg: 'GODOWN-B-001',
   toOrg: 'FPS-101',
   dispatchedQtyKg: 100,
   vehicleNo: 'MH-01',
   status: TransferStatus.DISPATCHED,
   dispatchTimestamp: '2026-07-01T00:00:00Z',
+  transporterId: 'TRANS-001',
+  transporterName: 'Transport Contractor 01',
   ...overrides
 });
 
@@ -34,6 +36,10 @@ const allocation = (overrides: Partial<FPSAllocation>): FPSAllocation => ({
   month: '2026-07',
   sourceGodownId: 'GODOWN-S-001',
   status: 'ALLOCATED',
+  transporterId: 'TRANS-001',
+  transporterName: 'Transport Contractor 01',
+  vehicleNo: 'MH-01-FPS',
+  dispatchTimestamp: '2026-07-01T00:00:00Z',
   ...overrides
 });
 
@@ -165,10 +171,9 @@ describe('roleSummaryCards', () => {
     const roles = [
       'CONTROL_OFFICE',
       'FCI_DEPOT',
-      'DEPOT',
       'FPS',
       'AUDITOR',
-      'PROCUREMENT',
+      'BLOCK_OFFICE',
       'GODOWN'
     ] as const;
     for (const role of roles) {

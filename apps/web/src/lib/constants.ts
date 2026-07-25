@@ -5,11 +5,10 @@ import { StakeholderType } from '@pds/shared-types';
 export type ParticipationMode = 'active' | 'passive';
 
 export const roleOrder: DemoRole[] = [
-  'PROCUREMENT',
   'FCI_DEPOT',
   'GODOWN',
   'CONTROL_OFFICE',
-  'DEPOT',
+  'BLOCK_OFFICE',
   'FPS',
   'MANAGEMENT',
   'AUDITOR'
@@ -18,10 +17,9 @@ export const roleOrder: DemoRole[] = [
 /** Roles with executable workbench actions in the custody chain. */
 export const activeParticipantRoles = new Set<DemoRole>([
   'CONTROL_OFFICE',
-  'PROCUREMENT',
+  'BLOCK_OFFICE',
   'FCI_DEPOT',
   'GODOWN',
-  'DEPOT',
   'FPS'
 ]);
 
@@ -46,7 +44,9 @@ export const roleCategory = (role: DemoRole): 'workflow' | 'optional' =>
 
 const passiveStakeholderTypes = new Set<StakeholderType>([
   StakeholderType.AUDITOR,
-  StakeholderType.TRANSPORTER
+  StakeholderType.TRANSPORTER,
+  StakeholderType.DISTRICT_SUPPLY_OFFICE,
+  StakeholderType.BLOCK_SUPPLY_OFFICE
 ]);
 
 export const stakeholderParticipation = (stakeholderType: StakeholderType): ParticipationMode =>
@@ -58,8 +58,8 @@ export const participationLabel: Record<ParticipationMode, string> = {
 };
 
 export const stageHints: Record<'I' | 'II', string> = {
-  I: 'Stage-I: government movement before the issue point (procurement to FCI to depot).',
-  II: 'Stage-II: RO-authorized movement from state depot to issue point before FPS allocation.'
+  I: 'Stage-I: government movement from FCI Central Depot to the state godown.',
+  II: 'Stage-II: RO-authorized movement from state godown to block godown before FPS allocation.'
 };
 
 export const scenarioOptions: Array<{ id: DemoScenario; label: string; short: string }> = [

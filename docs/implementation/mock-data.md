@@ -13,6 +13,7 @@ This separation makes it straightforward to:
 ```text
 mock/
   entities/          Domain records for workspace/demo display (JSON)
+  integrations/      Simulated canonical state-system source events
   seed/              Minimal backend bootstrap payload
   scenarios/         Per-scenario dashboard and alert overrides
   workspace/         Dashboard summary aggregates
@@ -23,7 +24,7 @@ packages/fixtures/   Typed loader (@pds/fixtures)
 
 ### `mock/entities/`
 
-Workspace entity files used by the web UI when running in mock or auto-fallback mode:
+Workspace entity files used by the web UI in explicit mock mode:
 
 | File | Contents |
 |------|----------|
@@ -34,6 +35,22 @@ Workspace entity files used by the web UI when running in mock or auto-fallback 
 | `distributions.json` | Distribution receipts |
 | `auth-transactions.json` | Simulated authentication records |
 | `entitlements.json` | Monthly entitlement balances |
+
+The entity set includes `FPS-101` and `FPS-202`. The second shop exists to make
+FPS authorization isolation testable rather than assumed.
+
+### `mock/integrations/`
+
+Privacy-approved fixture envelopes simulate:
+
+- SMART-PDS/RCMS master-reference events;
+- state-SCM allocation and movement events;
+- AePDS/ePoS distribution events.
+
+They enter through the authenticated integration API and exercise canonical
+hashing, provenance, replay/conflict handling, missing-parent quarantine,
+reconciliation, and source-to-proof trace. They are not live government data,
+approved Maharashtra mappings, or an external integration.
 
 ### `mock/seed/backend.json`
 
@@ -81,8 +98,9 @@ Consumers:
 | Component | Usage |
 |-----------|-------|
 | `blockchain/chaincode/pds-chaincode` | `seedDemoData()` loads stakeholders and backend seed |
-| `apps/web` | Mock/auto data via `api.ts` and re-exports in `demo-model.ts` |
+| `apps/web` | Explicit mock data via `api.ts` and re-exports in `demo-model.ts` |
 | `apps/web` tests | Fixture-backed demo model assertions |
+| integration seed script | Posts `mock/integrations/` through the canonical API seam |
 
 UI-only configuration (role profiles, screen labels, workflow step copy) remains in `apps/web/src/demo-model.ts` and is intentionally **not** part of `mock/`.
 
@@ -104,8 +122,6 @@ The web app reads `VITE_DATA_SOURCE` from the environment (see `.env.example`).
 |-------|----------|
 | `api` | Fetch workspace data only from the REST API. No fixture fallback. |
 | `mock` | Use `@pds/fixtures` only. No API reads for workspace data. |
-| `auto` | Use the API when `/health` succeeds; otherwise use fixtures. **Default.** |
-
 Implementation: `apps/web/src/data-source.ts` and `apps/web/src/api.ts`.
 
 Workflow **writes** (dispatch, distribute, authenticate) always go to the API when invoked from the workflow panel, regardless of read mode.
@@ -117,6 +133,7 @@ Workflow **writes** (dispatch, distribute, authenticate) always go to the API wh
 | `npm run seed` | Reset `tmp/` and seed file-based API state |
 | `npm run fabric:bootstrap` | Initialize chaincode runtime world state file |
 | `npm run fixtures:sql` | Regenerate PostgreSQL seed SQL |
+| `npm run fixtures:integrations` | Ingest simulated state-system events through the integration API |
 | `npm run demo:happy` | Run API happy-path demo script |
 | `npm run demo:exception` | Run API exception-path demo script |
 
@@ -125,7 +142,9 @@ Workflow **writes** (dispatch, distribute, authenticate) always go to the API wh
 1. Change JSON under `mock/`.
 2. Run `npm run fixtures:sql` if backend seed inputs changed.
 3. Run `npm test` to verify fixtures, API, and web tests.
-4. Restart API/containers if PostgreSQL seed should reload (requires fresh DB volume or `docker compose down -v`).
+4. Restart or explicitly reset/reseed local data only when that destructive
+   lifecycle is authorized. Do not remove a PostgreSQL volume as an ordinary
+   fixture-editing step.
 
 When seeding the ledger engine, objects from fixtures are cloned before mutation so repeated demo runs do not corrupt shared JSON module state.
 
@@ -134,6 +153,7 @@ When seeding the ledger engine, objects from fixtures are cloned before mutation
 Mock data is for MVP demos only. Production or pilot integrations should:
 
 1. Set `VITE_DATA_SOURCE=api` for the web UI.
-2. Replace mock auth endpoints with approved identity adapters.
+2. Keep browser mock-auth endpoints visibly PoC-only and ingest authoritative
+   pilot events from the approved AePDS/ePoS adapter.
 3. Feed operational data through integration adapters instead of `mock/entities/`.
 4. Keep beneficiary PII off-chain per the core privacy rule in [docs/README.md](../README.md).

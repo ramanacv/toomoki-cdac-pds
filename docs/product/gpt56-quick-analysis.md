@@ -1,5 +1,10 @@
 # GPT-5.6 Quick Architecture Analysis
 
+> Historical review snapshot. Deterministic proofs, PostgreSQL operational
+> authority, and `RecordLedgerProof` are now the maintained model. Remaining
+> current gates are tracked in
+> [MVP hardening](../implementation/mvp-hardening-plan.md).
+
 This review covers the current working tree on `feature/fabric-hardening`, with particular focus on the workflow engine, quantity calculations across lot movements, and the Hyperledger Fabric design and deployment model.
 
 ## Findings

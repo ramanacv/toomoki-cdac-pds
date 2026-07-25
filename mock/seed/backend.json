@@ -6,9 +6,9 @@
       "season": "Kharif 2026",
       "quantityKg": 10000,
       "qualityGrade": "A",
-      "source": "Procurement Centre 01",
-      "currentOwner": "PROC-001",
-      "currentLocation": "Procurement Yard"
+      "source": "FCI Central Depot",
+      "currentOwner": "FCI-001",
+      "currentLocation": "FCI Depot"
     },
     {
       "lotId": "LOT-WHEAT-2026-001",
@@ -16,9 +16,9 @@
       "season": "Rabi 2026",
       "quantityKg": 7000,
       "qualityGrade": "A",
-      "source": "Procurement Centre 01",
-      "currentOwner": "PROC-001",
-      "currentLocation": "Procurement Yard"
+      "source": "FCI Central Depot",
+      "currentOwner": "FCI-001",
+      "currentLocation": "FCI Depot"
     },
     {
       "lotId": "LOT-DAL-2026-001",
@@ -26,9 +26,9 @@
       "season": "Kharif 2026",
       "quantityKg": 2000,
       "qualityGrade": "A",
-      "source": "Procurement Centre 01",
-      "currentOwner": "PROC-001",
-      "currentLocation": "Procurement Yard"
+      "source": "FCI Central Depot",
+      "currentOwner": "FCI-001",
+      "currentLocation": "FCI Depot"
     },
     {
       "lotId": "LOT-SUGAR-2026-001",
@@ -36,9 +36,9 @@
       "season": "2026",
       "quantityKg": 2000,
       "qualityGrade": "A",
-      "source": "Procurement Centre 01",
-      "currentOwner": "PROC-001",
-      "currentLocation": "Procurement Yard"
+      "source": "FCI Central Depot",
+      "currentOwner": "FCI-001",
+      "currentLocation": "FCI Depot"
     },
     {
       "lotId": "LOT-COOKING-OIL-2026-001",
@@ -46,9 +46,9 @@
       "season": "2026",
       "quantityKg": 1000,
       "qualityGrade": "A",
-      "source": "Procurement Centre 01",
-      "currentOwner": "PROC-001",
-      "currentLocation": "Procurement Yard"
+      "source": "FCI Central Depot",
+      "currentOwner": "FCI-001",
+      "currentLocation": "FCI Depot"
     },
     {
       "lotId": "LOT-KEROSENE-2026-001",
@@ -56,9 +56,9 @@
       "season": "2026",
       "quantityKg": 1000,
       "qualityGrade": "A",
-      "source": "Procurement Centre 01",
-      "currentOwner": "PROC-001",
-      "currentLocation": "Procurement Yard"
+      "source": "FCI Central Depot",
+      "currentOwner": "FCI-001",
+      "currentLocation": "FCI Depot"
     }
   ],
   "initialEntitlements": [

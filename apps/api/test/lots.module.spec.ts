@@ -21,7 +21,7 @@ describe('LotsModule', () => {
       quantityKg: 500,
       qualityGrade: 'A',
       source: 'Test Source',
-      currentOwner: 'PROC-001',
+      currentOwner: 'FCI-001',
       currentLocation: 'Test Yard'
     });
 
@@ -37,9 +37,8 @@ describe('LotsModule', () => {
     controller = await createControllerWithFacade(LotsController, fixture.facade);
 
     const setupLegs = [
-      ['TR-LOT-CANONICAL-PROC-FCI', 'PROC-001', 'FCI-001'],
       ['TR-LOT-CANONICAL-FCI-DEPOT', 'FCI-001', 'GODOWN-S-001'],
-      ['TR-LOT-CANONICAL-DEPOT-ISSUE', 'GODOWN-S-001', 'ISSUE-001']
+      ['TR-LOT-CANONICAL-DEPOT-BLOCK', 'GODOWN-S-001', 'GODOWN-B-001']
     ] as const;
     for (const [transferId, fromOrg, toOrg] of setupLegs) {
       fixture.facade.dispatchLot({
@@ -48,13 +47,15 @@ describe('LotsModule', () => {
         fromOrg,
         toOrg,
         dispatchedQtyKg: demoQuantities.stageOneTransferKg,
-        vehicleNo: 'KA01LOT0001'
+        vehicleNo: 'KA01LOT0001',
+        transporterId: 'TRANS-001'
+      
       });
       fixture.facade.receiveLot({ transferId, receivedQtyKg: demoQuantities.stageOneTransferKg });
     }
 
     const lot = controller.lot('LOT-RICE-2026-001');
-    expect(lot.currentOwner).toBe('ISSUE-001');
+    expect(lot.currentOwner).toBe('GODOWN-B-001');
     expect(controller.lotHistory('LOT-RICE-2026-001').some((event) => event.eventType === 'TransformLot')).toBe(false);
   });
 });

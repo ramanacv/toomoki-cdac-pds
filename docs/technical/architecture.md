@@ -1,248 +1,236 @@
-# Technical Architecture: ViksitPDS MVP
+# Technical Architecture: ViksitPDS
 
 ## Architecture Summary
 
-ViksitPDS is a permissioned blockchain trust layer backed by an operational database and business API. PostgreSQL stores current workflow state and dashboard-optimized data. Hyperledger Fabric stores immutable transaction proofs, custody history, distribution receipts, and audit evidence.
+ViksitPDS is a complementary trust, reconciliation, and immutable-proof layer
+for the Public Distribution System. It does not replace SMART-PDS/RCMS,
+IAeSCM/state supply-chain systems, AePDS/ePoS, or approved authentication
+infrastructure.
 
-The MVP runs with mock data and simulated integrations. It is designed so real SMART-PDS, state PDS, ePoS, and authentication integrations can be added later through adapters.
+PostgreSQL is authoritative for ViksitPDS operational workflow state. Hyperledger
+Fabric receives non-sensitive immutable proofs asynchronously. Fabric does not
+execute or decide API business commands, and proof delay or failure does not
+roll back an accepted PostgreSQL operation.
+
+The repository implements a controlled PoC with fixture-backed state-system
+adapters. Maharashtra is the first planned non-production contract target; no
+fixture or provisional mapping may be presented as a live government
+integration.
 
 ## System Context
 
 ```text
-Demo Data / Future SMART-PDS / Future ePoS / Future State PDS
-        |
-        v
-Integration Adapter Layer
-        |
-        v
-Backend Business API
-        |
-        +--> PostgreSQL Operational Database
-        |
-        +--> Hyperledger Fabric Ledger + CouchDB World State
-        |
-        v
-Audit And Anomaly Engine
-        |
-        v
-Dashboard And Traceability UI
+SMART-PDS/RCMS       IAeSCM/state SCM       AePDS/ePoS
+      |                     |                    |
+      +---------- authenticated source events --+
+                            |
+                            v
+              Validation and adapter boundary
+             privacy | schema | replay | mapping
+                            |
+                            v
+                 Canonical source-event service
+                            |
+              +-------------+--------------+
+              |                            |
+              v                            v
+   PostgreSQL operational state     Integration operations
+   events, assignments, workflow    quarantine, reconciliation,
+   reconciliation, proof outbox     health, trace, dead letters
+              |
+              +------ asynchronous proof outbox ------+
+                                                       v
+                                      Hyperledger Fabric 2.5.15
+                                      non-sensitive proofs only
 ```
 
-## Architecture Layers
+The browser's FPS authentication and distribution controls are simulations of
+authoritative AePDS/ePoS events. Pilot traffic enters only through authenticated
+server-to-server integration endpoints.
+
+## Trust And Authority Boundaries
+
+- SMART-PDS/RCMS remains authoritative for approved master and entitlement
+  references.
+- IAeSCM or the approved state-SCM remains authoritative for allocations and
+  movements.
+- AePDS/ePoS remains authoritative for shop/device authentication and
+  distribution events.
+- PostgreSQL is authoritative for normalized ViksitPDS operations,
+  correlations, reconciliation results, workflow exceptions, authorization
+  assignments, and proof-delivery state.
+- Fabric is authoritative only for the immutable proof records it has committed.
+  A `PENDING`, `FAILED`, or `DEAD_LETTER` proof does not invalidate the accepted
+  operational command.
+
+## Integration Architecture
+
+Every adapter normalizes approved input to `SourceEventEnvelope<T>` and
+`SourceProvenance`. The provenance records source system, source event ID,
+schema version, occurrence and ingestion times, an approved-payload hash,
+operation ID, and processing status. Raw upstream payloads are not exposed in
+domain responses.
+
+Implemented controlled-PoC adapters are fixture-backed simulations for:
+
+- SMART-PDS/RCMS master references;
+- state-SCM allocation and movement events;
+- AePDS/ePoS distribution events.
+
+The canonical ingestion seam provides:
+
+- a unique `(source_system, source_event_id)` replay boundary;
+- `201` for a new accepted event;
+- `200` with the original result for an identical replay;
+- `202` for a durably quarantined event with missing parents;
+- `409` plus an audit exception for conflicting content;
+- linked amendment, reversal, and parent event references;
+- recursive prohibited-field rejection before persistence, logging, dead-letter
+  storage, or proof construction;
+- source health, counters, reconciliation lag, unresolved-parent age, replay,
+  and source-to-operation-to-Fabric trace.
+
+Maharashtra identifiers, mappings, and exception semantics belong in adapter
+configuration. The normalized domain remains state-neutral so a later J&K
+adapter can use the same contracts.
+
+## Backend Business API
+
+The NestJS API owns boundary validation, database-backed authorization,
+workflow orchestration, reconciliation, operational persistence, and durable
+proof intent.
+
+Main API areas include stakeholders, lots, transfers, FPS allocations, stock,
+beneficiaries, authentication simulations, entitlements, distributions, trace,
+audit, dashboards, integration ingestion, source operations, proof status, and
+administration.
+
+Identity tokens establish the subject. Effective operational authority comes
+from active database assignments for application role, organization/geography,
+stakeholder, FPS/facility, and integration source. `platform-admin` has
+administrative authority but no implied operational authority.
+
+An `integration-service` account is restricted to configured source systems,
+endpoint families, event types, and active credentials.
+
+## FPS Authorization Boundary
+
+The controlled PoC assigns `demo-fps` to `FPS-101`.
+
+- Every FPS request requires an active `FAIR_PRICE_SHOP` assignment.
+- The API derives effective shop and opaque operator reference from identity and
+  database assignments.
+- Allocation, receipt, stock, authentication, distribution, dashboard, and trace
+  data are scoped to that shop.
+- An individual resource belonging to another shop returns `404`.
+- Legacy mutation bodies may temporarily include `fpsId` or `dealerId`; a
+  mismatch returns `403`. The maintained web client omits those fields.
+- Department, management, and auditor reads are deliberately wider where their
+  assignment permits. Platform administration alone grants no operational read
+  or mutation access.
+
+The second shop fixture (`FPS-202`) exists to demonstrate isolation, not merely
+assert it.
+
+## PostgreSQL Operational Model
+
+PostgreSQL stores current workflow and stock state, source events and attempts,
+authorization assignments, correlations, reconciliation results, audit
+exceptions, proof-outbox state, and dashboard projections.
+
+The target command architecture writes each accepted source event, normalized
+business mutation, reconciliation/domain event, and Fabric outbox record on one
+PostgreSQL client inside one transaction. It uses row locks, conditional stock
+and entitlement changes, idempotency constraints, and optimistic versions.
+
+That target is not yet the repository-wide runtime. The controlled demo still
+uses the in-memory engine plus serialized full-state snapshots, and snapshot
+saving and outbox insertion are separate operations. Consequently it is:
 
-### External And Demo Data Sources
+- single replica only;
+- reset and deterministically reseeded before a demonstration;
+- not crash-atomic;
+- not evidence of concurrent mutation safety;
+- not pilot- or production-ready.
 
-For MVP, data is seeded or submitted through mock APIs and JSON fixtures. Canonical demo records live in `mock/` and are loaded through `@pds/fixtures`. Future integrations may consume CSV, batch files, REST APIs, event streams, or approved government system feeds.
+The mandatory replacement is tracked in
+[MVP hardening plan](../implementation/mvp-hardening-plan.md).
 
-Potential future sources:
+## Fabric Proof Architecture
 
-- SMART-PDS.
-- State PDS systems.
-- ePoS devices.
-- Procurement platforms.
-- Godown/warehouse systems.
-- Approved Aadhaar authentication infrastructure.
-- IoT-GPS devices.
+`RecordLedgerProof` is the API's Fabric submission boundary. Named business
+transactions in chaincode are compatibility functions, not new API integration
+points.
 
-### Integration Adapter Layer
+An accepted API operation creates durable proof intent. The PostgreSQL outbox
+worker then submits the privacy-approved proof asynchronously and records the
+actual Fabric transaction ID only after commit status succeeds.
 
-The adapter layer normalizes input from demo data, CSV imports, batch feeds, and future APIs into internal commands. This prevents business logic from depending directly on external system formats.
+Outbox states are:
 
-MVP adapters:
+- `PENDING`: ready or scheduled;
+- `SUBMITTING`: claimed by one worker;
+- `COMMITTED`: Fabric commit confirmed;
+- `FAILED`: retryable, with next-attempt and safe error detail;
+- `DEAD_LETTER`: retry limit exhausted and requiring authorized manual retry.
 
-- Fixture/seed data adapter (`mock/` + `@pds/fixtures` for API, chaincode, PostgreSQL, and web fallback).
-- Mock SMART-PDS adapter.
-- Mock beneficiary authentication adapter.
+Every proof includes event ID, operation ID, actor, application role, submitting
+organization, payload hash, schema version, entity identifiers, and
+API-generated business timestamp. Identical proof replay succeeds; conflicting
+content for an existing event ID fails.
 
-Future adapters:
+Fabric mode uses a two-organization Hyperledger Fabric 2.5.15 network with Food
+and Civil Supplies and Godown/Warehouse peers, channel `pdschannel`, chaincode
+`pds-chaincode`, CouchDB world state, and a single-node Raft orderer. Changes to
+endorsement or discovery must be verified through both peers.
 
-- State PDS API adapter.
-- ePoS transaction adapter.
-- Aadhaar/authentication reference adapter.
-- IoT-GPS oracle adapter.
+## Privacy Boundary
 
-### Backend Business API
+Recursive boundary validation rejects raw Aadhaar, biometrics, OTPs, mobile or
+phone numbers, full ration-card values, unmasked beneficiary names or addresses,
+and device credentials.
 
-The backend (NestJS 11, modular structure under `apps/api/src/modules/`) owns validation, workflow orchestration, role checks, database writes, ledger submission, and audit trigger calls.
+Those fields may not enter responses, application logs, PostgreSQL event or
+dead-letter payloads, or Fabric proofs. Approved opaque references include
+`rationCardHash`, `beneficiaryRefHash`, transaction-reference hashes, and
+server-derived operator references.
 
-Ledger modes:
+## Reconciliation
 
-- **Demo** (`PDS_LEDGER_MODE=demo`): in-process `PdsChaincodeInvoker` — default for stakeholder demos without Fabric containers.
-- **Fabric** (`PDS_LEDGER_MODE=fabric`): `@hyperledger/fabric-gateway` client submitting to `pds-chaincode` on channel `pdschannel`.
+Reconciliation compares:
 
-API groups:
+- allocation against dispatch and remaining stock;
+- movement against receipt or an explicit quantity adjustment;
+- FPS opening stock plus receipts minus distributions and adjustments against
+  closing stock.
 
-- Stakeholders.
-- Lots.
-- Transfers.
-- FPS allocations.
-- Beneficiaries.
-- Authentication.
-- Entitlements.
-- Distributions.
-- Traceability.
-- Audit alerts.
-- Dashboard.
+Alerts report an exception; they never change quantity. Late, offline,
+out-of-order, amended, and reversed events retain distinct occurrence,
+device-sync, ingestion, and processing times and linked source-event history.
 
-### PostgreSQL Operational Database
+## User Experience
 
-PostgreSQL stores:
+The React application provides separate Department, Supply-chain Operations,
+Fair Price Shop Demo, Audit/Management, and Platform Administration journeys.
+The FPS workspace shows assigned shop, simulated device mapping, stock and
+allocation position, pending receipts, recent simulated distributions,
+reconciliation exceptions, provenance, operational status, proof status, and
+Fabric transaction reference.
 
-- Current stock positions.
-- Stakeholder and user records.
-- Workflow state.
-- Mock beneficiary registry.
-- Monthly entitlements.
-- Distribution transactions.
-- Ledger transaction index.
-- Audit alerts.
-- Integration logs.
+`VITE_DATA_SOURCE=api` uses the REST API. `VITE_DATA_SOURCE=mock` is an explicitly
+labelled fixture workspace; there is no automatic fallback.
 
-PostgreSQL is optimized for application queries and dashboard views. It is not treated as the immutable source of truth for critical audit facts.
+## Deployment Posture
 
-### Hyperledger Fabric Ledger
+The maintained deployment is Docker Compose for local controlled demonstrations:
+PostgreSQL, Keycloak/OIDC, API, web application, and optional Fabric profile.
+Exactly one API replica is permitted under the current persistence design.
 
-Fabric stores immutable proofs and state transitions for critical PDS events:
+Future pilot topology requires approved contracts, TLS and secrets management,
+backup/restore and recovery exercises, observability, privacy/security review,
+row-scoped atomic commands, and state/NIC acceptance. Kubernetes, government
+cloud/data-centre topology, HSM-backed keys, multi-node ordering, and HA/DR are
+deployment decisions for that approved pilot—not properties of this PoC.
 
-- Stakeholder registration proof.
-- Commodity lot creation.
-- Dispatch and receipt events.
-- FPS allocation and receipt.
-- Privacy-preserving entitlement and authentication references.
-- Distribution receipts.
-- Audit alert creation and resolution.
-
-Fabric provides tamper-evident history and cross-organization trust. It does not store raw beneficiary identity or biometric data.
-
-### CouchDB World State
-
-CouchDB is used as Fabric world state DB for rich queries over current ledger asset state. Historical truth remains in Fabric transaction history.
-
-### Audit And Anomaly Engine
-
-The MVP audit engine is rule-based. It compares operational database state with ledger proofs and evaluates business rules.
-
-MVP rules:
-
-- DB quantity does not match ledger quantity.
-- Received quantity is less than dispatched quantity.
-- FPS distributes more than available stock.
-- Duplicate monthly claim.
-- Stock remains in transit beyond threshold.
-- Unauthorized actor attempts transaction.
-- FPS closing stock mismatch.
-- Distribution record altered after blockchain commit.
-
-### Dashboard And Traceability UI
-
-The UI provides:
-
-- Stock flow view.
-- Lot trace view.
-- FPS dashboard.
-- Beneficiary distribution log with masked identifiers.
-- Audit alert view.
-- Proof-of-integrity verification.
-
-The web app supports explicit data modes through `VITE_DATA_SOURCE`:
-
-- `api` — live REST API only.
-- `mock` — fixture workspace from `mock/` via `@pds/fixtures`.
-
-There is no automatic fallback. Jury builds use `api`; `mock` is an explicitly selected and labelled offline backup.
-
-UI role/screen configuration stays in application source; domain mock records stay in `mock/`. See [Mock data and fixtures](../implementation/mock-data.md).
-
-## Blockchain Network Design
-
-MVP network (implemented):
-
-- **Demo mode:** in-process chaincode runtime; no Fabric containers required.
-- **Fabric mode:** Hyperledger Fabric **2.5.15** 2-org demo (Food Department + Godown).
-- Channel: `pdschannel`; chaincode: `pds-chaincode`.
-- Single-node Raft orderer with channel participation (no system channel).
-- Fabric CA for identities; CouchDB world state on peers.
-
-Documented consortium (5 orgs in `network-manifest.json`):
-
-- Org1: Food and Civil Supplies Department.
-- Org2: Procurement/FCI.
-- Org3: Godown/Warehouse.
-- Org4: Fair Price Shop.
-- Org5: Auditor/Inspection Authority.
-
-Production hardening may deploy all five orgs with multi-node Raft, multiple peers per organization, private data collections, HSM-backed keys, and separate channels by state/district or data-sharing boundary.
-
-## On-Chain Versus Off-Chain Boundary
-
-On-chain:
-
-- Commodity lot IDs and metadata needed for audit.
-- Custody transfer events.
-- FPS allocation and receipt proofs.
-- Distribution receipt with masked/hash references.
-- Audit alert and resolution proofs.
-- Hashes of sensitive or operational records where reconciliation is needed.
-
-Off-chain:
-
-- Raw beneficiary identity data.
-- Aadhaar number.
-- Biometric templates or samples.
-- OTP values.
-- Mobile numbers.
-- Full ration card number.
-- Dashboard query models.
-- Integration payload logs that contain sensitive data.
-
-## Security And Privacy Model
-
-- Use x.509 identities for blockchain participants.
-- Use role-based access control in backend APIs.
-- Keep all sensitive beneficiary data off-chain.
-- Store hashes and references in ledger records.
-- Use TLS for service communication where applicable.
-- Maintain audit logs for privileged operations.
-- Use environment-based secrets for MVP; use vault/HSM-backed key management in production.
-
-## Integration Modes
-
-Demo mode:
-
-- Mock data and simulated APIs.
-- In-process chaincode ledger (`PDS_LEDGER_MODE=demo`).
-- Suitable for 2-week MVP demonstration without Fabric infrastructure.
-
-Fabric demo mode:
-
-- Live 2-org Fabric stack via `docker compose --profile fabric`.
-- Gateway-backed API (`PDS_LEDGER_MODE=fabric`).
-- Bootstrap: `blockchain/fabric-network/scripts/bootstrap-network.sh`.
-
-Pilot mode:
-
-- District/state PDS data through CSV, API, or batch feeds.
-- Controlled onboarding of real stakeholders and limited transaction volume.
-
-Production mode:
-
-- Approved integration with SMART-PDS, ePoS, authentication infrastructure, state systems, and government cloud deployment.
-
-## Deployment Model
-
-MVP:
-
-- Docker Compose with **demo** (default) and **fabric** profiles.
-- Fabric 2.5.15 network containers (fabric profile): orderer, 2 peers, CouchDB, CAs.
-- Backend API container (NestJS 11) joins `pds-fabric` network in fabric profile.
-- PostgreSQL container.
-- Frontend container.
-
-Future production:
-
-- Kubernetes.
-- Government cloud or state data centre.
-- API gateway.
-- Observability stack.
-- HSM or managed key storage.
-- Disaster recovery and backup policy.
+See [Deployment guide](../../fabric-deployment.md) and
+[J&K/Maharashtra implementation plan](../implementation/jkmaha-epos-smartpds-implementation-plan.md).

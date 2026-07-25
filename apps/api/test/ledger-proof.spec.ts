@@ -34,4 +34,11 @@ describe('LedgerProof', () => {
       payload: { rationCardHash: 'opaque-hash' }, timestamp: '2026-01-01T00:00:00.000Z'
     }, actor)).not.toThrow();
   });
+
+  it('rejects raw numeric personal identifiers even under an unrecognized nested key', () => {
+    expect(() => ledgerProofFromEvent({
+      ledgerTxId: 'evt-raw', entityType: 'auth', entityId: 'auth-1', eventType: 'AuthTransaction',
+      payload: { externalValue: '123456789012' }, timestamp: '2026-01-01T00:00:00.000Z'
+    }, actor)).toThrow(/raw numeric personal identifier/);
+  });
 });

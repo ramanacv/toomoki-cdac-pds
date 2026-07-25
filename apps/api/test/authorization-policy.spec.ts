@@ -11,6 +11,8 @@ import { MetricsController } from '../src/modules/metrics/metrics.controller.js'
 import { OpenapiController } from '../src/modules/openapi/openapi.controller.js';
 import { StakeholdersController } from '../src/modules/stakeholders/stakeholders.controller.js';
 import { TransfersController } from '../src/modules/transfers/transfers.controller.js';
+import { IntegrationsController } from '../src/modules/integrations/integrations.controller.js';
+import { EligibilityController } from '../src/modules/eligibility/eligibility.controller.js';
 import { IS_PUBLIC_KEY } from '../src/modules/auth/public.decorator.js';
 import type { PdsRole } from '../src/modules/auth/identity-provider.js';
 
@@ -25,11 +27,11 @@ const effectiveRoles = (controller: ControllerClass, method: string): PdsRole[] 
 describe('canonical endpoint authorization policy', () => {
   it.each([
     [StakeholdersController, 'registerStakeholder', ['department']],
-    [LotsController, 'createLot', ['procurement']],
-    [TransfersController, 'dispatch', ['procurement', 'fci', 'godown']],
+    [LotsController, 'createLot', ['fci']],
+    [TransfersController, 'dispatch', ['fci', 'godown']],
     [TransfersController, 'receive', ['fci', 'godown']],
     [TransfersController, 'authorize', ['department']],
-    [AllocationsController, 'allocate', ['department', 'godown']],
+    [AllocationsController, 'allocate', ['department', 'block-office']],
     [AllocationsController, 'fpsReceipt', ['fps']],
     [AuthController, 'authOtp', ['fps']],
     [AuthController, 'authBiometric', ['fps']],
@@ -40,7 +42,19 @@ describe('canonical endpoint authorization policy', () => {
     [AuditController, 'reconcile', ['auditor']],
     [AuditController, 'resolveAlert', ['auditor']],
     [AdminController, 'reset', ['demo-reset']],
-    [MetricsController, 'scrape', ['metrics-reader', 'platform-admin']]
+    [MetricsController, 'scrape', ['metrics-reader', 'platform-admin']],
+    [IntegrationsController, 'smartPds', ['integration-service']],
+    [IntegrationsController, 'allocations', ['integration-service']],
+    [IntegrationsController, 'movements', ['integration-service']],
+    [IntegrationsController, 'distributions', ['integration-service']]
+    ,[EligibilityController, 'screening', ['department']]
+    ,[EligibilityController, 'notice', ['department']]
+    ,[EligibilityController, 'verification', ['department']]
+    ,[EligibilityController, 'recommendation', ['department']]
+    ,[EligibilityController, 'decision', ['department']]
+    ,[EligibilityController, 'appeal', ['department']]
+    ,[EligibilityController, 'reinstate', ['department']]
+    ,[EligibilityController, 'reset', ['demo-reset']]
   ] as const)('%s.%s has the exact least-privilege role set', (controller, method, expected) => {
     expect(effectiveRoles(controller, method)).toEqual(expected);
   });
@@ -50,6 +64,8 @@ describe('canonical endpoint authorization policy', () => {
     [EntitlementsController, 'entitlementList', ['fps', 'department', 'auditor']],
     [DistributionsController, 'distributions', ['fps', 'department', 'auditor', 'management']],
     [AdminController, 'overview', ['platform-admin']]
+    ,[EligibilityController, 'summary', ['department', 'auditor', 'management']]
+    ,[EligibilityController, 'cases', ['department', 'auditor', 'management']]
   ] as const)('%s.%s restricts sensitive or administrative reads', (controller, method, expected) => {
     expect(effectiveRoles(controller, method)).toEqual(expected);
   });

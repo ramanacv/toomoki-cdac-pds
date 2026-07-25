@@ -38,7 +38,7 @@ const adminOverview = vi.hoisted(() => ({
     }
   },
   stakeholders: {
-    byType: [{ stakeholderType: 'PROCUREMENT', count: 1 }],
+    byType: [{ stakeholderType: 'FCI', count: 1 }],
     byStatus: [{ status: 'ACTIVE', count: 5 }],
     fabricOrgMapping: []
   },
@@ -91,13 +91,13 @@ vi.mock('@/api.js', () => ({
   fetchApiHealth: vi.fn().mockResolvedValue({ ok: true, ledgerMode: 'demo' }),
   buildApiUrl: vi.fn((path: string) => `/api${path}`),
   loadStakeholders: vi.fn().mockResolvedValue([
-    { stakeholderId: 'PROC-001', stakeholderType: 'PROCUREMENT_CENTER', name: 'Procurement Centre 01', district: 'Demo District', licenseNo: 'LIC-1', status: 'ACTIVE' }
+    { stakeholderId: 'FCI-001', stakeholderType: 'FCI', name: 'FCI Central Depot', district: 'Demo District', licenseNo: 'LIC-1', status: 'ACTIVE' }
   ]),
   createStockLot: vi.fn().mockResolvedValue({
     lotId: 'LOT-RICE-123',
     commodity: 'Rice',
     quantityKg: 5000,
-    currentOwner: 'PROC-001'
+    currentOwner: 'FCI-001'
   }),
   loadLots: vi.fn().mockResolvedValue([
     {
@@ -106,9 +106,9 @@ vi.mock('@/api.js', () => ({
       season: '2026-KHARIF',
       quantityKg: 5000,
       qualityGrade: 'A',
-      source: 'Procurement Yard',
-      currentOwner: 'PROC-001',
-      currentLocation: 'Procurement Yard',
+      source: 'FCI Depot',
+      currentOwner: 'FCI-001',
+      currentLocation: 'FCI Depot',
       status: 'CREATED'
     }
   ])
@@ -125,12 +125,12 @@ vi.mock('@/auth-token.js', () => ({
   getCurrentIdentity: vi.fn(() => ({
     subject: 'admin-test',
     displayName: 'Admin Test',
-    roles: ['platform-admin', 'procurement', 'demo-reset']
+    roles: ['platform-admin', 'fci', 'demo-reset']
   })),
   signIn: vi.fn(),
   signOut: vi.fn(),
   hasOperationalRole: vi.fn((roles: string[]) =>
-    roles.some((role) => ['management', 'department', 'procurement', 'fci', 'godown', 'fps', 'auditor'].includes(role))
+    roles.some((role) => ['management', 'department', 'procurement', 'fci', 'godown', 'block-office', 'fps', 'auditor'].includes(role))
   ),
   authHeaders: vi.fn(() => ({ Authorization: 'Bearer test-only' }))
 }));
@@ -148,7 +148,7 @@ beforeEach(() => {
   vi.mocked(getCurrentIdentity).mockReturnValue({
     subject: 'admin-test',
     displayName: 'Admin Test',
-    roles: ['platform-admin', 'procurement', 'demo-reset']
+    roles: ['platform-admin', 'fci', 'demo-reset']
   });
 });
 
@@ -259,7 +259,7 @@ describe('Admin console', () => {
     await user.click(addStock);
 
     expect(createStockLot).toHaveBeenCalledWith(
-      expect.objectContaining({ commodity: 'Wheat', quantityKg: 7000, currentOwner: 'PROC-001' })
+      expect.objectContaining({ commodity: 'Wheat', quantityKg: 7000, currentOwner: 'FCI-001' })
     );
     expect((await screen.findAllByText(/Created LOT-RICE-123/)).length).toBeGreaterThan(0);
     expect(await screen.findByText('Stock added')).toBeInTheDocument();
