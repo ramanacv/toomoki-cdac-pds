@@ -24,6 +24,10 @@ separate operations. Consequently:
 The replacement gate is defined in
 [MVP hardening plan](docs/implementation/mvp-hardening-plan.md).
 
+For standing up the same Compose Fabric stack on a plain E2E Networks cloud
+node (public IP, firewall rules, public OIDC origin), see
+[e2e-networks-fabric-demo.md](docs/implementation/e2e-networks-fabric-demo.md).
+
 ## Services And Ports
 
 | Service | Local endpoint |
@@ -385,3 +389,11 @@ Before any pilot-ready claim, complete all of the following:
 - deployment and HA/DR design for the approved target environment.
 
 Passing the controlled-demo lifecycle does not satisfy this gate.
+
+## Related documentation
+
+- [DEPLOYMENT.md](DEPLOYMENT.md) — deployment pointer and public-demo links
+- [e2e-networks-fabric-demo.md](docs/implementation/e2e-networks-fabric-demo.md) — E2E Networks Fabric Compose demo
+- [aws-ec2-https-demo.md](docs/implementation/aws-ec2-https-demo.md) — public HTTPS EC2 demo with Caddy
+- [blockchain/fabric-network/README.md](blockchain/fabric-network/README.md) — Fabric topology and bootstrap scripts
+- [mvp-hardening-plan.md](docs/implementation/mvp-hardening-plan.md) — persistence and concurrency hardening gate

@@ -26,3 +26,7 @@ For a public browser demo on EC2 (HTTPS via Compose `--profile edge` / Caddy),
 see [aws-ec2-https-demo.md](docs/implementation/aws-ec2-https-demo.md).
 Plain `http://<public-ip>:4173` cannot complete Sign in with Keycloak because
 OIDC PKCE requires a secure context.
+
+For a single E2E Networks node Fabric controlled demo (Compose, public IP, IAM
+public-origin helper), see
+[e2e-networks-fabric-demo.md](docs/implementation/e2e-networks-fabric-demo.md).

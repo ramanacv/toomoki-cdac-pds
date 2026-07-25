@@ -176,10 +176,13 @@ services:
     profiles: [edge]
     image: caddy:2.10-alpine
     restart: unless-stopped
+    # Defaults are empty so Compose can interpolate when --profile edge is not
+    # used (Compose still evaluates these vars for inactive profile services).
+    # For --profile edge, set PDS_WEB_HOST / PDS_AUTH_HOST / PDS_ACME_EMAIL.
     environment:
-      PDS_WEB_HOST: ${PDS_WEB_HOST:?Set PDS_WEB_HOST for --profile edge}
-      PDS_AUTH_HOST: ${PDS_AUTH_HOST:?Set PDS_AUTH_HOST for --profile edge}
-      PDS_ACME_EMAIL: ${PDS_ACME_EMAIL:?Set PDS_ACME_EMAIL for Let's Encrypt}
+      PDS_WEB_HOST: ${PDS_WEB_HOST:-}
+      PDS_AUTH_HOST: ${PDS_AUTH_HOST:-}
+      PDS_ACME_EMAIL: ${PDS_ACME_EMAIL:-}
     ports:
       - '80:80'
       - '443:443'
