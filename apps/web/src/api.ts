@@ -6,15 +6,17 @@ import type {
   DistributionTransaction,
   FPSAllocation,
   LedgerEvent,
+  LedgerProofAnalyticsResponse,
+  LedgerProofDetailResponse,
+  LedgerProofStatusResponse,
   MonthlyEntitlement,
   Stakeholder,
-  TransferOrder
-  ,LedgerProofStatusResponse
-  ,EligibilityCase
-  ,EligibilitySummary
-  ,BeneficiaryLifecycleEvent
-  ,BeneficiaryLifecycleEventResult
-  ,BeneficiaryRegistrySummary
+  TransferOrder,
+  EligibilityCase,
+  EligibilitySummary,
+  BeneficiaryLifecycleEvent,
+  BeneficiaryLifecycleEventResult,
+  BeneficiaryRegistrySummary
 } from '@pds/shared-types';
 import { AuthMode, AuthResult } from '@pds/shared-types';
 import { demoQuantities, getWorkspaceSnapshot, type DemoScenario } from '@pds/fixtures';
@@ -170,6 +172,17 @@ export async function loadStockPositions(apiOnline = true): Promise<StockPositio
 
 export async function loadLedgerProofStatus(eventId: string): Promise<LedgerProofStatusResponse> {
   return fetchJson(`/ledger-proofs/${encodeURIComponent(eventId)}`);
+}
+
+export async function loadLedgerProofAnalytics(apiOnline = true): Promise<LedgerProofAnalyticsResponse | null> {
+  if (!apiOnline || usesMockData(apiOnline)) {
+    return null;
+  }
+  return fetchJson('/ledger-proofs/analytics');
+}
+
+export async function loadLedgerProofDetail(eventId: string): Promise<LedgerProofDetailResponse> {
+  return fetchJson(`/ledger-proofs/${encodeURIComponent(eventId)}/detail`);
 }
 
 export const loadEligibilitySummary = (): Promise<EligibilitySummary> =>

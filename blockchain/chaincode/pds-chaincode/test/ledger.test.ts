@@ -272,6 +272,10 @@ describe('PdsLedgerEngine', () => {
   });
 
   it.each([
+    'EligibilityNoticeIssued',
+    'EligibilityVerificationRecorded',
+    'EligibilityRecommendationRecorded',
+    'EligibilityAppealOpened',
     'EligibilityDecisionAuthorized',
     'EligibilityDecisionReversed',
     'BENEFICIARY_CREATED',

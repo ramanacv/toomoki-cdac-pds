@@ -38,7 +38,13 @@ export const mapStakeholderRow = (row: Record<string, unknown>): Stakeholder => 
   name: asString(row.name),
   district: asString(row.district),
   licenseNo: asString(row.license_no),
-  status: asString(row.status) as StakeholderStatus
+  status: asString(row.status) as StakeholderStatus,
+  ...(row.dealer_name ? { dealerName: asString(row.dealer_name) } : {}),
+  ...(row.dealer_id ? { dealerId: asString(row.dealer_id) } : {}),
+  ...(row.shop_no ? { shopNo: asString(row.shop_no) } : {}),
+  ...(row.block_name ? { blockName: asString(row.block_name) } : {}),
+  ...(row.tehsil_name ? { tehsilName: asString(row.tehsil_name) } : {}),
+  ...(row.location_text ? { location: asString(row.location_text) } : {})
 });
 
 export const mapLotRow = (row: Record<string, unknown>): CommodityLot => ({

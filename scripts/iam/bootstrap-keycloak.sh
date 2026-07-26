@@ -170,7 +170,8 @@ for role in management department procurement fci godown block-office auditor pl
   ensure_user "demo-$role" "$role" "$first_name" "$last_name"
 done
 IFS='|' read -r first_name last_name <<<"${role_display_names[fps]}"
-ensure_user "demo-fps" "fps" "$first_name" "$last_name"
+ensure_user "demo-fps" "fps" "Suresh" "Jadhav"
+ensure_user "demo-fps-202" "fps" "Anita" "Deshmukh"
 
 for role in "${demo_roles[@]}"; do
   demo_subject_id="$("${kcadm[@]}" get users -r viksitpds -q "username=demo-$role" -q exact=true --fields id --format csv --noquotes | head -n 1)"
@@ -184,6 +185,15 @@ for role in "${demo_roles[@]}"; do
       DO UPDATE SET active = TRUE, valid_until = NULL;"
   fi
 done
+
+demo_fps_202_id="$("${kcadm[@]}" get users -r viksitpds -q "username=demo-fps-202" -q exact=true --fields id --format csv --noquotes | head -n 1)"
+test -n "$demo_fps_202_id"
+assign_database_role "$demo_fps_202_id" "fps"
+psql_exec "
+  INSERT INTO subject_scope_assignments (subject_id, scope_type, scope_id, active)
+  VALUES ('$demo_fps_202_id', 'FPS', 'FPS-202', TRUE)
+  ON CONFLICT (subject_id, scope_type, scope_id)
+  DO UPDATE SET active = TRUE, valid_until = NULL;"
 
 authenticate_keycloak
 

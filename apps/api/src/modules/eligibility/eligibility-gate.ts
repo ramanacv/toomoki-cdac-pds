@@ -1,3 +1,9 @@
+/**
+ * In-process entitlement gate. Durable source of truth is `eligibility_cases`
+ * (`entitlement_blocked`, `rcms_status`); `EligibilityService.onModuleInit`
+ * rebuilds this map from PostgreSQL after restart. Do not treat the Map alone
+ * as durable storage.
+ */
 type EligibilityGateState = {
   blocked: boolean;
   rcmsStatus: 'ACTIVE' | 'SUSPENDED' | 'CANCELLED';

@@ -1,11 +1,85 @@
 import { createHash } from 'node:crypto';
-import type { LedgerEvent, LedgerProof } from '@pds/shared-types';
+import type { LedgerEvent, LedgerProof, ProofAnalyticsModule } from '@pds/shared-types';
 
 const isProhibitedKey = (key: string): boolean => {
   const normalized = key.toLowerCase().replace(/[^a-z0-9]/g, '');
-  if (['aadhaar', 'mobile', 'phone', 'otp', 'biometric', 'address', 'credential'].some((term) => normalized.includes(term))) return true;
+  // Approved opaque refs may contain sensitive stems when they end in hash/refHash/digest.
+  const opaqueApproved = /(hash|refhash|digest)$/.test(normalized);
+  if (normalized.includes('aadhaar')) return !opaqueApproved;
+  if (['mobile', 'phone', 'otp', 'biometric', 'address', 'credential'].some((term) => normalized.includes(term))) {
+    return !opaqueApproved;
+  }
   if (normalized === 'name' || normalized.endsWith('beneficiaryname') || normalized.endsWith('dealername')) return true;
-  return normalized.includes('rationcard') && !/(hash|refhash|digest)$/.test(normalized);
+  return normalized.includes('rationcard') && !opaqueApproved;
+};
+
+const looksLikeRawNumericIdentifier = (value: string): boolean =>
+  /^\d{10,16}$/.test(value.replace(/[\s-]/g, ''));
+
+const ELIGIBILITY_EVENT_TYPES = new Set([
+  'EligibilityNoticeIssued',
+  'EligibilityVerificationRecorded',
+  'EligibilityRecommendationRecorded',
+  'EligibilityAppealOpened',
+  'EligibilityDecisionAuthorized',
+  'EligibilityDecisionReversed',
+  'BENEFICIARY_CREATED',
+  'MEMBER_ADDED',
+  'MEMBER_REMOVED',
+  'HOUSEHOLD_BIFURCATED',
+  'MIGRATION_RECORDED',
+  'CARD_TRANSFERRED',
+  'VERIFICATION_COMPLETED',
+  'STATUS_CHANGED',
+  'RECORD_DEACTIVATED'
+]);
+
+const SUPPLY_CHAIN_EVENT_TYPES = new Set([
+  'RegisterStakeholder',
+  'CreateCommodityLot',
+  'AuthorizeMovement',
+  'DispatchLot',
+  'ReceiveLot',
+  'AllocateToFPS',
+  'RecordFPSReceipt',
+  'CreateMonthlyEntitlement',
+  'RaiseAuditFlag',
+  'ResolveAuditFlag',
+  'ResetTransactionalData',
+  'MASTER_REFERENCE',
+  'ALLOCATION',
+  'MOVEMENT',
+  'IntegrationReconciliation'
+]);
+
+/** Bucket durable proof events into the three demo modules for Trust analytics. */
+export const proofAnalyticsModuleFor = (eventType: string, entityType: string): ProofAnalyticsModule => {
+  if (ELIGIBILITY_EVENT_TYPES.has(eventType) || entityType === 'eligibility-case' || entityType === 'beneficiary-registry') {
+    return 'eligibility';
+  }
+  if (eventType === 'AuthTransaction' || entityType === 'auth') return 'fps';
+  if (eventType === 'RecordDistribution' || eventType === 'DISTRIBUTION') return 'fps';
+  if (entityType === 'distribution' && eventType !== 'CreateMonthlyEntitlement') return 'fps';
+  if (SUPPLY_CHAIN_EVENT_TYPES.has(eventType)) return 'supply-chain';
+  if (entityType === 'lot' || entityType === 'transfer' || entityType === 'allocation' || entityType === 'stakeholder') {
+    return 'supply-chain';
+  }
+  return 'other';
+};
+
+/** Strip prohibited keys/values for dashboard display without throwing. */
+export const privacySafeCopy = (value: unknown): unknown => {
+  if (typeof value === 'string') {
+    return looksLikeRawNumericIdentifier(value) ? '[REDACTED]' : value;
+  }
+  if (value === null || typeof value !== 'object') return value;
+  if (Array.isArray(value)) return value.map((item) => privacySafeCopy(item));
+  const out: Record<string, unknown> = {};
+  for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
+    if (isProhibitedKey(key)) continue;
+    out[key] = privacySafeCopy(item);
+  }
+  return out;
 };
 
 export const canonicalJson = (value: unknown): string => {
@@ -18,8 +92,11 @@ export const canonicalJson = (value: unknown): string => {
     .join(',')}}`;
 };
 
+export const payloadHashFor = (payload: Record<string, unknown>): string =>
+  createHash('sha256').update(canonicalJson(payload)).digest('hex');
+
 export const assertPrivacySafe = (value: unknown, path = 'payload'): void => {
-  if (typeof value === 'string' && /^\d{10,16}$/.test(value.replace(/[\s-]/g, ''))) {
+  if (typeof value === 'string' && looksLikeRawNumericIdentifier(value)) {
     throw new Error(`${path} looks like a raw numeric personal identifier`);
   }
   if (value === null || typeof value !== 'object') return;
@@ -41,7 +118,7 @@ export const ledgerProofFromEvent = (
   operationId = event.ledgerTxId
 ): LedgerProof => {
   assertPrivacySafe(event.payload, 'proofPayload');
-  const payloadHash = createHash('sha256').update(canonicalJson(event.payload)).digest('hex');
+  const payloadHash = payloadHashFor(event.payload);
   return {
     eventId: event.ledgerTxId,
     operationId,

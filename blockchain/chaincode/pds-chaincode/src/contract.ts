@@ -79,9 +79,10 @@ const assertNoSensitiveProofFields = (value: unknown): void => {
   if (Array.isArray(value)) return value.forEach(assertNoSensitiveProofFields);
   for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
     const normalizedKey = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const opaqueApproved = /(hash|refhash|digest)$/.test(normalizedKey);
     const prohibitedIdentityAlias = ['aadhaar', 'mobile', 'phone', 'otp', 'biometric']
-      .some((term) => normalizedKey.includes(term));
-    const prohibitedRationCard = normalizedKey.includes('rationcard') && !/(hash|refhash|digest)$/.test(normalizedKey);
+      .some((term) => normalizedKey.includes(term)) && !opaqueApproved;
+    const prohibitedRationCard = normalizedKey.includes('rationcard') && !opaqueApproved;
     if (prohibitedIdentityAlias || prohibitedRationCard) {
       throw new Error(`LedgerProof contains prohibited personal data field: ${key}`);
     }

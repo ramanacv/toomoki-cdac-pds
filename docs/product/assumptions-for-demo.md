@@ -10,10 +10,16 @@
 - Single-node components are accepted locally. Backup and recovery are limited to the documented reset/reseed procedure.
 - Operational completion and proof completion are distinct UI/API states. Expected Fabric delay must not block normal workflow.
 - Proof payloads contain hashes and non-sensitive evidence only; raw beneficiary identity, OTP, biometric, mobile number and full ration-card values are prohibited.
-- `demo-fps` is assigned to `FPS-101` in the durable authorization tables; the
-  API derives the shop and opaque operator reference from that active
-  subject-scope assignment and filters all FPS-facing reads. If an optional
-  token shop claim is present, it must match the durable assignment.
+- `demo-fps` is assigned to `FPS-101` and `demo-fps-202` to `FPS-202` in the
+  durable authorization tables; the API derives the shop and opaque operator
+  reference from that active subject-scope assignment and filters all
+  FPS-facing reads. If an optional token shop claim is present, it must match
+  the durable assignment. Demo FPS shops include fictional dealer name/ID,
+  shop number, block/tehsil, and location for UI narrative.
+- Eligibility panel beneficiaries are fictional and may display synthetic
+  `9999…` Aadhaar numbers, `90000…` mobile numbers (OTP inbox narrative),
+  addresses, and family members for demo UI only. OTP values themselves are
+  never stored. Fabric proofs and ePoS auth mocks use opaque hashes only.
 - SMART-PDS/RCMS, state-SCM, and AePDS/ePoS records used in the demo are
   provisional fixtures submitted through the canonical integration boundary.
   They are not evidence of a live government integration.
@@ -54,3 +60,12 @@ non-blocking. Only a recorded, authorized, effective mock RCMS suspension or
 cancellation blocks the synthetic card's entitlement; dependency failure and
 invalid evidence preserve benefits. Final decisions take operational effect
 independently of asynchronous Fabric proof delivery.
+
+Mock integrity scoring is deterministic and rule-weighted over fixture signals
+(including opaque `linkageDigest` collisions). It is not AI/ML, not a live
+Aadhaar/CRS oracle, and never auto-cancels cards. Authorized adjudication
+checkpoints (notice, verification, recommendation, appeal, decision,
+reinstatement) and beneficiary lifecycle events enqueue privacy-safe Fabric
+proofs; Trust Overview shows expected-vs-COMMITTED completeness and detectable
+drift/missing-proof alerts. Do not claim chaincode mutates beneficiary status
+or “zero silent drift” while the supply-chain snapshot/outbox waiver remains.

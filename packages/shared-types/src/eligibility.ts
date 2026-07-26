@@ -33,6 +33,16 @@ export type EligibilitySignal = {
   risk: 'LOW' | 'MEDIUM' | 'HIGH';
   observedAt: string;
   factCode: string;
+  /** Opaque multi-registry linkage digest for deterministic duplicate fixtures (hash-only). */
+  linkageDigest?: string;
+};
+
+export type EligibilityScoreBreakdownEntry = {
+  ruleId: string;
+  signalFactCode: string;
+  weight: number;
+  contribution: number;
+  rationaleCode: string;
 };
 
 export type EligibilityScreeningRequest = {
@@ -60,6 +70,9 @@ export type EligibilityScreeningResponse = {
   evidenceDigest: string;
   responseAttestationHash: string;
   schemaVersion: typeof ELIGIBILITY_SCHEMA_VERSION;
+  /** Deterministic mock integrity score 0–100 (not ML). */
+  integrityScore?: number;
+  scoreBreakdown?: EligibilityScoreBreakdownEntry[];
 };
 
 export const ELIGIBILITY_CASE_STATES = [
@@ -122,15 +135,44 @@ export type EligibilityCase = {
   updatedAt: string;
 };
 
+export type EligibilityFamilyMember = {
+  fictionalName: string;
+  relation: string;
+  ageYears: number;
+  /** Synthetic demo Aadhaar for UI only (9999-prefixed). Never send to Fabric proofs. */
+  demoAadhaarNumber?: string;
+  /** Synthetic OTP handset for household head in UI demos (90000…). */
+  demoMobileNumber?: string;
+  aadhaarRefHash?: string;
+};
+
 export type EligibilityBeneficiary = {
   demoBeneficiaryId: string;
   fictionalName: string;
+  /** Synthetic demo residential address for UI only. Never send to Fabric proofs. */
+  fictionalAddress: string;
   maskedCardRef: string;
+  /**
+   * Synthetic 12-digit demo Aadhaar for controlled UI demos (must start with 9999).
+   * Never persist into Fabric proofs — use aadhaarRefHash / subjectRefHash instead.
+   */
+  demoAadhaarNumber: string;
+  /**
+   * Synthetic Indian mobile used only to narrate where mock OTP is received.
+   * Must start with 90000 for controlled demos. Never send to Fabric proofs or
+   * epos-auth-mock request bodies.
+   */
+  demoMobileNumber: string;
+  aadhaarRefHash: string;
   subjectRefHash: string;
   rationCardHash: string;
   householdSize: number;
   monthlyRiceEntitlementKg: number;
   alreadyLiftedKg: number;
+  fpsId: string;
+  blockName: string;
+  tehsilName: string;
+  familyMembers: EligibilityFamilyMember[];
   jurisdictionCode?: string;
   districtCode?: string;
   eligibilityStatus: 'ELIGIBLE' | 'UNDER_REVIEW' | 'SUSPENDED' | 'CANCELLED';
@@ -198,7 +240,8 @@ export const validateEligibilityScreeningResponse = (value: unknown, now = new D
   const raw = value as Record<string, unknown>;
   const allowedResponseKeys = new Set([
     'screeningId', 'screeningRequestId', 'status', 'signals', 'recommendedReviewAction',
-    'policy', 'assessedAt', 'expiresAt', 'evidenceDigest', 'responseAttestationHash', 'schemaVersion'
+    'policy', 'assessedAt', 'expiresAt', 'evidenceDigest', 'responseAttestationHash', 'schemaVersion',
+    'integrityScore', 'scoreBreakdown'
   ]);
   if (Object.keys(raw).some((key) => !allowedResponseKeys.has(key) || prohibitedKey.test(key))) {
     throw new Error('Screening response contains an unknown or prohibited field');
@@ -213,7 +256,7 @@ export const validateEligibilityScreeningResponse = (value: unknown, now = new D
   const signalSources = ['DEATH_REGISTRY', 'AEPDS_ONORC', 'GST_TURNOVER', 'INCOME_TAX', 'EMPLOYMENT', 'LAND_RECORDS', 'RCMS', 'REGISTRY_LINKAGE'];
   const signalStatuses = ['CLEAR', 'MATCH', 'CONFLICT', 'STALE', 'UNAVAILABLE'];
   const signalRisks = ['LOW', 'MEDIUM', 'HIGH'];
-  const allowedSignalKeys = new Set(['source', 'status', 'risk', 'observedAt', 'factCode']);
+  const allowedSignalKeys = new Set(['source', 'status', 'risk', 'observedAt', 'factCode', 'linkageDigest']);
   if (response.signals.some((signal) =>
     Object.keys(signal).some((key) => !allowedSignalKeys.has(key) || prohibitedKey.test(key)) ||
     !signalSources.includes(signal.source) || !signalStatuses.includes(signal.status) ||
@@ -231,5 +274,32 @@ export const validateEligibilityScreeningResponse = (value: unknown, now = new D
   const expiresAt = Date.parse(response.expiresAt ?? '');
   if (!Number.isFinite(assessedAt) || !Number.isFinite(expiresAt)) throw new Error('Screening timestamps are invalid');
   if (expiresAt <= now.getTime()) throw new Error('Screening response is expired');
+  if (response.integrityScore !== undefined) {
+    if (typeof response.integrityScore !== 'number' || !Number.isInteger(response.integrityScore) ||
+        response.integrityScore < 0 || response.integrityScore > 100) {
+      throw new Error('integrityScore must be an integer from 0 to 100');
+    }
+  }
+  if (response.scoreBreakdown !== undefined) {
+    if (!Array.isArray(response.scoreBreakdown)) throw new Error('scoreBreakdown must be an array');
+    for (const entry of response.scoreBreakdown) {
+      if (!entry || typeof entry !== 'object') throw new Error('scoreBreakdown entry is malformed');
+      const row = entry as Record<string, unknown>;
+      for (const key of Object.keys(row)) {
+        if (!['ruleId', 'signalFactCode', 'weight', 'contribution', 'rationaleCode'].includes(key) || prohibitedKey.test(key)) {
+          throw new Error('scoreBreakdown contains an unknown or prohibited field');
+        }
+      }
+      if (typeof row.ruleId !== 'string' || typeof row.signalFactCode !== 'string' ||
+          typeof row.rationaleCode !== 'string' || typeof row.weight !== 'number' ||
+          typeof row.contribution !== 'number') {
+        throw new Error('scoreBreakdown entry fields are invalid');
+      }
+    }
+  }
+  if (response.signals.some((signal) => signal.linkageDigest !== undefined &&
+      (typeof signal.linkageDigest !== 'string' || !/^[a-f0-9]{64}$/.test(signal.linkageDigest)))) {
+    throw new Error('linkageDigest must be a SHA-256 hex digest when present');
+  }
   return response as EligibilityScreeningResponse;
 };

@@ -20,11 +20,24 @@
   {
     "stakeholderId": "BSO-001",
     "stakeholderType": "BLOCK_SUPPLY_OFFICE",
-    "name": "Block Supply Office 01",
+    "name": "Block Supply Office · Haveli",
     "district": "Demo District",
     "licenseNo": "BSO-LIC-001",
     "status": "ACTIVE",
-    "jurisdiction": "STATE"
+    "jurisdiction": "STATE",
+    "blockName": "Haveli",
+    "tehsilName": "Haveli"
+  },
+  {
+    "stakeholderId": "BSO-002",
+    "stakeholderType": "BLOCK_SUPPLY_OFFICE",
+    "name": "Block Supply Office · Mulshi",
+    "district": "Demo District",
+    "licenseNo": "BSO-LIC-002",
+    "status": "ACTIVE",
+    "jurisdiction": "STATE",
+    "blockName": "Mulshi",
+    "tehsilName": "Mulshi"
   },
   {
     "stakeholderId": "GODOWN-S-001",
@@ -58,20 +71,32 @@
   {
     "stakeholderId": "FPS-101",
     "stakeholderType": "FAIR_PRICE_SHOP",
-    "name": "FPS 101",
+    "name": "FPS 101 · Haveli Fair Price Shop",
     "district": "Demo District",
     "licenseNo": "FPS-LIC-101",
     "status": "ACTIVE",
-    "jurisdiction": "STATE"
+    "jurisdiction": "STATE",
+    "dealerName": "Suresh Jadhav (Fictional)",
+    "dealerId": "DLR-MH-HAV-101",
+    "shopNo": "FPS/MH/HAV/101",
+    "blockName": "Haveli",
+    "tehsilName": "Haveli",
+    "location": "Near Gram Panchayat, Village Demo-Haveli, Demo District"
   },
   {
     "stakeholderId": "FPS-202",
     "stakeholderType": "FAIR_PRICE_SHOP",
-    "name": "FPS 202",
-    "district": "Neighbouring Demo District",
+    "name": "FPS 202 · Mulshi Fair Price Shop",
+    "district": "Demo District",
     "licenseNo": "FPS-LIC-202",
     "status": "ACTIVE",
-    "jurisdiction": "STATE"
+    "jurisdiction": "STATE",
+    "dealerName": "Anita Deshmukh (Fictional)",
+    "dealerId": "DLR-MH-MUL-202",
+    "shopNo": "FPS/MH/MUL/202",
+    "blockName": "Mulshi",
+    "tehsilName": "Mulshi",
+    "location": "Main Road, Village Demo-Mulshi, Demo District"
   },
   {
     "stakeholderId": "AUD-001",

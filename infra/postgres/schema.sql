@@ -15,8 +15,17 @@ CREATE TABLE IF NOT EXISTS stakeholders (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Additive demo geography / FPS dealer display fields (controlled PoC only).
+ALTER TABLE stakeholders ADD COLUMN IF NOT EXISTS dealer_name TEXT;
+ALTER TABLE stakeholders ADD COLUMN IF NOT EXISTS dealer_id TEXT;
+ALTER TABLE stakeholders ADD COLUMN IF NOT EXISTS shop_no TEXT;
+ALTER TABLE stakeholders ADD COLUMN IF NOT EXISTS block_name TEXT;
+ALTER TABLE stakeholders ADD COLUMN IF NOT EXISTS tehsil_name TEXT;
+ALTER TABLE stakeholders ADD COLUMN IF NOT EXISTS location_text TEXT;
+
 CREATE INDEX IF NOT EXISTS idx_stakeholders_status ON stakeholders (status);
 CREATE INDEX IF NOT EXISTS idx_stakeholders_type_district ON stakeholders (stakeholder_type, district);
+CREATE INDEX IF NOT EXISTS idx_stakeholders_block_tehsil ON stakeholders (block_name, tehsil_name);
 
 -- `users` is reserved for a future IAM-backed login flow. The MVP enforcement
 -- layer (T2.5) uses a stub IdentityProvider; this table is intentionally not

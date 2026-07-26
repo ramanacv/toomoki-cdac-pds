@@ -6,6 +6,11 @@ import { IDENTITY_PROVIDER } from './identity-provider.js';
 import { OidcIdentityProvider } from './oidc-identity-provider.js';
 import { TestIdentityProvider } from './stub-identity-provider.js';
 import { DurableAuthorizationService } from './durable-authorization.service.js';
+import {
+  createEposAuthAdapter,
+  EPOS_AUTH_ADAPTER,
+  EposAuthClient
+} from './epos-auth-client.js';
 
 export const createIdentityProvider = () => {
   const mode = (process.env.PDS_AUTH_MODE ?? 'oidc').toLowerCase();
@@ -25,8 +30,10 @@ export const createIdentityProvider = () => {
   providers: [
     { provide: IDENTITY_PROVIDER, useFactory: createIdentityProvider },
     DurableAuthorizationService,
-    { provide: APP_GUARD, useClass: BusinessAuthGuard }
+    { provide: APP_GUARD, useClass: BusinessAuthGuard },
+    { provide: EPOS_AUTH_ADAPTER, useFactory: createEposAuthAdapter },
+    EposAuthClient
   ],
-  exports: [DurableAuthorizationService]
+  exports: [DurableAuthorizationService, EposAuthClient]
 })
 export class AuthModule {}

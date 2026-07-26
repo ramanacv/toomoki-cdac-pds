@@ -13,11 +13,12 @@ import {
 
 describe('@pds/fixtures', () => {
   it('loads stakeholders from mock entities', () => {
-    expect(stakeholders).toHaveLength(9);
+    expect(stakeholders).toHaveLength(10);
     expect(stakeholders.map((entry) => entry.stakeholderId)).toEqual(
       expect.arrayContaining([
         'FCI-001',
         'BSO-001',
+        'BSO-002',
         'GODOWN-S-001',
         'GODOWN-B-001',
         'TRANS-001',
@@ -27,6 +28,12 @@ describe('@pds/fixtures', () => {
         'AUD-001'
       ])
     );
+    const fps101 = stakeholders.find((entry) => entry.stakeholderId === 'FPS-101');
+    const fps202 = stakeholders.find((entry) => entry.stakeholderId === 'FPS-202');
+    expect(fps101?.dealerName).toContain('Suresh Jadhav');
+    expect(fps101?.tehsilName).toBe('Haveli');
+    expect(fps202?.dealerName).toContain('Anita Deshmukh');
+    expect(fps202?.tehsilName).toBe('Mulshi');
   });
 
   it('defines backend seed lot and entitlement', () => {
@@ -74,7 +81,16 @@ describe('@pds/fixtures', () => {
     expect(eligibilityBeneficiaries.every((item) =>
       item.fictionalName.includes('(Fictional)') &&
       item.maskedCardRef.includes('***') &&
-      item.rationCardHash.endsWith('-hash')
+      item.rationCardHash.endsWith('-hash') &&
+      item.demoAadhaarNumber.startsWith('9999') &&
+      item.demoMobileNumber.startsWith('90000') &&
+      item.aadhaarRefHash.endsWith('-hash') &&
+      Boolean(item.fpsId) &&
+      Boolean(item.fictionalAddress) &&
+      Array.isArray(item.familyMembers) &&
+      item.familyMembers.length >= 2
     )).toBe(true);
+    expect(eligibilityBeneficiaries.filter((item) => item.fpsId === 'FPS-101' && item.jurisdictionCode === 'MH')).toHaveLength(3);
+    expect(eligibilityBeneficiaries.filter((item) => item.fpsId === 'FPS-202' && item.jurisdictionCode === 'MH')).toHaveLength(2);
   });
 });

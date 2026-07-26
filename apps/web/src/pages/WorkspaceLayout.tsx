@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Navigate, Outlet, useLocation, useSearchParams } from 'react-router-dom';
+import { Navigate, Outlet, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useWorkspace, useLiveScenarioView } from '@/hooks/use-workspace.js';
 import { parseRole, parseScenario } from '@/lib/url-state.js';
 import type { WorkspaceOutletContext } from '@/hooks/use-workspace-context.js';
@@ -7,7 +7,8 @@ import { LoginPage } from '@/pages/LoginPage.js';
 import { AppShell } from '@/components/layout/AppShell';
 import { getCurrentIdentity, signIn, signOut } from '@/auth-token.js';
 import { getDataSourceMode } from '@/data-source.js';
-import { oidcRoleToDemoRole } from '@/demo-model.js';
+import { oidcRoleToDemoRole, type DemoRole } from '@/demo-model.js';
+import { getDefaultPath } from '@/lib/modules.js';
 import { Button } from '@/components/ui/button.js';
 
 export function WorkspaceLayout() {
@@ -20,6 +21,7 @@ export function WorkspaceLayout() {
   const role = offlineMode ? selectedRole : (oidcRoleToDemoRole(identity?.roles ?? []) ?? 'MANAGEMENT');
   const scenario = parseScenario(params.get('scenario'));
   const location = useLocation();
+  const navigate = useNavigate();
 
   const workspace = useWorkspace(scenario, offlineMode || Boolean(identity));
   const { liveSummary, visibleAlerts } = useLiveScenarioView(scenario, workspace);
@@ -28,6 +30,15 @@ export function WorkspaceLayout() {
     const next = new URLSearchParams(params);
     next.set(key, value);
     setParams(next, { replace: true });
+  };
+
+  const handleRoleChange = (nextRole: DemoRole) => {
+    const next = new URLSearchParams(params);
+    next.set('role', nextRole);
+    navigate(
+      { pathname: getDefaultPath(nextRole), search: `?${next.toString()}` },
+      { replace: true }
+    );
   };
 
   if ((!offlineMode && !identity) || (offlineMode && !authenticated)) {
@@ -76,7 +87,7 @@ export function WorkspaceLayout() {
       operatorName={identity?.displayName ?? operatorName}
       apiOnline={workspace.apiOnline}
       ledgerMode={workspace.ledgerMode}
-      onRoleChange={(next) => updateParam('role', next)}
+      onRoleChange={handleRoleChange}
       onScenarioChange={(next) => updateParam('scenario', next)}
       offlineMode={offlineMode}
       onLogout={() => offlineMode ? setAuthenticated(false) : void signOut()}

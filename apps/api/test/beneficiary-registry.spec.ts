@@ -1,6 +1,21 @@
-import { describe, expect, it, vi } from 'vitest';
-import type { BeneficiaryLifecycleEvent } from '@pds/shared-types';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { BENEFICIARY_LIFECYCLE_EVENT_TYPES, type BeneficiaryLifecycleEvent } from '@pds/shared-types';
 import { BeneficiaryRegistryRepository } from '../src/modules/beneficiary-registry/beneficiary-registry.repository.js';
+
+const priorPersistence = process.env.PDS_PERSISTENCE_BACKEND;
+const priorDsn = process.env.PDS_POSTGRES_DSN;
+
+beforeEach(() => {
+  delete process.env.PDS_PERSISTENCE_BACKEND;
+  delete process.env.PDS_POSTGRES_DSN;
+});
+
+afterEach(() => {
+  if (priorPersistence === undefined) delete process.env.PDS_PERSISTENCE_BACKEND;
+  else process.env.PDS_PERSISTENCE_BACKEND = priorPersistence;
+  if (priorDsn === undefined) delete process.env.PDS_POSTGRES_DSN;
+  else process.env.PDS_POSTGRES_DSN = priorDsn;
+});
 
 const event = (overrides: Partial<BeneficiaryLifecycleEvent> = {}): BeneficiaryLifecycleEvent => ({
   eventId: 'JK-LIFECYCLE-001',
@@ -89,4 +104,76 @@ describe('beneficiary registry lifecycle projection', () => {
     expect(serialized).not.toMatch(/Zoya|RC-JK-DEMO/);
     expect(serialized).toContain('beneficiary-jk-demo-001-hash');
   });
+
+  it.each([...BENEFICIARY_LIFECYCLE_EVENT_TYPES])(
+    'enqueues a privacy-safe outbox proof for lifecycle event %s',
+    async (eventType) => {
+      const queries: Array<{ text: string; values?: unknown[] }> = [];
+      let projectionRow: Record<string, unknown> | undefined;
+      const client = {
+        query: vi.fn(async (text: string, values?: unknown[]) => {
+          queries.push({ text, ...(values ? { values } : {}) });
+          if (text.includes('SELECT request_hash') || text.includes('WHERE event_id = $1 FOR UPDATE')) {
+            return { rows: [], rowCount: 0 };
+          }
+          if (text.includes('FROM beneficiary_registry_projection') && text.includes('FOR UPDATE')) {
+            return { rows: projectionRow ? [projectionRow] : [], rowCount: projectionRow ? 1 : 0 };
+          }
+          if (text.includes('INSERT INTO beneficiary_registry_projection') || text.includes('UPDATE beneficiary_registry_projection')) {
+            const household = eventType === 'BENEFICIARY_CREATED' ? 5 : 4;
+            projectionRow = {
+              beneficiary_ref_hash: 'beneficiary-jk-demo-001-hash',
+              ration_card_hash: 'ration-card-jk-demo-001-hash',
+              district_code: 'JK-DEMO-01',
+              household_size: household,
+              state: eventType === 'RECORD_DEACTIVATED' ? 'DEACTIVATED' : 'ACTIVE',
+              version: eventType === 'BENEFICIARY_CREATED' ? 1 : 2,
+              last_event_id: `JK-${eventType}`,
+              updated_at: '2026-07-23T10:00:00.000Z',
+              proof_status: 'PENDING'
+            };
+          }
+          return { rows: [], rowCount: 1 };
+        }),
+        release: vi.fn()
+      };
+      const pool = { connect: vi.fn().mockResolvedValue(client), end: vi.fn() };
+      const repository = new BeneficiaryRegistryRepository(pool as never);
+      if (eventType !== 'BENEFICIARY_CREATED') {
+        // Seed an in-transaction projection read for non-create events.
+        projectionRow = {
+          beneficiary_ref_hash: 'beneficiary-jk-demo-001-hash',
+          ration_card_hash: 'ration-card-jk-demo-001-hash',
+          district_code: 'JK-DEMO-01',
+          household_size: 5,
+          state: 'ACTIVE',
+          version: 1,
+          last_event_id: 'JK-PRIOR',
+          updated_at: '2026-07-23T09:00:00.000Z',
+          proof_status: 'COMMITTED'
+        };
+      }
+      const delta =
+        eventType === 'BENEFICIARY_CREATED' ? 5
+          : eventType === 'MEMBER_ADDED' ? 1
+            : eventType === 'MEMBER_REMOVED' || eventType === 'HOUSEHOLD_BIFURCATED' ? -1
+              : 0;
+      const payload: Partial<BeneficiaryLifecycleEvent> = {
+        eventId: `JK-${eventType}`,
+        eventType,
+        householdSizeDelta: delta,
+        newState: eventType === 'RECORD_DEACTIVATED' ? 'DEACTIVATED' : 'ACTIVE',
+        districtCode: eventType === 'MIGRATION_RECORDED' ? 'JK-DEMO-03' : 'JK-DEMO-01'
+      };
+      if (eventType !== 'BENEFICIARY_CREATED') payload.priorState = 'ACTIVE';
+      const result = await repository.apply(event(payload));
+      expect(result.proofEventId).toMatch(/^BEN-LIFECYCLE-/);
+      const sql = queries.map((query) => query.text).join('\n');
+      expect(sql).toContain('INSERT INTO ledger_outbox');
+      const serialized = JSON.stringify(queries.flatMap((query) => query.values ?? []));
+      expect(serialized).toContain(eventType);
+      expect(serialized).toContain('beneficiary-jk-demo-001-hash');
+      expect(serialized).not.toMatch(/Zoya|Aadhaar|9999|RC-JK-DEMO/);
+    }
+  );
 });

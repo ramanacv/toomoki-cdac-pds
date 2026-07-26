@@ -1,4 +1,4 @@
-import { IsEnum, IsString } from 'class-validator';
+import { IsEnum, IsOptional, IsString } from 'class-validator';
 import { AuthMode, AuthResult } from '@pds/shared-types';
 
 export class AuthOtpDto {
@@ -10,6 +10,11 @@ export class AuthOtpDto {
 
   @IsString()
   rationCardHash!: string;
+
+  /** Opaque Aadhaar reference hash. Never a raw 12-digit Aadhaar number. */
+  @IsOptional()
+  @IsString()
+  aadhaarRefHash?: string;
 
   @IsEnum(AuthResult)
   authResult!: AuthResult;

@@ -8,9 +8,23 @@ import { ProofsService } from './proofs.service.js';
 export class ProofsController {
   constructor(@Inject(ProofsService) private readonly proofs: ProofsService) {}
 
+  @Get('/ledger-proofs/analytics')
+  analytics() {
+    return this.proofs.getAnalytics();
+  }
+
+  @Get('/ledger-proofs/:eventId/detail')
+  @Roles('auditor', 'management', 'platform-admin')
+  detail(@Param('eventId') eventId: string, @Req() request: AuthenticatedRequest) {
+    const includeRawError =
+      request.user?.roles.some((role) => role === 'auditor' || role === 'platform-admin') ?? false;
+    return this.proofs.getDetail(eventId, includeRawError);
+  }
+
   @Get('/ledger-proofs/:eventId')
   status(@Param('eventId') eventId: string, @Req() request: AuthenticatedRequest) {
-    const includeRawError = request.user?.roles.some((role) => role === 'auditor' || role === 'platform-admin') ?? false;
+    const includeRawError =
+      request.user?.roles.some((role) => role === 'auditor' || role === 'platform-admin') ?? false;
     return this.proofs.getStatus(eventId, includeRawError);
   }
 

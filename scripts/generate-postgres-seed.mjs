@@ -11,11 +11,12 @@ const eligibilityBeneficiaries = JSON.parse(
 const outputPath = resolve(root, 'infra/postgres/seed.sql');
 
 const sqlEscape = (value) => String(value).replaceAll("'", "''");
+const sqlNullable = (value) => (value == null || value === '' ? 'NULL' : `'${sqlEscape(value)}'`);
 
 const stakeholderRows = stakeholders
   .map(
     (entry) =>
-      `  ('${sqlEscape(entry.stakeholderId)}', '${sqlEscape(entry.stakeholderType)}', '${sqlEscape(entry.name)}', '${sqlEscape(entry.district)}', '${sqlEscape(entry.licenseNo)}', '${sqlEscape(entry.status)}')`
+      `  ('${sqlEscape(entry.stakeholderId)}', '${sqlEscape(entry.stakeholderType)}', '${sqlEscape(entry.name)}', '${sqlEscape(entry.district)}', '${sqlEscape(entry.licenseNo)}', '${sqlEscape(entry.status)}', ${sqlNullable(entry.dealerName)}, ${sqlNullable(entry.dealerId)}, ${sqlNullable(entry.shopNo)}, ${sqlNullable(entry.blockName)}, ${sqlNullable(entry.tehsilName)}, ${sqlNullable(entry.location)})`
   )
   .join(',\n');
 
@@ -27,7 +28,7 @@ const rationCard = backendSeed.rationCard;
 const sql = `-- Generated from mock/entities/stakeholders.json and mock/seed/backend.json
 -- Regenerate with: npm run fixtures:sql
 
-INSERT INTO stakeholders (stakeholder_id, stakeholder_type, name, district, license_no, status)
+INSERT INTO stakeholders (stakeholder_id, stakeholder_type, name, district, license_no, status, dealer_name, dealer_id, shop_no, block_name, tehsil_name, location_text)
 VALUES
 ${stakeholderRows};
 

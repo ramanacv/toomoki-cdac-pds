@@ -54,6 +54,18 @@ describe('GlobalExceptionFilter (T5.2 / T6.2)', () => {
     expect(res.statusCode).toBe(HttpStatus.BAD_REQUEST);
   });
 
+  it('maps Stage-II authorization requirement errors to 400', () => {
+    const res = makeResponse();
+    filter.catch(new Error('Stage-II dispatch requires roRef and authorizedBy'), makeHost(res));
+    expect(res.statusCode).toBe(HttpStatus.BAD_REQUEST);
+  });
+
+  it('maps cannot-exceed quantity errors to 400', () => {
+    const res = makeResponse();
+    filter.catch(new Error('receivedQtyKg cannot exceed allocatedQtyKg for allocation ALLOC-1'), makeHost(res));
+    expect(res.statusCode).toBe(HttpStatus.BAD_REQUEST);
+  });
+
   it('passes HttpException status through (UnauthorizedException → 401)', () => {
     const res = makeResponse();
     filter.catch(new UnauthorizedException('no'), makeHost(res));

@@ -47,6 +47,15 @@ codes, an evidence digest, effective timestamps, optional district code and
 household-size delta, and schema version. Reusing an event ID with identical
 content is an idempotent replay; conflicting reuse fails.
 
+## Mock integrity and proof completeness (controlled demo)
+
+- Eligibility adjudication checkpoints and all nine registry lifecycle types
+  enqueue privacy-safe outbox proofs; Trust Overview reports completeness and
+  detectable drift/missing proofs.
+- Deterministic mock scoring and `linkageDigest` collisions open human review
+  only; chaincode never mutates beneficiary status.
+- See [mocks-integrity-proof-completeness-plan.md](mocks-integrity-proof-completeness-plan.md).
+
 ## Remaining pilot work
 
 - Obtain approved J&K SMART-PDS/RCMS, AePDS/ePoS, death-registration, migration,
@@ -60,4 +69,4 @@ content is an idempotent replay; conflicting reuse fails.
   approved configuration.
 - Complete the broader row-scoped PostgreSQL command-service replacement
   tracked in the MVP hardening plan before any multi-replica or production
-  claim.
+  claim (supply-chain snapshot/outbox honesty unlock).

@@ -92,6 +92,9 @@ services:
       PDS_ELIGIBILITY_SERVICE_URL: http://eligibility-mock:3010
       PDS_ELIGIBILITY_SERVICE_TIMEOUT_MS: ${PDS_ELIGIBILITY_SERVICE_TIMEOUT_MS:-3000}
       PDS_ELIGIBILITY_SERVICE_TOKEN: ${PDS_ELIGIBILITY_SERVICE_TOKEN:-}
+      PDS_EPOS_AUTH_SERVICE_URL: ${PDS_EPOS_AUTH_SERVICE_URL:-}
+      PDS_EPOS_AUTH_SERVICE_TIMEOUT_MS: ${PDS_EPOS_AUTH_SERVICE_TIMEOUT_MS:-3000}
+      PDS_EPOS_AUTH_SERVICE_TOKEN: ${PDS_EPOS_AUTH_SERVICE_TOKEN:-}
     ports:
       - '3000:3000'
     depends_on:
@@ -106,7 +109,7 @@ services:
       - pds-fabric
 
   eligibility-mock:
-    profiles: [eligibility]
+    profiles: [eligibility, mocks]
     build:
       context: .
       dockerfile: apps/eligibility-mock/Dockerfile
@@ -122,6 +125,29 @@ services:
           'node',
           '-e',
           "fetch('http://127.0.0.1:3010/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+        ]
+      interval: 3s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+  epos-auth-mock:
+    profiles: [epos, mocks]
+    build:
+      context: .
+      dockerfile: apps/epos-auth-mock/Dockerfile
+    environment:
+      PORT: 3011
+      PDS_EPOS_AUTH_SERVICE_TOKEN: ${PDS_EPOS_AUTH_SERVICE_TOKEN:-}
+    ports:
+      - '3011:3011'
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3011/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
         ]
       interval: 3s
       timeout: 5s

@@ -11,6 +11,9 @@ describe('StakeholdersPanel', () => {
     expect(screen.getAllByText('Workbench operator').length).toBeGreaterThan(0);
     expect(screen.getByText('Transport Contractor 01').closest('article')).toHaveTextContent('View only');
     expect(screen.getByText('Auditor 01').closest('article')).toHaveTextContent('View only');
-    expect(screen.getByText('FPS 101').closest('article')).toHaveTextContent('Workbench operator');
+    expect(screen.getByText(/FPS 101 · Haveli Fair Price Shop/).closest('article')).toHaveTextContent(
+      'Workbench operator'
+    );
+    expect(screen.getByText(/Suresh Jadhav \(Fictional\)/)).toBeInTheDocument();
   });
 });

@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { canonicalJson, ledgerProofFromEvent } from '../src/modules/fabric/ledger-proof.js';
+import {
+  canonicalJson,
+  ledgerProofFromEvent,
+  privacySafeCopy,
+  proofAnalyticsModuleFor
+} from '../src/modules/fabric/ledger-proof.js';
 
 const actor = { subject: 'demo-user', applicationRole: 'DEPARTMENT', submittingOrganization: 'FoodAndCivilSuppliesMSP' };
 
@@ -28,10 +33,11 @@ describe('LedgerProof', () => {
     }
   );
 
-  it('allows approved opaque ration-card hashes', () => {
+  it('allows approved opaque ration-card and aadhaar reference hashes', () => {
     expect(() => ledgerProofFromEvent({
       ledgerTxId: 'evt-hash', entityType: 'distribution', entityId: 'distribution-1', eventType: 'Distribution',
-      payload: { rationCardHash: 'opaque-hash' }, timestamp: '2026-01-01T00:00:00.000Z'
+      payload: { rationCardHash: 'opaque-hash', aadhaarRefHash: 'aadhaar-demo-001-hash', beneficiaryRefHash: 'beneficiary-hash' },
+      timestamp: '2026-01-01T00:00:00.000Z'
     }, actor)).not.toThrow();
   });
 
@@ -40,5 +46,29 @@ describe('LedgerProof', () => {
       ledgerTxId: 'evt-raw', entityType: 'auth', entityId: 'auth-1', eventType: 'AuthTransaction',
       payload: { externalValue: '123456789012' }, timestamp: '2026-01-01T00:00:00.000Z'
     }, actor)).toThrow(/raw numeric personal identifier/);
+  });
+
+  it('buckets event types into demo modules', () => {
+    expect(proofAnalyticsModuleFor('DispatchLot', 'transfer')).toBe('supply-chain');
+    expect(proofAnalyticsModuleFor('EligibilityDecisionAuthorized', 'eligibility-case')).toBe('eligibility');
+    expect(proofAnalyticsModuleFor('EligibilityNoticeIssued', 'eligibility-case')).toBe('eligibility');
+    expect(proofAnalyticsModuleFor('EligibilityVerificationRecorded', 'eligibility-case')).toBe('eligibility');
+    expect(proofAnalyticsModuleFor('EligibilityRecommendationRecorded', 'eligibility-case')).toBe('eligibility');
+    expect(proofAnalyticsModuleFor('EligibilityAppealOpened', 'eligibility-case')).toBe('eligibility');
+    expect(proofAnalyticsModuleFor('AuthTransaction', 'auth')).toBe('fps');
+    expect(proofAnalyticsModuleFor('RecordDistribution', 'distribution')).toBe('fps');
+  });
+
+  it('redacts prohibited fields for analytics detail without throwing', () => {
+    expect(privacySafeCopy({
+      rationCardHash: 'demo-ration-card-hash',
+      otp: '123456',
+      evidence: { phone: '9999999999', ok: true },
+      externalValue: '123456789012'
+    })).toEqual({
+      rationCardHash: 'demo-ration-card-hash',
+      evidence: { ok: true },
+      externalValue: '[REDACTED]'
+    });
   });
 });

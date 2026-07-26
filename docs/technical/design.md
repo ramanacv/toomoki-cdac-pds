@@ -78,8 +78,18 @@ authorization checks.
 
 ## Entry And Identity Journeys
 
-The web application presents Department, Supply-chain Operations, Fair Price
-Shop Demo, Audit/Management, and Platform Administration entry journeys.
+The web application presents module-first entry journeys: Supply chain,
+Card & eligibility, FPS authentication, Trust & reconcile, and Platform
+Administration. Operators choose a module, then a Keycloak persona that lands
+on the matching module home (`/m/...`). Legacy screen routes remain flat
+(`/workbench`, `/eligibility`, `/distribution`, and related paths). See
+`docs/implementation/three-module-ui-ia.md` and
+`docs/implementation/three-module-mock-services.md`.
+
+FPS beneficiary authentication may call an optional `epos-auth-mock` that
+simulates Aadhaar/UIDAI-style auth outcomes using opaque `aadhaarRefHash`
+references only. Raw Aadhaar numbers, OTP values, and biometrics are prohibited.
+
 
 For an FPS request:
 

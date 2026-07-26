@@ -194,7 +194,7 @@ export class PdsRuntime extends PdsLedgerEngine {
   override listAllocations(): any {
     const pool = this.getDbPool();
     if (pool) {
-      return pool.query('SELECT * FROM fps_allocations ORDER BY month, allocation_id').then(res => res.rows.map(mapAllocationRow));
+      return pool.query('SELECT * FROM fps_allocations ORDER BY month, allocation_id').then(res => res.rows.map((row) => mapAllocationRow(row)));
     }
     return super.listAllocations();
   }
@@ -345,21 +345,85 @@ export class PdsRuntime extends PdsLedgerEngine {
     runFn: (engine: PdsLedgerEngine) => T
   ): Promise<T> {
     const client = await pool.connect();
+    let rejectionEvidence: { alerts: ReturnType<PdsLedgerEngine['exportState']>['alerts']; events: LedgerEvent[] } | null =
+      null;
     try {
       await client.query('BEGIN');
       const rows = await loadFn(client);
       const partialState = hydratePdsState(rows);
       const engine = new PdsLedgerEngine(false);
       engine.restoreState(partialState);
-      const result = runFn(engine);
-      const updatedState = engine.exportState();
-      const newEvents = updatedState.events;
-      await this.saveStateChanges(client, updatedState, newEvents);
-      await client.query('COMMIT');
-      return this.attachLedgerEventId(result, newEvents.at(-1)?.ledgerTxId);
+      try {
+        const result = runFn(engine);
+        const updatedState = engine.exportState();
+        const newEvents = updatedState.events;
+        await this.saveStateChanges(client, updatedState, newEvents);
+        await client.query('COMMIT');
+        return this.attachLedgerEventId(result, newEvents.at(-1)?.ledgerTxId);
+      } catch (domainError) {
+        // Domain commands may raise audit flags before throwing (over-allocation,
+        // unauthorized Stage-II, duplicate claim). Keep that evidence after rollback.
+        const updatedState = engine.exportState();
+        const priorAlertIds = new Set((partialState.alerts ?? []).map((alert) => alert.alertId));
+        const priorEventIds = new Set((partialState.events ?? []).map((event) => event.ledgerTxId));
+        const alerts = updatedState.alerts.filter((alert) => !priorAlertIds.has(alert.alertId));
+        const events = updatedState.events.filter(
+          (event) => !priorEventIds.has(event.ledgerTxId) && event.eventType === 'RaiseAuditFlag'
+        );
+        if (alerts.length > 0 || events.length > 0) {
+          rejectionEvidence = { alerts, events };
+        }
+        throw domainError;
+      }
     } catch (error) {
-      await client.query('ROLLBACK');
+      try {
+        await client.query('ROLLBACK');
+      } catch {
+        // No active transaction (for example, connect/BEGIN failure).
+      }
+      if (rejectionEvidence) {
+        await this.persistRejectionAuditEvidence(pool, rejectionEvidence);
+      }
       throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  private async persistRejectionAuditEvidence(
+    pool: Pool,
+    evidence: { alerts: ReturnType<PdsLedgerEngine['exportState']>['alerts']; events: LedgerEvent[] }
+  ): Promise<void> {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await this.saveStateChanges(
+        client,
+        {
+          stakeholders: [],
+          lots: [],
+          transfers: [],
+          allocations: [],
+          entitlements: [],
+          authTransactions: [],
+          distributions: [],
+          alerts: evidence.alerts,
+          events: evidence.events,
+          stock: [],
+          rationCards: [],
+          grievances: [],
+          entitlementRules: []
+        },
+        evidence.events
+      );
+      await client.query('COMMIT');
+    } catch (persistError) {
+      try {
+        await client.query('ROLLBACK');
+      } catch {
+        // ignore nested rollback failures
+      }
+      throw persistError;
     } finally {
       client.release();
     }
@@ -380,16 +444,38 @@ export class PdsRuntime extends PdsLedgerEngine {
   private async saveStateChanges(client: PoolClient, state: any, newEvents: LedgerEvent[]): Promise<void> {
     for (const stakeholder of state.stakeholders) {
       await client.query(
-        `INSERT INTO stakeholders (stakeholder_id, stakeholder_type, name, district, license_no, status)
-         VALUES ($1, $2, $3, $4, $5, $6)
+        `INSERT INTO stakeholders (
+           stakeholder_id, stakeholder_type, name, district, license_no, status,
+           dealer_name, dealer_id, shop_no, block_name, tehsil_name, location_text
+         )
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
          ON CONFLICT (stakeholder_id) DO UPDATE SET
            stakeholder_type = EXCLUDED.stakeholder_type,
            name = EXCLUDED.name,
            district = EXCLUDED.district,
            license_no = EXCLUDED.license_no,
            status = EXCLUDED.status,
+           dealer_name = EXCLUDED.dealer_name,
+           dealer_id = EXCLUDED.dealer_id,
+           shop_no = EXCLUDED.shop_no,
+           block_name = EXCLUDED.block_name,
+           tehsil_name = EXCLUDED.tehsil_name,
+           location_text = EXCLUDED.location_text,
            updated_at = NOW()`,
-        [stakeholder.stakeholderId, stakeholder.stakeholderType, stakeholder.name, stakeholder.district, stakeholder.licenseNo, stakeholder.status]
+        [
+          stakeholder.stakeholderId,
+          stakeholder.stakeholderType,
+          stakeholder.name,
+          stakeholder.district,
+          stakeholder.licenseNo,
+          stakeholder.status,
+          stakeholder.dealerName ?? null,
+          stakeholder.dealerId ?? null,
+          stakeholder.shopNo ?? null,
+          stakeholder.blockName ?? null,
+          stakeholder.tehsilName ?? null,
+          stakeholder.location ?? null
+        ]
       );
     }
 
@@ -659,7 +745,11 @@ export class PdsRuntime extends PdsLedgerEngine {
 
         const [lotRes, stakeholderRes, stockRes, transferRes, authorizationEventRes] = await Promise.all([
           client.query('SELECT * FROM commodity_lots WHERE lot_id = $1 FOR UPDATE', [input.lotId]),
-          client.query('SELECT * FROM stakeholders WHERE stakeholder_id IN ($1, $2) FOR UPDATE', [input.fromOrg, input.toOrg]),
+          client.query('SELECT * FROM stakeholders WHERE stakeholder_id IN ($1, $2, $3) FOR UPDATE', [
+            input.fromOrg,
+            input.toOrg,
+            input.transporterId
+          ]),
           client.query(
             'SELECT * FROM stock_positions WHERE stakeholder_id = $1 AND commodity = $2 AND lot_id IS NULL AND month IS NULL FOR UPDATE',
             [input.fromOrg, commodity]
@@ -755,9 +845,10 @@ export class PdsRuntime extends PdsLedgerEngine {
     return this.executeMutationTx(
       pool,
       async (client) => {
-        const [godownRes, fpsRes, stockRes, allocationRes] = await Promise.all([
+        const [godownRes, fpsRes, transporterRes, stockRes, allocationRes] = await Promise.all([
           client.query('SELECT * FROM stakeholders WHERE stakeholder_id = $1 FOR UPDATE', [input.sourceGodownId]),
           client.query('SELECT * FROM stakeholders WHERE stakeholder_id = $1 FOR UPDATE', [input.fpsId]),
+          client.query('SELECT * FROM stakeholders WHERE stakeholder_id = $1 FOR UPDATE', [input.transporterId]),
           client.query(
             'SELECT * FROM stock_positions WHERE stakeholder_id = $1 AND commodity = $2 AND lot_id IS NULL AND month IS NULL FOR UPDATE',
             [input.sourceGodownId, input.commodity]
@@ -765,9 +856,9 @@ export class PdsRuntime extends PdsLedgerEngine {
           client.query('SELECT * FROM fps_allocations WHERE allocation_id = $1 FOR UPDATE', [input.allocationId])
         ]);
         return {
-          stakeholders: [...godownRes.rows, ...fpsRes.rows].map(mapStakeholderRow),
+          stakeholders: [...godownRes.rows, ...fpsRes.rows, ...transporterRes.rows].map(mapStakeholderRow),
           stock: stockRes.rows.map(r => [`${r.stakeholder_id}:${r.commodity}`, Number(r.quantity_kg)] as const),
-          allocations: allocationRes.rows.map(mapAllocationRow)
+          allocations: allocationRes.rows.map((row) => mapAllocationRow(row))
         };
       },
       (engine) => engine.allocateToFps(input)
@@ -798,7 +889,7 @@ export class PdsRuntime extends PdsLedgerEngine {
           )
         ]);
         return {
-          allocations: allocationRes.rows.map(mapAllocationRow),
+          allocations: allocationRes.rows.map((row) => mapAllocationRow(row)),
           stock: stockRes.rows.map(r => [`${r.stakeholder_id}:${r.commodity}`, Number(r.quantity_kg)] as const)
         };
       },
