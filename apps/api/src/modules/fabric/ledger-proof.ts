@@ -112,13 +112,26 @@ export const assertPrivacySafe = (value: unknown, path = 'payload'): void => {
 
 export type ProofActor = LedgerProof['actor'];
 
+/**
+ * Stakeholder operational records may carry display names in PostgreSQL, but
+ * Fabric proofs must not. Redact prohibited keys at the proof boundary only —
+ * other event types still fail loudly if they embed personal data.
+ */
+const proofPayloadFor = (event: LedgerEvent): Record<string, unknown> => {
+  if (event.eventType === 'RegisterStakeholder' || event.entityType === 'stakeholder') {
+    return privacySafeCopy(event.payload) as Record<string, unknown>;
+  }
+  return event.payload;
+};
+
 export const ledgerProofFromEvent = (
   event: LedgerEvent,
   actor: ProofActor,
   operationId = event.ledgerTxId
 ): LedgerProof => {
-  assertPrivacySafe(event.payload, 'proofPayload');
-  const payloadHash = payloadHashFor(event.payload);
+  const proofPayload = proofPayloadFor(event);
+  assertPrivacySafe(proofPayload, 'proofPayload');
+  const payloadHash = payloadHashFor(proofPayload);
   return {
     eventId: event.ledgerTxId,
     operationId,
@@ -128,7 +141,7 @@ export const ledgerProofFromEvent = (
     entityId: event.entityId,
     actor,
     payloadHash,
-    proofPayload: event.payload,
+    proofPayload,
     businessTimestamp: event.timestamp
   };
 };

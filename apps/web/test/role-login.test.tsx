@@ -2,8 +2,18 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
-const { signInAs } = vi.hoisted(() => ({ signInAs: vi.fn() }));
-vi.mock('@/auth-token.js', () => ({ signInAs }));
+const { signInAs, consumePendingPersonaSignIn, getCurrentIdentity, signOut } = vi.hoisted(() => ({
+  signInAs: vi.fn(),
+  consumePendingPersonaSignIn: vi.fn().mockResolvedValue(false),
+  getCurrentIdentity: vi.fn().mockReturnValue(null),
+  signOut: vi.fn()
+}));
+vi.mock('@/auth-token.js', () => ({
+  signInAs,
+  consumePendingPersonaSignIn,
+  getCurrentIdentity,
+  signOut
+}));
 
 import { RoleLoginPage, quickRoleLogins } from '@/pages/RoleLoginPage.js';
 
@@ -53,5 +63,17 @@ describe('quick role login', () => {
     expect(screen.getByText('demo-fps-202')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Continue as FPS Dealer · Mulshi (FPS-202)' }));
     expect(signInAs).toHaveBeenCalledWith('demo-fps-202', '/m/fps');
+  });
+
+  it('shows the active identity and consumes a pending persona switch on mount', () => {
+    getCurrentIdentity.mockReturnValue({
+      subject: 'sub',
+      displayName: 'Demo FCI',
+      roles: ['fci']
+    });
+    render(<RoleLoginPage />);
+    expect(screen.getByText(/Signed in as/i)).toBeInTheDocument();
+    expect(screen.getByText('Demo FCI')).toBeInTheDocument();
+    expect(consumePendingPersonaSignIn).toHaveBeenCalled();
   });
 });

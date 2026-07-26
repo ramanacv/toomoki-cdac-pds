@@ -107,6 +107,7 @@ describe('PostgreSQL eligibility final-decision atomicity', () => {
     expect(sql).toContain('eligibility_cases');
     expect(sql).toContain('eligibility_case_actions');
     expect(sql).toContain('case_snapshot');
+    expect(sql).toContain('INSERT INTO ration_cards_mock');
     expect(sql).toContain('INSERT INTO ledger_outbox');
     expect(sql).not.toContain('UPDATE ration_cards_mock');
     const serializedValues = JSON.stringify(fake.queries.flatMap((entry) => entry.values ?? []));
@@ -146,6 +147,7 @@ describe('PostgreSQL eligibility final-decision atomicity', () => {
     const sql = fake.queries.map((entry) => entry.text).join('\n');
     expect(fake.queries[0]?.text).toBe('BEGIN');
     expect(fake.queries.at(-1)?.text).toBe('COMMIT');
+    expect(sql).toContain('INSERT INTO ration_cards_mock');
     expect(sql).toContain('eligibility_cases');
     expect(sql).toContain('eligibility_case_actions');
     expect(sql).toContain('UPDATE ration_cards_mock');
@@ -171,5 +173,32 @@ describe('PostgreSQL eligibility final-decision atomicity', () => {
     await expect(new EligibilityRepository(fake.pool as never).persistFinalDecision(item, 'DECISION-IDEMPOTENCY-003'))
       .rejects.toThrow(/changed concurrently/);
     expect(fake.queries.map((entry) => entry.text)).toContain('ROLLBACK');
+  });
+
+  it('ensures a missing ration_cards_mock parent before case insert', async () => {
+    const fake = fakePool();
+    const openCase = structuredClone(item);
+    delete openCase.decision;
+    openCase.state = 'OPEN';
+    openCase.version = 1;
+    openCase.rcmsStatus = 'ACTIVE';
+    openCase.entitlementBlocked = false;
+    openCase.proofStatus = 'NOT_REQUIRED';
+    delete openCase.proofEventId;
+    openCase.history = [{
+      actionId: 'SCREEN-003', action: 'SCREENING', outcomeCode: 'OPENED',
+      reasonCode: 'EXTERNAL_SCREENING', actorRef: 'department-officer-ref',
+      occurredAt: '2026-07-23T00:00:00Z', priorState: 'OPEN', newState: 'OPEN'
+    }];
+    await new EligibilityRepository(fake.pool as never).persistScreening(
+      'e'.repeat(64),
+      { screening: openCase.screening, case: openCase, entitlementPreserved: true },
+      openCase,
+      openCase.demoBeneficiaryId
+    );
+    const sql = fake.queries.map((entry) => entry.text).join('\n');
+    expect(sql).toContain('INSERT INTO ration_cards_mock');
+    expect(sql).toContain('INSERT INTO eligibility_cases');
+    expect(fake.queries.some((entry) => entry.values?.[0] === openCase.rationCardHash)).toBe(true);
   });
 });

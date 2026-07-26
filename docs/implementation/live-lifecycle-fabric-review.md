@@ -77,7 +77,7 @@ Commands run on 2026-07-25 against the local Fabric stack:
 | `node scripts/live-lifecycle.mjs` (Fabric) | Passed — run `LIVE-20260725113823` |
 | Operational completion | Passed — happy path + 5 negative deficit cases |
 | Lifecycle proof completion | Passed — 27 required proofs `COMMITTED` with Fabric tx ids |
-| Stakeholder proof completion | Excluded — 9 `RegisterStakeholder` proofs dead-letter on `proofPayload.name` |
+| Stakeholder proof completion | Redacted at API proof boundary — display `name` / `dealerName` stripped before `RecordLedgerProof` |
 
 Evidence (local only, not committed): `/tmp/pds-live-lifecycle/LIVE-20260725113823.json`.
 
@@ -95,9 +95,10 @@ over-receipt), and an additional `SHORT_RECEIPT`.
 - Upstream stock is not re-read from `/stock` under the FPS-scoped service
   token; conservation is asserted from the planned ledger and mutation
   responses, with FPS stock confirmed via `/stock`.
-- `RegisterStakeholder` events still include display `name` and fail Fabric
-  privacy validation. The lifecycle script excludes them from the proof gate
-  until stakeholder proofs are redacted at the proof boundary.
+- `RegisterStakeholder` operational payloads may still include display `name`
+  in PostgreSQL / engine events; the API proof boundary redacts prohibited
+  keys before Fabric submission. Legacy `DEAD_LETTER` rows from before that
+  fix may remain until reset or manual retry.
 - API and chaincode source now allow opaque `aadhaarRefHash` in proofs; the
   lifecycle omits that field until the deployed chaincode is upgraded.
 - Rejected mutations now persist `RaiseAuditFlag` audit rows after Postgres

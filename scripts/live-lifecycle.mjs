@@ -284,11 +284,11 @@ const PROOF_REQUIRED_EVENT_TYPES = new Set([
 ]);
 
 /**
- * RegisterStakeholder payloads still carry display `name` and are rejected by
- * proof privacy validation (dead-letter). They are reported but not required
- * for lifecycle operational/proof success until stakeholder proofs are redacted.
+ * RegisterStakeholder proofs are redacted at the API proof boundary
+ * (`ledgerProofFromEvent` strips display name / dealerName). Keep this set empty
+ * unless a new event type is intentionally excluded from the proof gate.
  */
-const PROOF_EXCLUDED_EVENT_TYPES = new Set(['RegisterStakeholder']);
+const PROOF_EXCLUDED_EVENT_TYPES = new Set();
 
 async function waitForCommittedProofs(events) {
   const deadline = Date.now() + proofTimeoutMs;

@@ -46,6 +46,33 @@ services:
     volumes:
       - ./infra/postgres/schema.sql:/schema/schema.sql:ro
 
+  seed-reference-data:
+    image: postgres:16-alpine
+    restart: 'no'
+    environment:
+      PGPASSWORD: pds
+    depends_on:
+      postgres:
+        condition: service_healthy
+      schema-migrate:
+        condition: service_completed_successfully
+    command:
+      [
+        'psql',
+        '-h',
+        'postgres',
+        '-U',
+        'pds',
+        '-d',
+        'pds_chain',
+        '-v',
+        'ON_ERROR_STOP=1',
+        '-f',
+        '/seed/seed.sql'
+      ]
+    volumes:
+      - ./infra/postgres/seed.sql:/seed/seed.sql:ro
+
   api:
     build:
       context: .
@@ -87,8 +114,8 @@ services:
       PDS_OIDC_CLOCK_SKEW_SECONDS: ${PDS_OIDC_CLOCK_SKEW_SECONDS:-30}
       PDS_CORS_ORIGINS: ${PDS_CORS_ORIGINS:-http://localhost:4173}
       PDS_ALLOW_RESET: ${PDS_ALLOW_RESET:-false}
-      PDS_RATE_LIMIT_READ_PER_MINUTE: ${PDS_RATE_LIMIT_READ_PER_MINUTE:-120}
-      PDS_RATE_LIMIT_MUTATION_PER_MINUTE: ${PDS_RATE_LIMIT_MUTATION_PER_MINUTE:-30}
+      PDS_RATE_LIMIT_READ_PER_MINUTE: ${PDS_RATE_LIMIT_READ_PER_MINUTE:-600}
+      PDS_RATE_LIMIT_MUTATION_PER_MINUTE: ${PDS_RATE_LIMIT_MUTATION_PER_MINUTE:-120}
       PDS_ELIGIBILITY_SERVICE_URL: http://eligibility-mock:3010
       PDS_ELIGIBILITY_SERVICE_TIMEOUT_MS: ${PDS_ELIGIBILITY_SERVICE_TIMEOUT_MS:-3000}
       PDS_ELIGIBILITY_SERVICE_TOKEN: ${PDS_ELIGIBILITY_SERVICE_TOKEN:-}
@@ -101,6 +128,8 @@ services:
       postgres:
         condition: service_healthy
       schema-migrate:
+        condition: service_completed_successfully
+      seed-reference-data:
         condition: service_completed_successfully
     volumes:
       - ./blockchain/fabric-network/crypto:/app/blockchain/fabric-network/crypto:ro

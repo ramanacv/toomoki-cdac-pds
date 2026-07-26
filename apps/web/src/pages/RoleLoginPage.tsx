@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { signInAs } from '@/auth-token.js';
+import { consumePendingPersonaSignIn, getCurrentIdentity, signInAs, signOut } from '@/auth-token.js';
 import { Panel } from '@/components/Panel';
 import { Button } from '@/components/ui/button';
 import { moduleDefinitions, type DemoModule } from '@/lib/modules.js';
@@ -95,6 +95,7 @@ const chooserModules: Array<{ id: DemoModule | 'admin'; title: string; subtitle:
 
 export function RoleLoginPage() {
   const [selectedModule, setSelectedModule] = useState<DemoModule | 'admin' | null>(null);
+  const [activeIdentityLabel, setActiveIdentityLabel] = useState<string | null>(null);
   const personasRef = useRef<HTMLDivElement | null>(null);
   const personas = useMemo(
     () => (selectedModule ? quickRoleLogins.filter((login) => login.moduleId === selectedModule) : []),
@@ -102,6 +103,12 @@ export function RoleLoginPage() {
   );
   const selectedTitle =
     chooserModules.find((item) => item.id === selectedModule)?.title ?? 'module';
+
+  useEffect(() => {
+    const identity = getCurrentIdentity();
+    setActiveIdentityLabel(identity?.displayName ?? null);
+    void consumePendingPersonaSignIn();
+  }, []);
 
   useEffect(() => {
     if (!selectedModule || !personasRef.current) {
@@ -117,8 +124,19 @@ export function RoleLoginPage() {
         <h1 className="text-3xl font-semibold tracking-tight">Choose a demo module</h1>
         <p className="mt-2 max-w-3xl leading-relaxed text-muted-foreground">
           Step 1: select a module. Step 2: choose a Keycloak persona below. This page only pre-fills the username;
-          Keycloak still authenticates the user and signs the role-bearing token.
+          Keycloak still authenticates the user and signs the role-bearing token. Switching personas ends the current
+          SSO session first so the next login cannot reuse a sticky identity.
         </p>
+        {activeIdentityLabel ? (
+          <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-teal-700/30 bg-teal-50 px-4 py-3 text-sm text-teal-950">
+            <span>
+              Signed in as <strong>{activeIdentityLabel}</strong>. Continue as another persona will log out first.
+            </span>
+            <Button type="button" variant="outline" size="sm" onClick={() => { void signOut(); }}>
+              Log out now
+            </Button>
+          </div>
+        ) : null}
       </section>
 
       <Panel eyebrow="Demo modules" title="Step 1 · Select a module" pill="Module-first entry" className="p-6">
@@ -201,6 +219,8 @@ export function RoleLoginPage() {
             </div>
             <p className="mt-5 text-sm text-muted-foreground">
               Passwords are never stored or submitted by this page. Enter the configured local demo password on Keycloak.
+              Prefer Continuations from this page over clearing sessionStorage alone — Continue ends the Keycloak SSO
+              session before the next persona login.
             </p>
           </Panel>
         </div>

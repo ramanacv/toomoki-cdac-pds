@@ -543,3 +543,32 @@ CREATE INDEX IF NOT EXISTS idx_ledger_outbox_created_at ON ledger_outbox (create
 ALTER TABLE stock_positions ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1;
 ALTER TABLE monthly_entitlements ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1;
 CREATE INDEX IF NOT EXISTS idx_ledger_outbox_status_created ON ledger_outbox (status, created_at);
+
+-- Repair duplicate stock_positions created when UNIQUE treated NULL months as
+-- distinct, then enforce NULLS NOT DISTINCT so seed re-apply cannot multiply rows.
+-- Prefer the newest updated_at (then highest id) when quantities diverge.
+DELETE FROM stock_positions a
+ USING stock_positions b
+ WHERE a.stock_position_id <> b.stock_position_id
+   AND a.stakeholder_id = b.stakeholder_id
+   AND a.commodity = b.commodity
+   AND a.lot_id IS NOT DISTINCT FROM b.lot_id
+   AND a.month IS NOT DISTINCT FROM b.month
+   AND (
+     a.updated_at < b.updated_at
+     OR (a.updated_at = b.updated_at AND a.stock_position_id < b.stock_position_id)
+   );
+
+-- Legacy lot-/month-scoped seed copies are not the operational Available-stock grain.
+DELETE FROM stock_positions WHERE lot_id IS NOT NULL OR month IS NOT NULL;
+
+DO $$
+BEGIN
+  ALTER TABLE stock_positions DROP CONSTRAINT IF EXISTS stock_positions_stakeholder_id_commodity_lot_id_month_key;
+  ALTER TABLE stock_positions
+    ADD CONSTRAINT stock_positions_stakeholder_id_commodity_lot_id_month_key
+    UNIQUE NULLS NOT DISTINCT (stakeholder_id, commodity, lot_id, month);
+EXCEPTION
+  WHEN duplicate_table THEN NULL;
+  WHEN duplicate_object THEN NULL;
+END $$;

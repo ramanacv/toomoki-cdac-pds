@@ -37,6 +37,21 @@ This limitation is accepted only for a controlled demonstration under all of the
 - Reset and deterministically reseed immediately before the demonstration.
 - Treat the demo as non-crash-safe; restart and repeat the reset lifecycle if the API or database fails during a run.
 - After the scripted lifecycle, verify that the PostgreSQL outbox has no `PENDING`, `SUBMITTING`, `FAILED`, or `DEAD_LETTER` rows and that every `COMMITTED` row has a Fabric transaction ID.
+- Before a multi-persona UI demo, run the ordered custody prep
+  (`node scripts/live-lifecycle.mjs` after an authorized reset/reseed, or
+  workbench actions FCI → Godown → DSO → Godown → BSO → FPS) so BSO allotment
+  and FPS issue actions are unlocked. Switching personas from `/role-login`
+  ends the Keycloak SSO session first; do not clear only `sessionStorage`.
+- Compose demo API defaults raise read/mutation rate limits (600/120) so rapid
+  persona switches are less likely to 429; production/code defaults remain
+  120/30 when those env vars are unset.
+- Operator “Available stock” and dashboard tracked stock are org-grain only
+  (`stock_positions` rows with `lot_id IS NULL AND month IS NULL`). After any
+  seed re-apply on a retained volume, confirm FCI balances are not duplicated.
+- Monthly entitlement `already_lifted_kg` is reconciled from
+  `distribution_transactions` after entitlement/distribution writes. Dirty demo
+  DBs that issued more than the monthly quota during earlier bugs may show
+  lifted above monthly with available 0 until reset.
 
 This waiver does not mark transactional-command hardening complete. Atomic operational writes and outbox insertion are required before pilot use, multi-user concurrency testing, multiple API replicas, or any reliability/near-MVP production claim.
 

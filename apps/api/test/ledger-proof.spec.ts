@@ -23,6 +23,37 @@ describe('LedgerProof', () => {
     expect(() => ledgerProofFromEvent({ ledgerTxId: 'evt-1', entityType: 'auth', entityId: 'auth-1', eventType: 'AuthTransaction', payload: { evidence: { otp: '1234' } }, timestamp: '2026-01-01T00:00:00.000Z' }, actor)).toThrow(/prohibited personal data/);
   });
 
+  it('redacts RegisterStakeholder display names at the proof boundary', () => {
+    const proof = ledgerProofFromEvent(
+      {
+        ledgerTxId: 'evt-stakeholder',
+        entityType: 'stakeholder',
+        entityId: 'FCI-001',
+        eventType: 'RegisterStakeholder',
+        payload: {
+          stakeholderId: 'FCI-001',
+          stakeholderType: 'FCI',
+          name: 'FCI Depot Pune',
+          dealerName: 'Should Not Appear',
+          district: 'Pune',
+          licenseNo: 'LIC-1',
+          status: 'ACTIVE'
+        },
+        timestamp: '2026-01-01T00:00:00.000Z'
+      },
+      actor
+    );
+    expect(proof.proofPayload).toMatchObject({
+      stakeholderId: 'FCI-001',
+      stakeholderType: 'FCI',
+      district: 'Pune',
+      licenseNo: 'LIC-1',
+      status: 'ACTIVE'
+    });
+    expect(proof.proofPayload).not.toHaveProperty('name');
+    expect(proof.proofPayload).not.toHaveProperty('dealerName');
+  });
+
   it.each(['aadhaarNumber', 'customer_aadhaar', 'phoneNumber', 'mobileNo', 'otpValue', 'biometricPayload', 'ration_card_value']) (
     'rejects normalized sensitive alias %s',
     (key) => {
