@@ -20,6 +20,15 @@ authenticate_keycloak() {
 authenticate_keycloak
 "${compose[@]}" exec -T postgres psql -U pds -d pds_chain -v ON_ERROR_STOP=1 \
   < infra/postgres/schema.sql >/dev/null
+# Idempotent reference rows (ration cards, entitlements, stakeholders). Safe on retained volumes.
+"${compose[@]}" exec -T postgres psql -U pds -d pds_chain -v ON_ERROR_STOP=1 \
+  < infra/postgres/seed.sql >/dev/null
+
+# Demo personas must not hit Keycloak VERIFY_PROFILE / email prompts on first login.
+if "${kcadm[@]}" get "authentication/required-actions/VERIFY_PROFILE" -r viksitpds >/dev/null 2>&1; then
+  "${kcadm[@]}" update "authentication/required-actions/VERIFY_PROFILE" -r viksitpds \
+    -s enabled=false -s defaultAction=false >/dev/null || true
+fi
 
 client_id() {
   "${kcadm[@]}" get clients -r viksitpds -q "clientId=$1" --fields id --format csv --noquotes | head -n 1
@@ -105,12 +114,20 @@ authenticate_keycloak
 
 ensure_user() {
   local username="$1" role="$2" first_name="$3" last_name="$4" user_id
+  local email="${username}@viksitpds.local"
   user_id="$("${kcadm[@]}" get users -r viksitpds -q "username=$username" -q exact=true --fields id --format csv --noquotes | head -n 1)"
   if [[ -z "$user_id" ]]; then
-    "${kcadm[@]}" create users -r viksitpds       -s "username=$username" -s enabled=true       -s "firstName=$first_name" -s "lastName=$last_name" >/dev/null
+    "${kcadm[@]}" create users -r viksitpds \
+      -s "username=$username" -s enabled=true \
+      -s "email=$email" -s emailVerified=true \
+      -s "firstName=$first_name" -s "lastName=$last_name" \
+      -s 'requiredActions=[]' >/dev/null
     user_id="$("${kcadm[@]}" get users -r viksitpds -q "username=$username" -q exact=true --fields id --format csv --noquotes | head -n 1)"
   else
-    "${kcadm[@]}" update "users/$user_id" -r viksitpds       -s "firstName=$first_name" -s "lastName=$last_name" -s enabled=true >/dev/null
+    "${kcadm[@]}" update "users/$user_id" -r viksitpds \
+      -s "firstName=$first_name" -s "lastName=$last_name" -s enabled=true \
+      -s "email=$email" -s emailVerified=true \
+      -s 'requiredActions=[]' >/dev/null
   fi
   "${kcadm[@]}" set-password -r viksitpds --userid "$user_id" --new-password "$PDS_DEMO_USER_PASSWORD" >/dev/null
   "${kcadm[@]}" add-roles -r viksitpds --uid "$user_id" --rolename "$role" >/dev/null
@@ -173,11 +190,22 @@ IFS='|' read -r first_name last_name <<<"${role_display_names[fps]}"
 ensure_user "demo-fps" "fps" "Suresh" "Jadhav"
 ensure_user "demo-fps-202" "fps" "Anita" "Deshmukh"
 
+# Emit shop ids into JWT claims so the web UI can label Assigned shop without
+# hardcoding FPS-101. Durable scope still comes from subject_scope_assignments.
+set_user_fps_attributes() {
+  local user_id="$1"
+  local fps_id="$2"
+  "${kcadm[@]}" update "users/${user_id}" -r viksitpds \
+    -s "attributes.pds_stakeholder_id=[\"${fps_id}\"]" \
+    -s "attributes.pds_org_id=[\"${fps_id}\"]" >/dev/null
+}
+
 for role in "${demo_roles[@]}"; do
   demo_subject_id="$("${kcadm[@]}" get users -r viksitpds -q "username=demo-$role" -q exact=true --fields id --format csv --noquotes | head -n 1)"
   test -n "$demo_subject_id"
   assign_database_role "$demo_subject_id" "$role"
   if [[ "$role" == "fps" ]]; then
+    set_user_fps_attributes "$demo_subject_id" "FPS-101"
     psql_exec "
       INSERT INTO subject_scope_assignments (subject_id, scope_type, scope_id, active)
       VALUES ('$demo_subject_id', 'FPS', 'FPS-101', TRUE)
@@ -189,6 +217,7 @@ done
 demo_fps_202_id="$("${kcadm[@]}" get users -r viksitpds -q "username=demo-fps-202" -q exact=true --fields id --format csv --noquotes | head -n 1)"
 test -n "$demo_fps_202_id"
 assign_database_role "$demo_fps_202_id" "fps"
+set_user_fps_attributes "$demo_fps_202_id" "FPS-202"
 psql_exec "
   INSERT INTO subject_scope_assignments (subject_id, scope_type, scope_id, active)
   VALUES ('$demo_fps_202_id', 'FPS', 'FPS-202', TRUE)

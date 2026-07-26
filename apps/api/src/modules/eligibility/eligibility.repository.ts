@@ -101,6 +101,31 @@ export class EligibilityRepository implements OnModuleDestroy {
     }
   }
 
+  /** Write refreshed outbox-derived proof status back to eligibility_cases. */
+  async syncProofStatuses(
+    updates: Array<{ caseId: string; proofEventId: string; proofStatus: EligibilityCase['proofStatus'] }>
+  ): Promise<void> {
+    if (!this.pool || updates.length === 0) return;
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      for (const update of updates) {
+        await client.query(
+          `UPDATE eligibility_cases
+           SET proof_status = $2, updated_at = NOW()
+           WHERE case_id = $1 AND proof_event_id = $3 AND proof_status IS DISTINCT FROM $2`,
+          [update.caseId, update.proofStatus, update.proofEventId]
+        );
+      }
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   async persistScreening(
     requestHash: string,
     result: ScreeningResult,
@@ -218,7 +243,22 @@ export class EligibilityRepository implements OnModuleDestroy {
     );
   }
 
+  private async ensureRationCardParent(client: PoolClient, item: EligibilityCase): Promise<void> {
+    await client.query(
+      `INSERT INTO ration_cards_mock (ration_card_hash, household_size, district, status)
+       VALUES ($1, GREATEST($2, 1), $3, $4)
+       ON CONFLICT (ration_card_hash) DO NOTHING`,
+      [
+        item.rationCardHash,
+        item.householdSize,
+        'DEMO',
+        item.rcmsStatus === 'CANCELLED' || item.rcmsStatus === 'SUSPENDED' ? item.rcmsStatus : 'ACTIVE'
+      ]
+    );
+  }
+
   private async lockAndWriteCase(client: PoolClient, item: EligibilityCase): Promise<void> {
+    await this.ensureRationCardParent(client, item);
     const current = await client.query<{ version: number }>(
       'SELECT version FROM eligibility_cases WHERE case_id = $1 FOR UPDATE',
       [item.caseId]

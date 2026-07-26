@@ -90,3 +90,71 @@ Re-ran after `fix: migrate postgres schema before api startup`.
 | OIDC via `http://127.0.0.1:4173` | **Fails** with Keycloak `Invalid parameter: redirect_uri` |
 
 Use `localhost`, not `127.0.0.1`, when continuing the online UI walkthrough.
+
+## Authenticated online re-run — 2026-07-26 evening
+
+Visible Playwright + Glass walkthrough on `http://localhost:4173` after the
+two-commodity Admin Tools reset series `R20260726-171531-22be`.
+
+### Preconditions observed
+
+- `eligibility-mock` healthy (`GET /health` → `simulationOnly: true`).
+- External service summary on Eligibility review: **HEALTHY**.
+- Admin reset had wiped `monthly_entitlements`. Before guided decisions /
+  gate checks, seed July Rice rows for `ration-card-demo-*` and
+  `ration-card-jk-demo-*` were restored (same heads-up as FPS issue: without
+  them the UI surfaces “Eligibility entitlement … was not found”).
+
+### Scenario A — ghost / death-match (`BEN-DEMO-001` Asha Patil)
+
+| Step | Result |
+| --- | --- |
+| Select row + **Run external eligibility check** | `DEATH_MATCH_REVIEW`; `DEATH_REGISTRY` **MATCH · HIGH**; integrity **40/100**; recommended `VERIFY_MEMBER_AND_RECALCULATE_HOUSEHOLD` |
+| **Entitlement gate check** (pre-decision) | **Distribution allowed** · RCMS ACTIVE · 25 kg available (review alone does not block) |
+| Guided actions | Issue notice → Recommend ineligible → **Authorize member removal** |
+| Case after decision | `DECIDED` path then **Accept appeal** → **Reinstate** |
+| Final UI | Guided state **REINSTATED**; gate **Distribution allowed · ELIGIBLE**; Fabric proof shown **COMMITTED** in UI |
+
+### Scenario B — economic / fraud-band cancellation (`BEN-DEMO-003` Meera Kulkarni)
+
+| Step | Result |
+| --- | --- |
+| External screening | Opened case; income/GST high-band signals (mock) |
+| Guided actions | Issue notice → Recommend ineligible → **Authorize cancellation** |
+| Planning impact during cancelled state | Baseline 195 → **180 kg/month** (−15 kg); indicative subsidy **₹−450** |
+| Gate after cancellation (before appeal) | Exercised in-run; planning impact confirmed entitlement planning drop |
+| Accept appeal → Reinstate | Planning restored to **195 kg/month** / ₹0 delta |
+| Final UI | Case **REINSTATED**; gate **Distribution allowed · ELIGIBLE** · 10 kg available after 5 kg lifted |
+
+### Summary metrics after both paths
+
+| Metric | Value |
+| --- | ---: |
+| Open cases | 0 |
+| Decisions / appeals | 2 / 2 |
+| Reversals / quarantine | 2 / 0 |
+
+### Honesty / gaps from this evening pass
+
+| Item | Status then | Fix status |
+| --- | --- | --- |
+| Post-reset `monthly_entitlements` wipe | Broke gate until SQL reseed | Fixed in API reset (keep/reseed entitlements + operational month) |
+| **Record verification** after Issue notice | Often unavailable in UI | Fixed — button shown in `NOTICE_ISSUED` |
+| UI proof `COMMITTED` vs DB `PENDING` | Mismatch on `eligibility_cases.proof_status` | Fixed — outbox status synced back to cases |
+
+### Verdict
+
+**PASS for authenticated online ghost/fraud demo path** on this stack: external
+screening, human-authorized decisions, planning-impact simulation, appeal /
+reinstate, and entitlement-gate allow after reinstatement all exercised in a
+visible browser. Do not claim zero-defect proof-status durability for that
+evening session; re-verify after the fixes above.
+
+### Demo checklist
+
+1. Prefer `localhost:4173` for Keycloak.
+2. After Admin Tools reset, entitlements should already be present (no manual
+   SQL); if an older API build is running, restore seed July rows before gate demos.
+3. Show `BEN-DEMO-001` for death-registry ghost review; show `BEN-DEMO-003` for
+   cancellation → blocked planning → appeal → reinstate.
+4. Optional: after Issue notice, use **Record verification** before recommend.

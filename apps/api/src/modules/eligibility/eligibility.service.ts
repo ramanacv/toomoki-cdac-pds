@@ -556,10 +556,26 @@ export class EligibilityService implements OnModuleInit {
       .map((item) => item.proofEventId)
       .filter((eventId): eventId is string => Boolean(eventId));
     const statuses = await this.repository.loadProofStatuses(eventIds);
+    const updates: Array<{
+      caseId: string;
+      proofEventId: string;
+      proofStatus: EligibilityCase['proofStatus'];
+    }> = [];
     for (const item of this.cases.values()) {
       if (item.proofEventId && statuses.has(item.proofEventId)) {
-        item.proofStatus = statuses.get(item.proofEventId)!;
+        const next = statuses.get(item.proofEventId)!;
+        if (item.proofStatus !== next) {
+          item.proofStatus = next;
+          updates.push({
+            caseId: item.caseId,
+            proofEventId: item.proofEventId,
+            proofStatus: next
+          });
+        }
       }
+    }
+    if (updates.length > 0) {
+      await this.repository.syncProofStatuses(updates);
     }
   }
 }

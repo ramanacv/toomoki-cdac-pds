@@ -151,6 +151,15 @@ describe('eligibility review workspace', () => {
     );
   });
 
+  it('keeps Record verification available after Issue notice', async () => {
+    api.loadEligibilityCases.mockResolvedValueOnce([{ ...openCase, state: 'NOTICE_ISSUED', version: 2 }]);
+    render(<EligibilityReviewPage />);
+    await screen.findByText('Guided case actions · NOTICE_ISSUED');
+    expect(screen.getByRole('button', { name: 'Record verification' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Recommend ineligible' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: 'Issue notice' })).not.toBeInTheDocument();
+  });
+
   it.each(['MANAGEMENT', 'AUDITOR'])('is read-only for %s', async (role) => {
     context.role = role;
     render(<EligibilityReviewPage />);

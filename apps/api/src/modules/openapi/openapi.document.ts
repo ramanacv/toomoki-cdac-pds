@@ -71,6 +71,7 @@ export const OPENAPI_SPEC = {
     },
     '/fps-allocations/{allocationId}': { get: secured('Get FPS allocation') },
     '/fps-allocations/{allocationId}/receipt': { post: secured('Confirm FPS receipt', ['fps']) },
+    '/auth/fps-assignment': { get: secured('Resolve the authenticated FPS shop assignment', ['fps']) },
     '/auth/transactions': { get: secured('List authentication transactions', ['fps', 'department', 'auditor']) },
     '/auth/transactions/{authTxnId}': { get: secured('Get authentication transaction', ['fps', 'department', 'auditor']) },
     '/auth/mock-otp': { post: secured('Simulate OTP authentication', ['fps']) },

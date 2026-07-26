@@ -387,10 +387,12 @@ export function EligibilityReviewPage() {
       {selectedCase && <Card><CardHeader><CardTitle>Guided case actions · {selectedCase.state}</CardTitle></CardHeader><CardContent className="grid gap-3">
         <p className="text-sm">Operational RCMS: <strong>{selectedCase.rcmsStatus}</strong> · Fabric proof: <strong>{selectedCase.proofStatus}</strong> · version {selectedCase.version}</p>
         <div className="flex flex-wrap gap-2">
-          {['OPEN', 'AWAITING_DATA', 'AWAITING_FIELD_VERIFICATION'].includes(selectedCase.state) && <>
+          {['OPEN', 'AWAITING_DATA', 'AWAITING_FIELD_VERIFICATION'].includes(selectedCase.state) && (
             <Button disabled={!mutable || busy} onClick={() => void act('notice', 'ISSUED', 'GUIDED_NOTICE')}>Issue notice</Button>
+          )}
+          {['OPEN', 'AWAITING_DATA', 'AWAITING_FIELD_VERIFICATION', 'NOTICE_ISSUED'].includes(selectedCase.state) && (
             <Button disabled={!mutable || busy} variant="outline" onClick={() => void act('verification', selectedId === 'BEN-DEMO-004' ? 'STALE_SOURCE_CONFIRMED' : selectedId === 'BEN-DEMO-001' ? 'DECEASED_MEMBER_CONFIRMED' : 'EVIDENCE_RECONCILED', 'FIELD_VERIFIED')}>Record verification</Button>
-          </>}
+          )}
           {['NOTICE_ISSUED', 'REVIEW_READY'].includes(selectedCase.state) && <>
             <Button disabled={!mutable || busy} onClick={() => void act('recommendation', 'INELIGIBLE', 'DEMO_POLICY_MATCH')}>Recommend ineligible</Button>
             <Button disabled={!mutable || busy} variant="outline" onClick={() => void act('recommendation', 'ELIGIBLE', 'EVIDENCE_CLEARED')}>Recommend eligible</Button>

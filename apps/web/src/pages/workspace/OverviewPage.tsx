@@ -6,14 +6,13 @@ import { AlertsSummary } from '@/components/AlertsSummary.js';
 import { FabricAnalyticsPanel } from '@/components/FabricAnalyticsPanel.js';
 import { getRoleScreens } from '@/demo-model.js';
 import { useWorkspaceContext } from '@/hooks/use-workspace-context.js';
-import { getCurrentIdentity } from '@/auth-token.js';
 import { Panel } from '@/components/Panel.js';
+import { useAssignedFpsId } from '@/hooks/use-assigned-fps-id.js';
 
 export function OverviewPage() {
   const { role, scenario, workspace, liveSummary, visibleAlerts } = useWorkspaceContext();
   const roleProfile = getRoleProfile(role);
-  const identity = getCurrentIdentity();
-  const fpsId = identity?.stakeholderId ?? (role === 'FPS' ? 'FPS-101' : undefined);
+  const fpsId = useAssignedFpsId(role, workspace.apiOnline);
   const fpsAllocations = fpsId ? workspace.allocations.filter((item) => item.fpsId === fpsId) : [];
   const fpsDistributions = fpsId ? workspace.distributions.filter((item) => item.fpsId === fpsId) : [];
   const canOpenDetail = role === 'MANAGEMENT' || role === 'AUDITOR';
@@ -28,7 +27,7 @@ export function OverviewPage() {
           &amp; eligibility, and FPS authentication. {roleProfile.summary}
         </p>
       </header>
-      <SummaryCards cards={roleSummaryCards(role, workspace, liveSummary)} />
+      <SummaryCards cards={roleSummaryCards(role, workspace, liveSummary, fpsId ? { fpsId } : undefined)} />
       <FabricAnalyticsPanel apiOnline={workspace.apiOnline} canOpenDetail={canOpenDetail} />
       {role === 'FPS' && (
         <Panel eyebrow="Assigned-shop security boundary" title={fpsId ?? 'No active FPS assignment'} pill="Controlled PoC">

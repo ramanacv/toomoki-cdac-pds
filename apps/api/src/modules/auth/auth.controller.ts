@@ -31,6 +31,12 @@ export class AuthController {
     @Inject(EposAuthClient) private readonly eposAuth: EposAuthClient
   ) {}
 
+  @Get('/auth/fps-assignment')
+  @Roles('fps')
+  async fpsAssignment(@Req() request?: AuthenticatedRequest) {
+    return requireFpsAssignment(this.ledger, request);
+  }
+
   @Get('/auth/transactions')
   async authTransactions(@Req() request?: AuthenticatedRequest) {
     const assignment = await fpsAssignmentForRead(this.ledger, request);

@@ -10,7 +10,7 @@ import {
   type DemoModule
 } from '@/lib/modules.js';
 import { screenPath } from '@/lib/screen-routes.js';
-import { getCurrentIdentity } from '@/auth-token.js';
+import { useAssignedFpsId } from '@/hooks/use-assigned-fps-id.js';
 
 type ModuleHomePageProps = {
   moduleId: DemoModule;
@@ -22,8 +22,7 @@ export function ModuleHomePage({ moduleId }: ModuleHomePageProps) {
   const module = getModuleDefinition(moduleId);
   const roleProfile = getRoleProfile(role);
   const screens = getModuleScreensForRole(moduleId, role);
-  const identity = getCurrentIdentity();
-  const fpsId = identity?.stakeholderId ?? (role === 'FPS' ? 'FPS-101' : undefined);
+  const fpsId = useAssignedFpsId(role, workspace.apiOnline);
 
   const ctaScreens = screens
     .map((screenId) => screenDefinitions.find((item) => item.id === screenId))

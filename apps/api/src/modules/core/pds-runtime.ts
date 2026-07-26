@@ -22,6 +22,12 @@ import {
   type LedgerEvent
 } from '@pds/shared-types';
 import { assertEligibilityGateOpen } from '../eligibility/eligibility-gate.js';
+import {
+  applyDurableLift,
+  entitlementMonthFromTimestamp
+} from './entitlement-lift.js';
+import { backendSeed, eligibilityBeneficiaries, entitlements as fixtureEntitlements } from '@pds/fixtures';
+import type { MonthlyEntitlement } from '@pds/shared-types';
 
 const asChainQueryPort = (port: PdsLedgerPort): ChainQueryPort | null => {
   const candidate = port as Partial<ChainQueryPort>;
@@ -281,8 +287,13 @@ export class PdsRuntime extends PdsLedgerEngine {
   listStockPositions(): any {
     const pool = this.getDbPool();
     if (pool) {
+      // Operational Available stock is org-grain only. Lot-scoped seed rows must
+      // not be summed into operator balances (that produced ~4× inflation).
       return pool.query(
-        'SELECT stakeholder_id, commodity, quantity_kg FROM stock_positions ORDER BY stakeholder_id, commodity'
+        `SELECT stakeholder_id, commodity, quantity_kg
+         FROM stock_positions
+         WHERE lot_id IS NULL AND month IS NULL
+         ORDER BY stakeholder_id, commodity`
       ).then(res => res.rows.map(row => ({
         entityId: String(row.stakeholder_id),
         commodity: String(row.commodity),
@@ -299,7 +310,11 @@ export class PdsRuntime extends PdsLedgerEngine {
     const pool = this.getDbPool();
     if (!pool) return super.getDashboardSummary();
     return Promise.all([
-      pool.query('SELECT COALESCE(SUM(quantity_kg), 0)::bigint AS value FROM stock_positions'),
+      pool.query(
+        `SELECT COALESCE(SUM(quantity_kg), 0)::bigint AS value
+         FROM stock_positions
+         WHERE lot_id IS NULL AND month IS NULL`
+      ),
       pool.query("SELECT COUNT(*)::int AS value FROM commodity_lots WHERE status IN ('CREATED', 'DISPATCHED')"),
       pool.query('SELECT COUNT(*)::int AS value FROM distribution_transactions'),
       pool.query("SELECT COUNT(*)::int AS value FROM transfer_orders WHERE status = 'DISPATCHED'"),
@@ -434,6 +449,52 @@ export class PdsRuntime extends PdsLedgerEngine {
     const object = result as Record<string, unknown>;
     if (object.ledgerTxId) return result;
     return { ...object, ledgerTxId } as T;
+  }
+
+  /**
+   * Force `already_lifted_kg` to equal SUM(delivered_kg) for the entitlement month.
+   * Month bucketing matches {@link entitlementMonthFromTimestamp} (UTC YYYY-MM).
+   */
+  private async reconcileEntitlementLift(
+    client: PoolClient,
+    rationCardHash: string,
+    commodity: string,
+    month: string
+  ): Promise<void> {
+    await client.query(
+      `UPDATE monthly_entitlements AS me
+       SET already_lifted_kg = calc.lifted,
+           available_balance_kg = GREATEST(0, me.monthly_entitlement_kg - calc.lifted),
+           version = me.version + 1
+       FROM (
+         SELECT COALESCE(SUM(d.delivered_kg), 0)::int AS lifted
+         FROM distribution_transactions d
+         WHERE d.ration_card_hash = $1
+           AND d.commodity = $2
+           AND to_char(d.timestamp AT TIME ZONE 'UTC', 'YYYY-MM') = $3
+       ) AS calc
+       WHERE me.ration_card_hash = $1
+         AND me.commodity = $2
+         AND me.month = $3`,
+      [rationCardHash, commodity, month]
+    );
+  }
+
+  private async durableLiftedKg(
+    client: PoolClient,
+    rationCardHash: string,
+    commodity: string,
+    month: string
+  ): Promise<number> {
+    const result = await client.query(
+      `SELECT COALESCE(SUM(delivered_kg), 0)::int AS lifted
+       FROM distribution_transactions
+       WHERE ration_card_hash = $1
+         AND commodity = $2
+         AND to_char(timestamp AT TIME ZONE 'UTC', 'YYYY-MM') = $3`,
+      [rationCardHash, commodity, month]
+    );
+    return Number(result.rows[0]?.lifted ?? 0);
   }
 
   private attachLatestInMemoryEventId<T>(result: T): T {
@@ -572,8 +633,12 @@ export class PdsRuntime extends PdsLedgerEngine {
          VALUES ($1, $2, $3, $4, $5, $6, $7, 1)
          ON CONFLICT (ration_card_hash, commodity, month) DO UPDATE SET
            monthly_entitlement_kg = EXCLUDED.monthly_entitlement_kg,
-           already_lifted_kg = EXCLUDED.already_lifted_kg,
-           available_balance_kg = EXCLUDED.available_balance_kg,
+           already_lifted_kg = GREATEST(monthly_entitlements.already_lifted_kg, EXCLUDED.already_lifted_kg),
+           available_balance_kg = GREATEST(
+             0,
+             EXCLUDED.monthly_entitlement_kg
+               - GREATEST(monthly_entitlements.already_lifted_kg, EXCLUDED.already_lifted_kg)
+           ),
            active = EXCLUDED.active,
            version = monthly_entitlements.version + 1`,
         [
@@ -609,6 +674,17 @@ export class PdsRuntime extends PdsLedgerEngine {
           distribution.authMode, distribution.authResult, distribution.authTxnRefHash,
           distribution.dealerId, distribution.ledgerTxId ?? null, distribution.timestamp
         ]
+      );
+    }
+
+    // After durable distribution inserts, recompute lifts so an entitlement upsert
+    // cannot leave already_lifted_kg below SUM(delivered_kg) for the month.
+    for (const entitlement of state.entitlements) {
+      await this.reconcileEntitlementLift(
+        client,
+        entitlement.rationCardHash,
+        entitlement.commodity,
+        entitlement.month
       );
     }
 
@@ -925,18 +1001,35 @@ export class PdsRuntime extends PdsLedgerEngine {
       return result;
     }
     const input = args[0];
+    let durableLifted = 0;
     return this.executeMutationTx(
       pool,
       async (client) => {
-        const entitlementRes = await client.query(
-          'SELECT * FROM monthly_entitlements WHERE ration_card_hash = $1 AND commodity = $2 AND month = $3 FOR UPDATE',
-          [input.rationCardHash, input.commodity, input.month]
-        );
-        return {
-          entitlements: entitlementRes.rows.map(mapEntitlementRow)
-        };
+        const [entitlementRes, lifted] = await Promise.all([
+          client.query(
+            'SELECT * FROM monthly_entitlements WHERE ration_card_hash = $1 AND commodity = $2 AND month = $3 FOR UPDATE',
+            [input.rationCardHash, input.commodity, input.month]
+          ),
+          this.durableLiftedKg(client, input.rationCardHash, input.commodity, input.month)
+        ]);
+        durableLifted = lifted;
+        const entitlements = entitlementRes.rows.map(mapEntitlementRow).map((row) => applyDurableLift(row, lifted));
+        return { entitlements };
       },
-      (engine) => engine.createOrUpdateEntitlement(input)
+      (engine) =>
+        engine.createOrUpdateEntitlement(
+          applyDurableLift(
+            {
+              ...input,
+              alreadyLiftedKg: Math.max(input.alreadyLiftedKg, durableLifted),
+              availableBalanceKg: Math.max(
+                0,
+                input.monthlyEntitlementKg - Math.max(input.alreadyLiftedKg, durableLifted)
+              )
+            },
+            durableLifted
+          )
+        )
     ) as any;
   }
 
@@ -956,9 +1049,20 @@ export class PdsRuntime extends PdsLedgerEngine {
     return this.executeMutationTx(
       pool,
       async (client) => {
-        const month = (input.timestamp || new Date().toISOString()).slice(0, 7);
-        const [distRes, entitlementRes, stockRes] = await Promise.all([
-          client.query('SELECT * FROM distribution_transactions WHERE distribution_id = $1 FOR UPDATE', [input.distributionId]),
+        const effectiveTimestamp = input.timestamp || new Date().toISOString();
+        const month = entitlementMonthFromTimestamp(effectiveTimestamp);
+        const [distRes, monthDistRes, entitlementRes, stockRes, lifted] = await Promise.all([
+          client.query('SELECT * FROM distribution_transactions WHERE distribution_id = $1 FOR UPDATE', [
+            input.distributionId
+          ]),
+          client.query(
+            `SELECT * FROM distribution_transactions
+             WHERE ration_card_hash = $1
+               AND commodity = $2
+               AND to_char(timestamp AT TIME ZONE 'UTC', 'YYYY-MM') = $3
+             FOR UPDATE`,
+            [input.rationCardHash, input.commodity, month]
+          ),
           client.query(
             'SELECT * FROM monthly_entitlements WHERE ration_card_hash = $1 AND commodity = $2 AND month = $3 FOR UPDATE',
             [input.rationCardHash, input.commodity, month]
@@ -966,12 +1070,21 @@ export class PdsRuntime extends PdsLedgerEngine {
           client.query(
             'SELECT * FROM stock_positions WHERE stakeholder_id = $1 AND commodity = $2 AND lot_id IS NULL AND month IS NULL FOR UPDATE',
             [input.fpsId, input.commodity]
-          )
+          ),
+          this.durableLiftedKg(client, input.rationCardHash, input.commodity, month)
         ]);
+        const byId = new Map(
+          [...monthDistRes.rows, ...distRes.rows].map((row) => [String(row.distribution_id), row])
+        );
+        const entitlements = entitlementRes.rows
+          .map(mapEntitlementRow)
+          .map((row) => applyDurableLift(row, lifted));
         return {
-          distributions: distRes.rows.map(r => mapDistributionRow(r)),
-          entitlements: entitlementRes.rows.map(mapEntitlementRow),
-          stock: stockRes.rows.map(r => [`${r.stakeholder_id}:${r.commodity}`, Number(r.quantity_kg)] as const)
+          distributions: [...byId.values()].map((row) => mapDistributionRow(row)),
+          entitlements,
+          stock: stockRes.rows.map(
+            (r) => [`${r.stakeholder_id}:${r.commodity}`, Number(r.quantity_kg)] as const
+          )
         };
       },
       (engine) => engine.recordDistribution(input)
@@ -1040,6 +1153,50 @@ export class PdsRuntime extends PdsLedgerEngine {
     ) as any;
   }
 
+  /**
+   * Canonical demo entitlement rows for admin reset. Resets lifts to zero and
+   * ensures the current operational month exists for FPS issue after reset.
+   */
+  private buildDemoEntitlementSeed(operationalMonth: string): MonthlyEntitlement[] {
+    const byKey = new Map<string, MonthlyEntitlement>();
+    const put = (row: MonthlyEntitlement) => {
+      byKey.set(`${row.rationCardHash}\0${row.commodity}\0${row.month}`, {
+        ...row,
+        alreadyLiftedKg: 0,
+        availableBalanceKg: row.monthlyEntitlementKg,
+        active: true
+      });
+    };
+    for (const row of fixtureEntitlements) put(row);
+    for (const row of backendSeed.initialEntitlements) put(row);
+    for (const entry of eligibilityBeneficiaries) {
+      put({
+        rationCardHash: entry.rationCardHash,
+        commodity: 'Rice',
+        month: '2026-07',
+        monthlyEntitlementKg: entry.monthlyRiceEntitlementKg,
+        alreadyLiftedKg: 0,
+        availableBalanceKg: entry.monthlyRiceEntitlementKg,
+        active: true
+      });
+    }
+    for (const row of [...byKey.values()]) {
+      if (
+        (row.rationCardHash === 'demo-ration-card-hash' ||
+          row.rationCardHash === 'exception-ration-card-hash') &&
+        row.month !== operationalMonth
+      ) {
+        put({
+          ...row,
+          month: operationalMonth,
+          alreadyLiftedKg: 0,
+          availableBalanceKg: row.monthlyEntitlementKg
+        });
+      }
+    }
+    return [...byKey.values()];
+  }
+
   override resetTransactionalData(...args: Parameters<PdsLedgerEngine['resetTransactionalData']>) {
     const pool = this.getDbPool();
     if (!pool) {
@@ -1051,13 +1208,75 @@ export class PdsRuntime extends PdsLedgerEngine {
     return (async () => {
       const client = await pool.connect();
       let stakeholders: any[] = [];
+      let seededEntitlements: MonthlyEntitlement[] = [];
       try {
         await client.query('BEGIN');
+        // Keep monthly_entitlements: in-memory reset zeros lifts; truncating here
+        // left FPS issue with "Entitlement not found" until a manual SQL restore.
         await client.query(
-          'TRUNCATE integration_event_attempts, integration_events, commodity_lots, stock_positions, transfer_orders, fps_allocations, monthly_entitlements, auth_transactions, distribution_transactions, audit_alerts, ledger_events, ledger_tx_index RESTART IDENTITY CASCADE'
+          'TRUNCATE integration_event_attempts, integration_events, commodity_lots, stock_positions, transfer_orders, fps_allocations, auth_transactions, distribution_transactions, audit_alerts, ledger_events, ledger_tx_index RESTART IDENTITY CASCADE'
         );
+        await client.query(
+          `UPDATE monthly_entitlements
+           SET already_lifted_kg = 0,
+               available_balance_kg = monthly_entitlement_kg,
+               version = version + 1`
+        );
+        const operationalMonth = entitlementMonthFromTimestamp(new Date().toISOString());
+        seededEntitlements = this.buildDemoEntitlementSeed(operationalMonth);
+        await client.query(
+          `INSERT INTO ration_cards_mock (ration_card_hash, household_size, district, status)
+           VALUES ($1, $2, $3, $4)
+           ON CONFLICT (ration_card_hash) DO NOTHING`,
+          [
+            backendSeed.rationCard.rationCardHash,
+            backendSeed.rationCard.householdSize,
+            backendSeed.rationCard.district,
+            backendSeed.rationCard.status
+          ]
+        );
+        await client.query(
+          `INSERT INTO ration_cards_mock (ration_card_hash, household_size, district, status)
+           VALUES ('exception-ration-card-hash', 3, 'DEMO', 'ACTIVE')
+           ON CONFLICT (ration_card_hash) DO NOTHING`
+        );
+        for (const entry of eligibilityBeneficiaries) {
+          await client.query(
+            `INSERT INTO ration_cards_mock (ration_card_hash, household_size, district, status)
+             VALUES ($1, $2, $3, 'ACTIVE')
+             ON CONFLICT (ration_card_hash) DO NOTHING`,
+            [
+              entry.rationCardHash,
+              entry.householdSize,
+              entry.districtCode ?? `${entry.jurisdictionCode ?? 'MH'}-DEMO`
+            ]
+          );
+        }
+        for (const entitlement of seededEntitlements) {
+          await client.query(
+            `INSERT INTO monthly_entitlements
+               (ration_card_hash, commodity, month, monthly_entitlement_kg, already_lifted_kg, available_balance_kg, active, version)
+             VALUES ($1, $2, $3, $4, 0, $4, TRUE, 1)
+             ON CONFLICT (ration_card_hash, commodity, month) DO UPDATE SET
+               monthly_entitlement_kg = EXCLUDED.monthly_entitlement_kg,
+               already_lifted_kg = 0,
+               available_balance_kg = EXCLUDED.monthly_entitlement_kg,
+               active = TRUE,
+               version = monthly_entitlements.version + 1`,
+            [
+              entitlement.rationCardHash,
+              entitlement.commodity,
+              entitlement.month,
+              entitlement.monthlyEntitlementKg
+            ]
+          );
+        }
         const stakeholdersRes = await client.query('SELECT * FROM stakeholders');
         stakeholders = stakeholdersRes.rows.map(row => mapStakeholderRow(row));
+        const entitlementRes = await client.query(
+          'SELECT * FROM monthly_entitlements ORDER BY month, ration_card_hash, commodity'
+        );
+        seededEntitlements = entitlementRes.rows.map(mapEntitlementRow);
         await client.query('COMMIT');
       } catch (e) {
         await client.query('ROLLBACK');
@@ -1070,7 +1289,7 @@ export class PdsRuntime extends PdsLedgerEngine {
         lots: [],
         transfers: [],
         allocations: [],
-        entitlements: [],
+        entitlements: seededEntitlements,
         authTransactions: [],
         distributions: [],
         alerts: [],

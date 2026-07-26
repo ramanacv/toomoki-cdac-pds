@@ -138,6 +138,36 @@ describe('eligibility review workflow', () => {
     expect(service.gate('BEN-DEMO-005', 15)).toMatchObject({ allowed: true, availableBalanceKg: 15, alreadyLiftedKg: 10 });
   });
 
+  it('persists refreshed Fabric proof status from the outbox onto eligibility cases', async () => {
+    const pendingCase = {
+      caseId: 'ELIG-CASE-PROOF', demoBeneficiaryId: 'BEN-DEMO-003',
+      subjectRefHash: 'beneficiary-demo-003-hash', rationCardHash: 'ration-card-demo-003-hash',
+      screening: response({
+        screeningRequestId: 'REQ-PROOF', demoBeneficiaryId: 'BEN-DEMO-003',
+        subjectRefHash: 'beneficiary-demo-003-hash', rationCardHash: 'ration-card-demo-003-hash',
+        checks: ['ECONOMIC'], schemaVersion: '1.0'
+      }, 'ECONOMIC_ELIGIBILITY_REVIEW'),
+      state: 'NOTICE_ISSUED' as const, version: 2, rcmsStatus: 'ACTIVE' as const,
+      entitlementBlocked: false, householdSize: 3, monthlyRiceEntitlementKg: 15,
+      alreadyLiftedKg: 0, proofStatus: 'PENDING' as const, proofEventId: 'ELIG-PROOF-1',
+      history: [], updatedAt: '2026-07-23T00:00:00.000Z'
+    };
+    const syncProofStatuses = vi.fn().mockResolvedValue(undefined);
+    const repository = {
+      loadState: vi.fn().mockResolvedValue({ cases: [pendingCase], actions: [], screenings: [] }),
+      persistScreening: vi.fn(), persistCaseAction: vi.fn(), persistFinalDecision: vi.fn(),
+      loadProofStatuses: vi.fn().mockResolvedValue(new Map([['ELIG-PROOF-1', 'COMMITTED']])),
+      syncProofStatuses
+    } as unknown as EligibilityRepository;
+    const service = createService(undefined, repository);
+    await service.onModuleInit();
+    const listed = await service.listCases();
+    expect(listed[0]?.proofStatus).toBe('COMMITTED');
+    expect(syncProofStatuses).toHaveBeenCalledWith([
+      { caseId: 'ELIG-CASE-PROOF', proofEventId: 'ELIG-PROOF-1', proofStatus: 'COMMITTED' }
+    ]);
+  });
+
   it('restores entitlement gates from durable eligibility cases after restart', async () => {
     const blockedCase = {
       caseId: 'ELIG-CASE-GATE', demoBeneficiaryId: 'BEN-DEMO-003',
@@ -155,7 +185,8 @@ describe('eligibility review workflow', () => {
     const repository = {
       loadState: vi.fn().mockResolvedValue({ cases: [blockedCase], actions: [], screenings: [] }),
       persistScreening: vi.fn(), persistCaseAction: vi.fn(), persistFinalDecision: vi.fn(),
-      loadProofStatuses: vi.fn().mockResolvedValue(new Map())
+      loadProofStatuses: vi.fn().mockResolvedValue(new Map()),
+      syncProofStatuses: vi.fn().mockResolvedValue(undefined)
     } as unknown as EligibilityRepository;
     const service = createService(undefined, repository);
     await service.onModuleInit();
