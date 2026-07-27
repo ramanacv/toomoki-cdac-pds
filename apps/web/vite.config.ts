@@ -26,6 +26,16 @@ export default defineConfig({
     proxy: apiProxy
   },
   preview: {
-    proxy: apiProxy
+    proxy: apiProxy,
+    // nginx/TLS demos forward the public Host header; allow explicit hosts or all.
+    // VITE_PREVIEW_ALLOWED_HOSTS=all | comma-separated list (default: localhost + demo.viksitpds.in)
+    allowedHosts: (() => {
+      const raw = process.env.VITE_PREVIEW_ALLOWED_HOSTS?.trim();
+      if (raw === 'all') return true;
+      const hosts = (raw ? raw.split(',') : ['localhost', 'demo.viksitpds.in'])
+        .map((host) => host.trim())
+        .filter(Boolean);
+      return hosts.length > 0 ? hosts : true;
+    })()
   }
 });
