@@ -83,18 +83,18 @@ describe('PostgreSQL eligibility final-decision atomicity', () => {
     });
   });
 
-  it('durably writes a non-final case action without creating a Fabric proof', async () => {
+  it('durably writes a verification checkpoint with a privacy-safe Fabric proof outbox row', async () => {
     const fake = fakePool({ currentVersion: 3 });
     const caseWithoutFinalDecision = structuredClone(item);
     delete caseWithoutFinalDecision.decision;
-    delete caseWithoutFinalDecision.proofEventId;
     const reviewReady: EligibilityCase = {
       ...caseWithoutFinalDecision,
       state: 'REVIEW_READY' as const,
       version: 4,
       rcmsStatus: 'ACTIVE' as const,
       entitlementBlocked: false,
-      proofStatus: 'NOT_REQUIRED' as const,
+      proofStatus: 'PENDING' as const,
+      proofEventId: 'ELIG-PROOF-VERIFY-003',
       history: [{
         actionId: 'VERIFY-003', action: 'VERIFICATION' as const, outcomeCode: 'CORROBORATED',
         reasonCode: 'FIELD_REVIEW', actorRef: 'department-officer-ref',
@@ -107,7 +107,38 @@ describe('PostgreSQL eligibility final-decision atomicity', () => {
     expect(sql).toContain('eligibility_cases');
     expect(sql).toContain('eligibility_case_actions');
     expect(sql).toContain('case_snapshot');
-    expect(sql).not.toContain('ledger_outbox');
+    expect(sql).toContain('INSERT INTO ration_cards_mock');
+    expect(sql).toContain('INSERT INTO ledger_outbox');
+    expect(sql).not.toContain('UPDATE ration_cards_mock');
+    const serializedValues = JSON.stringify(fake.queries.flatMap((entry) => entry.values ?? []));
+    expect(serializedValues).toContain('EligibilityVerificationRecorded');
+    expect(serializedValues).toContain('beneficiary-demo-003-hash');
+  });
+
+  it.each([
+    ['NOTICE', 'EligibilityNoticeIssued'],
+    ['RECOMMENDATION', 'EligibilityRecommendationRecorded'],
+    ['APPEAL', 'EligibilityAppealOpened']
+  ] as const)('enqueues %s checkpoint proof as %s', async (action, eventType) => {
+    const fake = fakePool({ currentVersion: 3 });
+    const checkpoint = structuredClone(item);
+    delete checkpoint.decision;
+    checkpoint.state = action === 'APPEAL' ? 'APPEALED' : 'NOTICE_ISSUED';
+    checkpoint.version = 4;
+    checkpoint.rcmsStatus = 'ACTIVE';
+    checkpoint.entitlementBlocked = false;
+    checkpoint.proofStatus = 'PENDING';
+    checkpoint.proofEventId = `ELIG-PROOF-${action}-003`;
+    checkpoint.history = [{
+      actionId: `${action}-003`, action, outcomeCode: 'RECORDED',
+      reasonCode: 'CHECKPOINT', actorRef: 'department-officer-ref',
+      occurredAt: '2026-07-23T00:30:00Z', priorState: 'OPEN', newState: 'NOTICE_ISSUED'
+    }];
+    await new EligibilityRepository(fake.pool as never)
+      .persistCaseAction(checkpoint, `${action}-IDEMPOTENCY-003`, 'c'.repeat(64));
+    const serializedValues = JSON.stringify(fake.queries.flatMap((entry) => entry.values ?? []));
+    expect(serializedValues).toContain(eventType);
+    expect(fake.queries.map((entry) => entry.text).join('\n')).toContain('INSERT INTO ledger_outbox');
   });
 
   it('writes case, action, RCMS card, entitlement, ledger event, and outbox in one transaction', async () => {
@@ -116,6 +147,7 @@ describe('PostgreSQL eligibility final-decision atomicity', () => {
     const sql = fake.queries.map((entry) => entry.text).join('\n');
     expect(fake.queries[0]?.text).toBe('BEGIN');
     expect(fake.queries.at(-1)?.text).toBe('COMMIT');
+    expect(sql).toContain('INSERT INTO ration_cards_mock');
     expect(sql).toContain('eligibility_cases');
     expect(sql).toContain('eligibility_case_actions');
     expect(sql).toContain('UPDATE ration_cards_mock');
@@ -141,5 +173,32 @@ describe('PostgreSQL eligibility final-decision atomicity', () => {
     await expect(new EligibilityRepository(fake.pool as never).persistFinalDecision(item, 'DECISION-IDEMPOTENCY-003'))
       .rejects.toThrow(/changed concurrently/);
     expect(fake.queries.map((entry) => entry.text)).toContain('ROLLBACK');
+  });
+
+  it('ensures a missing ration_cards_mock parent before case insert', async () => {
+    const fake = fakePool();
+    const openCase = structuredClone(item);
+    delete openCase.decision;
+    openCase.state = 'OPEN';
+    openCase.version = 1;
+    openCase.rcmsStatus = 'ACTIVE';
+    openCase.entitlementBlocked = false;
+    openCase.proofStatus = 'NOT_REQUIRED';
+    delete openCase.proofEventId;
+    openCase.history = [{
+      actionId: 'SCREEN-003', action: 'SCREENING', outcomeCode: 'OPENED',
+      reasonCode: 'EXTERNAL_SCREENING', actorRef: 'department-officer-ref',
+      occurredAt: '2026-07-23T00:00:00Z', priorState: 'OPEN', newState: 'OPEN'
+    }];
+    await new EligibilityRepository(fake.pool as never).persistScreening(
+      'e'.repeat(64),
+      { screening: openCase.screening, case: openCase, entitlementPreserved: true },
+      openCase,
+      openCase.demoBeneficiaryId
+    );
+    const sql = fake.queries.map((entry) => entry.text).join('\n');
+    expect(sql).toContain('INSERT INTO ration_cards_mock');
+    expect(sql).toContain('INSERT INTO eligibility_cases');
+    expect(fake.queries.some((entry) => entry.values?.[0] === openCase.rationCardHash)).toBe(true);
   });
 });

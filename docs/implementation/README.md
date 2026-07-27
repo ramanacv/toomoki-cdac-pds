@@ -12,6 +12,12 @@ This folder contains implementation guidance derived from the product and techni
 - [Near-MVP hardening tracker](mvp-hardening-plan.md)
 - [External ghost-beneficiary screening and review implementation](ghost-detection-impl.md)
 - [Beneficiary registry and fraud-detection alignment](beneficiary-registry-alignment.md)
+- [Mocks-only integrity + proof completeness](mocks-integrity-proof-completeness-plan.md)
+  — includes `npm run test:beneficiaries` and `npm run live:beneficiaries` for the
+  fraud-prevention / lifecycle focus shift
+- [Three-module mock services](three-module-mock-services.md)
+  — eligibility-mock + epos-auth-mock; includes `npm run live:fps-auth` for FPS
+  authentication success/failure coverage
 
 ## Intended Use
 

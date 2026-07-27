@@ -7,9 +7,13 @@ import {
   type EligibilitySignal,
   validateEligibilityScreeningRequest
 } from '@pds/shared-types';
+import { scoreSignals, statusForScenario } from './scoring.js';
 
 const sha256 = (value: string): string => createHash('sha256').update(value).digest('hex');
 const canonical = (value: unknown): string => JSON.stringify(value, Object.keys(value as object).sort());
+
+/** Shared opaque linkage digest for deterministic duplicate-collision fixtures (not Aadhaar). */
+export const DUPLICATE_LINKAGE_DIGEST = sha256('viksitpds-demo-duplicate-linkage-v1');
 
 type Scenario = {
   status: EligibilityScreeningStatus;
@@ -24,8 +28,16 @@ const signal = (
   source: EligibilitySignal['source'],
   status: EligibilitySignal['status'],
   risk: EligibilitySignal['risk'],
-  factCode: string
-): EligibilitySignal => ({ source, status, risk, observedAt, factCode });
+  factCode: string,
+  linkageDigest?: string
+): EligibilitySignal => ({
+  source,
+  status,
+  risk,
+  observedAt,
+  factCode,
+  ...(linkageDigest ? { linkageDigest } : {})
+});
 
 const scenarios: Record<string, Scenario> = {
   'BEN-DEMO-INACTIVE': {
@@ -68,7 +80,21 @@ const scenarios: Record<string, Scenario> = {
     status: 'DUPLICATE_RECORD_REVIEW',
     action: 'VERIFY_CROSS_REGISTRY_LINKAGE_WITHOUT_AUTOMATIC_DEACTIVATION',
     ruleIds: ['JK-DUPLICATE-LINK-01'],
-    signals: [signal('REGISTRY_LINKAGE', 'MATCH', 'HIGH', 'TWO_ACTIVE_REGISTRY_REFERENCES'), signal('RCMS', 'CONFLICT', 'MEDIUM', 'ACTIVE_CARD_LINKAGE_REQUIRES_REVIEW')],
+    signals: [
+      signal('REGISTRY_LINKAGE', 'MATCH', 'HIGH', 'TWO_ACTIVE_REGISTRY_REFERENCES', DUPLICATE_LINKAGE_DIGEST),
+      signal('RCMS', 'CONFLICT', 'MEDIUM', 'ACTIVE_CARD_LINKAGE_REQUIRES_REVIEW')
+    ],
+    policyId: JK_ELIGIBILITY_POLICY_ID
+  },
+  /** Second card sharing the same linkageDigest — hash-collision duplicate narrative, not Aadhaar match. */
+  'BEN-JK-DEMO-001B': {
+    status: 'DUPLICATE_RECORD_REVIEW',
+    action: 'VERIFY_CROSS_REGISTRY_LINKAGE_WITHOUT_AUTOMATIC_DEACTIVATION',
+    ruleIds: ['JK-DUPLICATE-LINK-01'],
+    signals: [
+      signal('REGISTRY_LINKAGE', 'MATCH', 'HIGH', 'TWO_ACTIVE_REGISTRY_REFERENCES', DUPLICATE_LINKAGE_DIGEST),
+      signal('RCMS', 'CONFLICT', 'MEDIUM', 'ACTIVE_CARD_LINKAGE_REQUIRES_REVIEW')
+    ],
     policyId: JK_ELIGIBILITY_POLICY_ID
   },
   'BEN-JK-DEMO-002': {
@@ -114,17 +140,27 @@ export class EligibilityScreeningEngine {
       signals: [signal('RCMS', 'CLEAR', 'LOW', 'NO_DEMO_RISK_SIGNAL')]
     };
     const policyId = scenario.policyId ?? ELIGIBILITY_POLICY_ID;
-    const evidenceDigest = sha256(canonical({ request, signals: scenario.signals, policyId }));
+    const { integrityScore, scoreBreakdown } = scoreSignals(scenario.signals);
+    const status = statusForScenario(scenario.status, integrityScore);
+    const evidenceDigest = sha256(canonical({
+      request,
+      signals: scenario.signals,
+      policyId,
+      integrityScore,
+      scoreBreakdown
+    }));
     const base = {
       screeningId: `ELIG-${sha256(request.screeningRequestId).slice(0, 16).toUpperCase()}`,
       screeningRequestId: request.screeningRequestId,
-      status: scenario.status,
+      status,
       signals: scenario.signals,
       recommendedReviewAction: scenario.action,
       policy: { policyId, simulationOnly: true as const, ruleIds: scenario.ruleIds },
       assessedAt: '2026-07-23T06:30:00.000Z',
       expiresAt: '2099-12-31T23:59:59.000Z',
       evidenceDigest,
+      integrityScore,
+      scoreBreakdown,
       schemaVersion: '1.0' as const
     };
     const response: EligibilityScreeningResponse = {

@@ -95,6 +95,10 @@ const ALLOWED_LEDGER_EVENT_TYPES = new Set([
   'ApproveEntitlementRule',
   'RolloverUnclaimedQuota',
   'ResetTransactionalData',
+  'EligibilityNoticeIssued',
+  'EligibilityVerificationRecorded',
+  'EligibilityRecommendationRecorded',
+  'EligibilityAppealOpened',
   'EligibilityDecisionAuthorized',
   'EligibilityDecisionReversed',
   'BENEFICIARY_CREATED',
@@ -1639,6 +1643,10 @@ export class PdsLedgerEngine {
       case 'RolloverUnclaimedQuota':
         // Rollover updates multiple entitlements; projection not applicable for replay.
         break;
+      case 'EligibilityNoticeIssued':
+      case 'EligibilityVerificationRecorded':
+      case 'EligibilityRecommendationRecorded':
+      case 'EligibilityAppealOpened':
       case 'EligibilityDecisionAuthorized':
       case 'EligibilityDecisionReversed':
       case 'BENEFICIARY_CREATED':

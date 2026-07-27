@@ -35,7 +35,22 @@ describe('external eligibility screening engine', () => {
       policy: { policyId: 'JK-PANEL-DEMO-2026-V1', simulationOnly: true }
     });
     expect(response.signals[0]).toMatchObject({ source: 'REGISTRY_LINKAGE', status: 'MATCH', risk: 'HIGH' });
+    expect(response.signals[0]?.linkageDigest).toMatch(/^[a-f0-9]{64}$/);
     expect(JSON.stringify(response)).not.toMatch(/Zoya|ration.?card.?number|address/i);
+  });
+
+  it('scores deterministic integrity rules and shares linkageDigest across duplicate fixtures', () => {
+    const engine = new EligibilityScreeningEngine();
+    const death = validateEligibilityScreeningResponse(engine.screen(request('BEN-DEMO-001', 'SCORE-DEATH-001')));
+    expect(death.integrityScore).toBeGreaterThanOrEqual(40);
+    expect(death.scoreBreakdown?.some((row) => row.ruleId === 'SCORE-DEATH-HIGH')).toBe(true);
+
+    const a = engine.screen({ ...request('BEN-JK-DEMO-001', 'DUP-LINK-A-001'), checks: ['DUPLICATE'] });
+    const b = engine.screen({ ...request('BEN-JK-DEMO-001B', 'DUP-LINK-B-001'), checks: ['DUPLICATE'] });
+    expect(a.signals[0]?.linkageDigest).toBe(b.signals[0]?.linkageDigest);
+    expect(a.integrityScore).toBeGreaterThanOrEqual(35);
+    expect(a.status).toBe('DUPLICATE_RECORD_REVIEW');
+    expect(JSON.stringify(a)).not.toMatch(/Aadhaar|UIDAI|biometric/i);
   });
 
   it('replays identical request IDs and rejects conflicting reuse', () => {

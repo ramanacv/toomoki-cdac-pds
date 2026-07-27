@@ -111,11 +111,18 @@ vi.mock('@/api.js', () => ({
     stockPositions: []
   }),
   buildApiUrl: vi.fn((path: string) => `/api${path}`),
-  executeWorkflowAction: vi.fn()
+  executeWorkflowAction: vi.fn(),
+  loadLedgerProofAnalytics: vi.fn().mockResolvedValue(null),
+  loadLedgerProofDetail: vi.fn()
 }));
 
 import { AppRoutes } from '@/App.js';
-import { fetchApiHealth, loadWorkspaceData, probeApi } from '@/api.js';
+import {
+  fetchApiHealth,
+  loadLedgerProofAnalytics,
+  loadWorkspaceData,
+  probeApi
+} from '@/api.js';
 
 beforeEach(() => {
   vi.stubEnv('VITE_DATA_SOURCE', 'mock');
@@ -124,6 +131,7 @@ beforeEach(() => {
   (fetchApiHealth as unknown as { mockResolvedValue: (v: { ok: boolean; ledgerMode?: string }) => void }).mockResolvedValue({
     ok: false
   });
+  (loadLedgerProofAnalytics as unknown as { mockResolvedValue: (v: null) => void }).mockResolvedValue(null);
 });
 
 afterEach(() => {
@@ -142,32 +150,39 @@ async function renderApp(initialEntry: string) {
 }
 
 const sidebar = () => within(screen.getByRole('navigation', { name: 'Workspace sections' }));
+const modulesNav = () => within(screen.getByRole('navigation', { name: 'Demo modules' }));
 
 describe('app shell', () => {
-  it('filters sidebar navigation by role', async () => {
+  it('filters sidebar navigation by role and active module', async () => {
     await renderApp('/?role=AUDITOR');
 
+    expect(await screen.findByRole('heading', { name: 'Trust & reconcile home' })).toBeInTheDocument();
+    expect(modulesNav().getByRole('link', { name: 'Trust & reconcile' })).toBeInTheDocument();
     expect(sidebar().getByRole('link', { name: 'Dashboard' })).toBeInTheDocument();
     expect(sidebar().getByRole('link', { name: 'Audit alerts' })).toBeInTheDocument();
     expect(sidebar().queryByRole('link', { name: 'Workbench' })).not.toBeInTheDocument();
   });
 
-  it('lands operational roles on their workbench by default', async () => {
+  it('lands operational roles on their supply-chain module home', async () => {
     await renderApp('/?role=CONTROL_OFFICE');
 
-    expect(await screen.findByRole('heading', { name: 'Role workbench' })).toBeInTheDocument();
-    // Every role gets the overview for orientation, but operational roles land on their queue.
-    expect(sidebar().getByRole('link', { name: 'Dashboard' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Supply chain home' })).toBeInTheDocument();
+    expect(modulesNav().getByRole('link', { name: 'Supply chain' })).toBeInTheDocument();
+    expect(modulesNav().getByRole('link', { name: 'Card & eligibility' })).toBeInTheDocument();
+    expect(sidebar().getByRole('link', { name: 'Workbench' })).toBeInTheDocument();
   });
 
-  it('lands oversight roles on the trimmed overview', async () => {
-    await renderApp('/?role=MANAGEMENT');
+  it('lands oversight roles on the trust module home and keeps the trimmed overview', async () => {
+    const user = await renderApp('/?role=MANAGEMENT');
 
+    expect(await screen.findByRole('heading', { name: 'Trust & reconcile home' })).toBeInTheDocument();
+    await user.click(sidebar().getByRole('link', { name: 'Dashboard' }));
     expect(await screen.findByRole('heading', { name: 'Overview' })).toBeInTheDocument();
     expect(screen.getByText('Active lots')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Proof analytics' })).toBeInTheDocument();
+    expect(screen.getByText(/Live API required for Fabric analytics/i)).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Custody to delivery' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Open alerts' })).toBeInTheDocument();
-    // The overview no longer stacks every data panel or the old hero copy.
     expect(
       screen.queryByText('Trace the ration journey from procurement to household delivery.')
     ).not.toBeInTheDocument();
@@ -178,32 +193,46 @@ describe('app shell', () => {
   it('redirects deep links to screens the role cannot access', async () => {
     await renderApp('/stakeholders?role=FPS');
 
-    expect(await screen.findByRole('heading', { name: 'Role workbench' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'FPS authentication home' })).toBeInTheDocument();
     expect(screen.queryByText('Demo operating network')).not.toBeInTheDocument();
   });
 
   it('navigates between routed pages from the sidebar', async () => {
     const user = await renderApp('/?role=AUDITOR');
+    await screen.findByRole('heading', { name: 'Trust & reconcile home' });
 
+    await user.click(modulesNav().getByRole('link', { name: 'Supply chain' }));
+    expect(await screen.findByRole('heading', { name: 'Supply chain home' })).toBeInTheDocument();
     await user.click(sidebar().getByRole('link', { name: 'Transfers' }));
     expect(await screen.findByRole('heading', { name: 'Operational movement log' })).toBeInTheDocument();
 
+    await user.click(modulesNav().getByRole('link', { name: 'Trust & reconcile' }));
     await user.click(sidebar().getByRole('link', { name: 'Stakeholders' }));
     expect(await screen.findByRole('heading', { name: 'Demo operating network' })).toBeInTheDocument();
   });
 
   it('exposes eligibility review to oversight roles but keeps offline screening read-only', async () => {
     const user = await renderApp('/?role=AUDITOR');
+    await screen.findByRole('heading', { name: 'Trust & reconcile home' });
+    await user.click(modulesNav().getByRole('link', { name: 'Card & eligibility' }));
     await user.click(sidebar().getByRole('link', { name: 'Eligibility review' }));
     expect(await screen.findByText('External-service simulation using synthetic beneficiaries')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Run external eligibility check' })).toBeDisabled();
     expect(screen.getByText(/Offline fixture mode is read-only/)).toBeInTheDocument();
   });
 
+  it('lets control office open eligibility through the module shell', async () => {
+    const user = await renderApp('/m/eligibility?role=CONTROL_OFFICE');
+    expect(await screen.findByRole('heading', { name: 'Card & eligibility home' })).toBeInTheDocument();
+    await user.click(sidebar().getByRole('link', { name: 'Eligibility review' }));
+    expect(await screen.findByText('External-service simulation using synthetic beneficiaries')).toBeInTheDocument();
+  });
+
   it('keeps workflow actions on the workbench only', async () => {
     const user = await renderApp('/?role=GODOWN');
 
-    // GODOWN acts from its workbench, which is also its default landing screen.
+    expect(await screen.findByRole('heading', { name: 'Supply chain home' })).toBeInTheDocument();
+    await user.click(sidebar().getByRole('link', { name: 'Workbench' }));
     expect(await screen.findByRole('heading', { name: 'Role workbench' })).toBeInTheDocument();
 
     await user.click(sidebar().getByRole('link', { name: 'Transfers' }));
@@ -214,11 +243,12 @@ describe('app shell', () => {
 
   it('switches roles from the top bar and re-filters navigation', async () => {
     const user = await renderApp('/?role=AUDITOR');
-    await screen.findByRole('heading', { name: 'Overview' });
+    await screen.findByRole('heading', { name: 'Trust & reconcile home' });
 
     await user.click(screen.getByRole('combobox'));
     await user.click(await screen.findByRole('option', { name: 'FPS Dealer' }));
 
+    expect(await screen.findByRole('heading', { name: 'FPS authentication home' })).toBeInTheDocument();
     expect(await sidebar().findByRole('link', { name: 'Distribution' })).toBeInTheDocument();
     expect(sidebar().queryByRole('link', { name: 'Stakeholders' })).not.toBeInTheDocument();
   });
@@ -243,6 +273,8 @@ describe('app shell', () => {
 
   it('switches scenarios through the demo controls drawer', async () => {
     const user = await renderApp('/?role=MANAGEMENT');
+    await screen.findByRole('heading', { name: 'Trust & reconcile home' });
+    await user.click(sidebar().getByRole('link', { name: 'Dashboard' }));
     await screen.findByRole('heading', { name: 'Overview' });
 
     await user.click(screen.getByRole('button', { name: 'Demo controls' }));
@@ -267,10 +299,15 @@ describe('app shell', () => {
 
   it('keeps the skip-link target and supports logout', async () => {
     const user = await renderApp('/?role=MANAGEMENT');
-    await screen.findByRole('heading', { name: 'Overview' });
+    await screen.findByRole('heading', { name: 'Trust & reconcile home' });
     expect(document.getElementById('main')).not.toBeNull();
 
     await user.click(screen.getByRole('button', { name: 'Log out' }));
     expect(await screen.findByRole('button', { name: 'Enter demo workspace' })).toBeInTheDocument();
+  });
+
+  it('redirects roles away from modules they cannot enter', async () => {
+    await renderApp('/m/eligibility?role=FPS');
+    expect(await screen.findByRole('heading', { name: 'FPS authentication home' })).toBeInTheDocument();
   });
 });

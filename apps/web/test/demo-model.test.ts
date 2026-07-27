@@ -51,5 +51,6 @@ describe('demo model', () => {
     expect(getRoleScreens('FPS')).toContain('distribution');
     expect(getRoleScreens('FCI_DEPOT')).toContain('lots');
     expect(getRoleScreens('BLOCK_OFFICE')).toContain('allocations');
+    expect(getRoleScreens('CONTROL_OFFICE')).toContain('eligibility-review');
   });
 });

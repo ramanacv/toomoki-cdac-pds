@@ -26,6 +26,13 @@ describe('IAM assignments for FPS and source integrations', () => {
 
   it('idempotently assigns demo-fps to FPS-101 and limits the integration account by durable contracts', () => {
     expect(bootstrap).toContain('ensure_user "demo-fps" "fps"');
+    expect(bootstrap).toContain('ensure_user "demo-fps-202" "fps"');
+    expect(bootstrap).toContain('@viksitpds.local');
+    expect(bootstrap).toContain('emailVerified=true');
+    expect(bootstrap).toContain("requiredActions=[]");
+    expect(bootstrap).toContain('VERIFY_PROFILE');
+    expect(bootstrap).toContain('infra/postgres/seed.sql');
+    expect(bootstrap).toContain("'FPS-202'");
     expect(bootstrap).toContain('service-account-pds-integration-maharashtra');
     expect(bootstrap).toContain('"SMARTPDS_RCMS|smartpds|MASTER_REFERENCE"');
     expect(bootstrap).toContain('"STATE_SCM|scm|ALLOCATION"');

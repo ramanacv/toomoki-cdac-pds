@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import type { DemoRole, DemoScenario } from '@/demo-model.js';
 import type { LedgerMode } from '@/api.js';
 import { screenDefinitions } from '@/demo-model.js';
+import { getModuleDefinition, resolveActiveModule } from '@/lib/modules.js';
 import { routeToScreen } from '@/lib/screen-routes.js';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { TopBar } from '@/components/layout/TopBar';
@@ -38,8 +39,11 @@ export function AppShell({
   const { pathname } = useLocation();
 
   const screen = routeToScreen(pathname.replace(/^\//, ''));
-  const screenLabel =
-    screenDefinitions.find((definition) => definition.id === screen)?.label ?? 'Workspace';
+  const activeModule = resolveActiveModule(pathname, role);
+  const screenLabel = pathname.startsWith('/m/')
+    ? getModuleDefinition(activeModule).title
+    : (screenDefinitions.find((definition) => definition.id === screen)?.label ??
+      getModuleDefinition(activeModule).title);
 
   const openDemoControls = () => {
     setSidebarOpen(false);

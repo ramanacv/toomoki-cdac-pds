@@ -6,6 +6,11 @@ import { Test } from '@nestjs/testing';
 import { PdsLedgerFacade } from '../../src/modules/core/pds-ledger.facade.js';
 import { FilePdsLedgerPort } from '../../src/infrastructure/ledger-port.js';
 import type { AuthenticatedRequest } from '../../src/modules/auth/identity-provider.js';
+import {
+  EPOS_AUTH_ADAPTER,
+  EposAuthClient,
+  LocalEposAuthAdapter
+} from '../../src/modules/auth/epos-auth-client.js';
 
 export type DemoLedgerFixture = {
   facade: PdsLedgerFacade;
@@ -37,7 +42,12 @@ export const createControllerWithFacade = async <T>(
 ): Promise<T> => {
   const moduleRef = await Test.createTestingModule({
     controllers: [Controller],
-    providers: [{ provide: PdsLedgerFacade, useValue: facade }]
+    providers: [
+      { provide: PdsLedgerFacade, useValue: facade },
+      // AuthController depends on EposAuthClient; local adapter keeps tests offline.
+      { provide: EPOS_AUTH_ADAPTER, useClass: LocalEposAuthAdapter },
+      EposAuthClient
+    ]
   }).compile();
 
   return moduleRef.get(Controller);

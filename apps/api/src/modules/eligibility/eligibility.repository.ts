@@ -5,6 +5,26 @@ import { createHash } from 'node:crypto';
 
 const sha256 = (value: unknown): string => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 export const ELIGIBILITY_DB_POOL = Symbol('ELIGIBILITY_DB_POOL');
+
+/** Authorized adjudication checkpoints that enqueue privacy-safe Fabric proofs. */
+export const ELIGIBILITY_PROOF_ACTIONS = new Set<EligibilityCaseAction['action']>([
+  'NOTICE',
+  'VERIFICATION',
+  'RECOMMENDATION',
+  'DECISION',
+  'APPEAL',
+  'REINSTATEMENT'
+]);
+
+const ELIGIBILITY_ACTION_EVENT_TYPES: Partial<Record<EligibilityCaseAction['action'], string>> = {
+  NOTICE: 'EligibilityNoticeIssued',
+  VERIFICATION: 'EligibilityVerificationRecorded',
+  RECOMMENDATION: 'EligibilityRecommendationRecorded',
+  DECISION: 'EligibilityDecisionAuthorized',
+  APPEAL: 'EligibilityAppealOpened',
+  REINSTATEMENT: 'EligibilityDecisionReversed'
+};
+
 type EligibilityPool = Pick<Pool, 'connect' | 'end'>;
 type ScreeningResult = {
   screening: EligibilityScreeningResponse;
@@ -81,6 +101,31 @@ export class EligibilityRepository implements OnModuleDestroy {
     }
   }
 
+  /** Write refreshed outbox-derived proof status back to eligibility_cases. */
+  async syncProofStatuses(
+    updates: Array<{ caseId: string; proofEventId: string; proofStatus: EligibilityCase['proofStatus'] }>
+  ): Promise<void> {
+    if (!this.pool || updates.length === 0) return;
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      for (const update of updates) {
+        await client.query(
+          `UPDATE eligibility_cases
+           SET proof_status = $2, updated_at = NOW()
+           WHERE case_id = $1 AND proof_event_id = $3 AND proof_status IS DISTINCT FROM $2`,
+          [update.caseId, update.proofStatus, update.proofEventId]
+        );
+      }
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   async persistScreening(
     requestHash: string,
     result: ScreeningResult,
@@ -125,6 +170,11 @@ export class EligibilityRepository implements OnModuleDestroy {
       await client.query('BEGIN');
       await this.lockAndWriteCase(client, item);
       await this.writeAction(client, item, idempotencyKey, requestHash);
+      const action = item.history.at(-1)?.action;
+      if (action && ELIGIBILITY_PROOF_ACTIONS.has(action)) {
+        if (!item.proofEventId) throw new Error(`Eligibility ${action} requires a proof event ID`);
+        await this.insertProof(client, item, idempotencyKey);
+      }
       await client.query('COMMIT');
     } catch (error) {
       await client.query('ROLLBACK');
@@ -166,20 +216,7 @@ export class EligibilityRepository implements OnModuleDestroy {
       );
       if (entitlementUpdate.rowCount === 0) throw new Error(`Eligibility entitlement ${item.rationCardHash} was not found`);
       if (!item.proofEventId) throw new Error('Final eligibility decision requires a proof event ID');
-      const event = this.proofEvent(item);
-      await client.query(
-        `INSERT INTO ledger_events (ledger_tx_id, entity_type, entity_id, event_type, payload, timestamp)
-         VALUES ($1, 'eligibility-case', $2, $3, $4::jsonb, $5)
-         ON CONFLICT (ledger_tx_id) DO NOTHING`,
-        [event.ledgerTxId, item.caseId, event.eventType, JSON.stringify(event.payload), event.timestamp]
-      );
-      await client.query(
-        `INSERT INTO ledger_outbox
-          (event_id, operation_id, idempotency_key, schema_version, event_payload, status)
-         VALUES ($1,$1,$2,1,$3::jsonb,'PENDING')
-         ON CONFLICT (event_id) WHERE event_id IS NOT NULL DO NOTHING`,
-        [item.proofEventId, idempotencyKey, JSON.stringify(event)]
-      );
+      await this.insertProof(client, item, idempotencyKey);
       await client.query('COMMIT');
     } catch (error) {
       await client.query('ROLLBACK');
@@ -189,7 +226,39 @@ export class EligibilityRepository implements OnModuleDestroy {
     }
   }
 
+  private async insertProof(client: PoolClient, item: EligibilityCase, idempotencyKey: string): Promise<void> {
+    const event = this.proofEvent(item);
+    await client.query(
+      `INSERT INTO ledger_events (ledger_tx_id, entity_type, entity_id, event_type, payload, timestamp)
+       VALUES ($1, 'eligibility-case', $2, $3, $4::jsonb, $5)
+       ON CONFLICT (ledger_tx_id) DO NOTHING`,
+      [event.ledgerTxId, item.caseId, event.eventType, JSON.stringify(event.payload), event.timestamp]
+    );
+    await client.query(
+      `INSERT INTO ledger_outbox
+        (event_id, operation_id, idempotency_key, schema_version, event_payload, status)
+       VALUES ($1,$1,$2,1,$3::jsonb,'PENDING')
+       ON CONFLICT (event_id) WHERE event_id IS NOT NULL DO NOTHING`,
+      [item.proofEventId, idempotencyKey, JSON.stringify(event)]
+    );
+  }
+
+  private async ensureRationCardParent(client: PoolClient, item: EligibilityCase): Promise<void> {
+    await client.query(
+      `INSERT INTO ration_cards_mock (ration_card_hash, household_size, district, status)
+       VALUES ($1, GREATEST($2, 1), $3, $4)
+       ON CONFLICT (ration_card_hash) DO NOTHING`,
+      [
+        item.rationCardHash,
+        item.householdSize,
+        'DEMO',
+        item.rcmsStatus === 'CANCELLED' || item.rcmsStatus === 'SUSPENDED' ? item.rcmsStatus : 'ACTIVE'
+      ]
+    );
+  }
+
   private async lockAndWriteCase(client: PoolClient, item: EligibilityCase): Promise<void> {
+    await this.ensureRationCardParent(client, item);
     const current = await client.query<{ version: number }>(
       'SELECT version FROM eligibility_cases WHERE case_id = $1 FOR UPDATE',
       [item.caseId]
@@ -281,21 +350,32 @@ export class EligibilityRepository implements OnModuleDestroy {
   }
 
   private proofEvent(item: EligibilityCase) {
+    const action = item.history.at(-1);
+    const eventType = action
+      ? ELIGIBILITY_ACTION_EVENT_TYPES[action.action]
+      : undefined;
+    if (!eventType) {
+      throw new Error(`Eligibility action ${action?.action ?? 'unknown'} cannot enqueue a Fabric proof`);
+    }
+    const outcomeCode = action?.action === 'DECISION' || action?.action === 'REINSTATEMENT'
+      ? item.decision
+      : action?.outcomeCode;
     return {
       ledgerTxId: item.proofEventId!,
       entityType: 'eligibility-case',
       entityId: item.caseId,
-      eventType: item.decision === 'REINSTATED' ? 'EligibilityDecisionReversed' : 'EligibilityDecisionAuthorized',
+      eventType,
       payload: {
         caseId: item.caseId,
         subjectRefHash: item.subjectRefHash,
         rationCardHash: item.rationCardHash,
         policyId: item.screening.policy.policyId,
         ruleIds: item.screening.policy.ruleIds,
-        outcomeCode: item.decision,
-        reasonCode: item.history.at(-1)?.reasonCode,
+        outcomeCode,
+        reasonCode: action?.reasonCode,
+        actionType: action?.action,
         effectiveTimestamp: item.updatedAt,
-        priorState: item.history.at(-1)?.priorState,
+        priorState: action?.priorState,
         newState: item.state,
         externalEvidenceDigest: item.screening.evidenceDigest
       },

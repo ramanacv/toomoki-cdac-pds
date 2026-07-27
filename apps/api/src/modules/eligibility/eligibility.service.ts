@@ -1,7 +1,8 @@
-import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException, OnModuleInit, ServiceUnavailableException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException, OnModuleInit, Optional, ServiceUnavailableException } from '@nestjs/common';
 import { createHash, randomUUID } from 'node:crypto';
 import {
   ELIGIBILITY_POLICY_ID,
+  type BeneficiaryLifecycleEvent,
   type EligibilityBeneficiary,
   type EligibilityCase,
   type EligibilityCaseAction,
@@ -12,6 +13,7 @@ import {
   type EligibilitySummary,
   validateEligibilityScreeningRequest
 } from '@pds/shared-types';
+import { BeneficiaryRegistryService } from '../beneficiary-registry/beneficiary-registry.service.js';
 import { EligibilityClient, EligibilityDependencyError } from './eligibility-client.js';
 import { clearEligibilityGates, getEligibilityGate, removeEligibilityGate, setEligibilityGate } from './eligibility-gate.js';
 import { EligibilityRepository } from './eligibility.repository.js';
@@ -52,7 +54,8 @@ export class EligibilityService implements OnModuleInit {
 
   constructor(
     @Inject(EligibilityClient) private readonly client: EligibilityClient,
-    @Inject(EligibilityRepository) private readonly repository: EligibilityRepository
+    @Inject(EligibilityRepository) private readonly repository: EligibilityRepository,
+    @Optional() @Inject(BeneficiaryRegistryService) private readonly registry?: BeneficiaryRegistryService
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -279,23 +282,27 @@ export class EligibilityService implements OnModuleInit {
       input.outcomeCode === 'STALE_SOURCE_CONFIRMED' || input.outcomeCode === 'PORTABILITY_CONFIRMED' ? 'CLOSED' : 'REVIEW_READY';
     const result = this.transition(caseId, input, actorRef, 'VERIFICATION',
       ['OPEN', 'AWAITING_DATA', 'AWAITING_FIELD_VERIFICATION', 'NOTICE_ISSUED'], target);
+    this.assignCheckpointProof(result, 'VERIFICATION');
     if (result.demoBeneficiaryId === 'BEN-DEMO-001' && input.outcomeCode === 'DECEASED_MEMBER_CONFIRMED') {
       result.householdSize = 4;
       result.monthlyRiceEntitlementKg = 20;
       const beneficiary = this.mustBeneficiary(result.demoBeneficiaryId);
       beneficiary.householdSize = 4;
       beneficiary.monthlyRiceEntitlementKg = 20;
-      this.cases.set(caseId, structuredClone(result));
     }
     if (target === 'CLOSED') {
       this.mustBeneficiary(result.demoBeneficiaryId).eligibilityStatus = 'ELIGIBLE';
     }
+    this.cases.set(caseId, structuredClone(result));
     this.idempotency.set(input.idempotencyKey, {
       fingerprint: hash({ caseId, action: 'VERIFICATION', input }),
       result: structuredClone(result)
     });
     try {
       await this.repository.persistCaseAction(result, input.idempotencyKey, hash({ caseId, action: 'VERIFICATION', input }));
+      if (result.demoBeneficiaryId === 'BEN-DEMO-001' && input.outcomeCode === 'DECEASED_MEMBER_CONFIRMED') {
+        await this.bridgeDeceasedMemberRemoval(result, actorRef);
+      }
     } catch (error) {
       this.cases.set(caseId, before);
       this.beneficiaries.set(before.demoBeneficiaryId, beneficiaryBefore);
@@ -448,6 +455,12 @@ export class EligibilityService implements OnModuleInit {
     if (replay) return replay;
     const before = structuredClone(this.mustCase(caseId));
     const result = this.transition(caseId, input, actorRef, action, allowed, newState);
+    this.assignCheckpointProof(result, action);
+    this.cases.set(caseId, structuredClone(result));
+    this.idempotency.set(input.idempotencyKey, {
+      fingerprint: hash({ caseId, action, input }),
+      result: structuredClone(result)
+    });
     try {
       await this.repository.persistCaseAction(result, input.idempotencyKey, hash({ caseId, action, input }));
     } catch (error) {
@@ -456,6 +469,59 @@ export class EligibilityService implements OnModuleInit {
       throw error;
     }
     return result;
+  }
+
+  private assignCheckpointProof(item: EligibilityCase, action: EligibilityCaseAction['action']): void {
+    item.proofStatus = 'PENDING';
+    item.proofEventId = `ELIG-PROOF-${hash({
+      caseId: item.caseId,
+      version: item.version,
+      action,
+      outcomeCode: item.history.at(-1)?.outcomeCode
+    }).slice(0, 24)}`;
+  }
+
+  /**
+   * Idempotent ops-side bridge: verified deceased-member removal updates the
+   * beneficiary registry projection. Fabric only receives the registry proof
+   * after PostgreSQL accepts the lifecycle event — chaincode never mutates status.
+   */
+  private async bridgeDeceasedMemberRemoval(item: EligibilityCase, actorRef: string): Promise<void> {
+    if (!this.registry) return;
+    void actorRef;
+    const base = {
+      beneficiaryRefHash: item.subjectRefHash,
+      rationCardHash: item.rationCardHash,
+      sourceSystem: 'FIELD_VERIFICATION' as const,
+      occurredAt: item.updatedAt,
+      effectiveAt: item.updatedAt,
+      policyId: item.screening.policy.policyId,
+      evidenceDigest: item.screening.evidenceDigest,
+      schemaVersion: '1.0' as const
+    };
+    const removal: BeneficiaryLifecycleEvent = {
+      ...base,
+      eventId: `ELIG-BRIDGE-MEMBER-REMOVED-${item.caseId}-${item.version}`,
+      eventType: 'MEMBER_REMOVED',
+      reasonCode: 'DECEASED_MEMBER_CONFIRMED',
+      householdSizeDelta: -1,
+      priorState: 'ACTIVE',
+      newState: 'ACTIVE'
+    };
+    try {
+      await this.registry.apply(removal);
+    } catch {
+      await this.registry.apply({
+        ...base,
+        eventId: `ELIG-BRIDGE-CREATED-${item.caseId}`,
+        eventType: 'BENEFICIARY_CREATED',
+        reasonCode: 'DEMO_REGISTRY_ENSURE',
+        householdSizeDelta: item.householdSize + 1,
+        districtCode: 'MH-DEMO-01',
+        newState: 'ACTIVE'
+      });
+      await this.registry.apply(removal);
+    }
   }
 
   private replay(caseId: string, action: EligibilityCaseAction['action'], input: ActionInput): EligibilityCase | undefined {
@@ -490,10 +556,26 @@ export class EligibilityService implements OnModuleInit {
       .map((item) => item.proofEventId)
       .filter((eventId): eventId is string => Boolean(eventId));
     const statuses = await this.repository.loadProofStatuses(eventIds);
+    const updates: Array<{
+      caseId: string;
+      proofEventId: string;
+      proofStatus: EligibilityCase['proofStatus'];
+    }> = [];
     for (const item of this.cases.values()) {
       if (item.proofEventId && statuses.has(item.proofEventId)) {
-        item.proofStatus = statuses.get(item.proofEventId)!;
+        const next = statuses.get(item.proofEventId)!;
+        if (item.proofStatus !== next) {
+          item.proofStatus = next;
+          updates.push({
+            caseId: item.caseId,
+            proofEventId: item.proofEventId,
+            proofStatus: next
+          });
+        }
       }
+    }
+    if (updates.length > 0) {
+      await this.repository.syncProofStatuses(updates);
     }
   }
 }

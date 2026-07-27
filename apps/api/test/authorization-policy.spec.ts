@@ -60,6 +60,7 @@ describe('canonical endpoint authorization policy', () => {
   });
 
   it.each([
+    [AuthController, 'fpsAssignment', ['fps']],
     [AuthController, 'authTransactions', ['fps', 'department', 'auditor']],
     [EntitlementsController, 'entitlementList', ['fps', 'department', 'auditor']],
     [DistributionsController, 'distributions', ['fps', 'department', 'auditor', 'management']],

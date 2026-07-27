@@ -38,7 +38,13 @@ export const mapStakeholderRow = (row: Record<string, unknown>): Stakeholder => 
   name: asString(row.name),
   district: asString(row.district),
   licenseNo: asString(row.license_no),
-  status: asString(row.status) as StakeholderStatus
+  status: asString(row.status) as StakeholderStatus,
+  ...(row.dealer_name ? { dealerName: asString(row.dealer_name) } : {}),
+  ...(row.dealer_id ? { dealerId: asString(row.dealer_id) } : {}),
+  ...(row.shop_no ? { shopNo: asString(row.shop_no) } : {}),
+  ...(row.block_name ? { blockName: asString(row.block_name) } : {}),
+  ...(row.tehsil_name ? { tehsilName: asString(row.tehsil_name) } : {}),
+  ...(row.location_text ? { location: asString(row.location_text) } : {})
 });
 
 export const mapLotRow = (row: Record<string, unknown>): CommodityLot => ({
@@ -246,7 +252,7 @@ export const buildSnapshotWritePlan = (state: PdsLedgerState): SqlStatement[] =>
 
   for (const entitlement of state.entitlements) {
     statements.push({
-      text: 'INSERT INTO monthly_entitlements (ration_card_hash, commodity, month, monthly_entitlement_kg, already_lifted_kg, available_balance_kg, active) VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT (ration_card_hash, commodity, month) DO UPDATE SET monthly_entitlement_kg = EXCLUDED.monthly_entitlement_kg, already_lifted_kg = EXCLUDED.already_lifted_kg, available_balance_kg = EXCLUDED.available_balance_kg, active = EXCLUDED.active',
+      text: `INSERT INTO monthly_entitlements (ration_card_hash, commodity, month, monthly_entitlement_kg, already_lifted_kg, available_balance_kg, active) VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT (ration_card_hash, commodity, month) DO UPDATE SET monthly_entitlement_kg = EXCLUDED.monthly_entitlement_kg, already_lifted_kg = GREATEST(monthly_entitlements.already_lifted_kg, EXCLUDED.already_lifted_kg), available_balance_kg = GREATEST(0, EXCLUDED.monthly_entitlement_kg - GREATEST(monthly_entitlements.already_lifted_kg, EXCLUDED.already_lifted_kg)), active = EXCLUDED.active`,
       values: [
         entitlement.rationCardHash,
         entitlement.commodity,
@@ -294,6 +300,25 @@ export const buildSnapshotWritePlan = (state: PdsLedgerState): SqlStatement[] =>
         distribution.ledgerTxId ?? null,
         distribution.timestamp
       ]
+    });
+  }
+
+  for (const entitlement of state.entitlements) {
+    statements.push({
+      text: `UPDATE monthly_entitlements AS me
+ SET already_lifted_kg = calc.lifted,
+     available_balance_kg = GREATEST(0, me.monthly_entitlement_kg - calc.lifted)
+ FROM (
+   SELECT COALESCE(SUM(d.delivered_kg), 0)::int AS lifted
+   FROM distribution_transactions d
+   WHERE d.ration_card_hash = $1
+     AND d.commodity = $2
+     AND to_char(d.timestamp AT TIME ZONE 'UTC', 'YYYY-MM') = $3
+ ) AS calc
+ WHERE me.ration_card_hash = $1
+   AND me.commodity = $2
+   AND me.month = $3`,
+      values: [entitlement.rationCardHash, entitlement.commodity, entitlement.month]
     });
   }
 

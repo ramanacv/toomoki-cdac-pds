@@ -71,6 +71,7 @@ export const OPENAPI_SPEC = {
     },
     '/fps-allocations/{allocationId}': { get: secured('Get FPS allocation') },
     '/fps-allocations/{allocationId}/receipt': { post: secured('Confirm FPS receipt', ['fps']) },
+    '/auth/fps-assignment': { get: secured('Resolve the authenticated FPS shop assignment', ['fps']) },
     '/auth/transactions': { get: secured('List authentication transactions', ['fps', 'department', 'auditor']) },
     '/auth/transactions/{authTxnId}': { get: secured('Get authentication transaction', ['fps', 'department', 'auditor']) },
     '/auth/mock-otp': { post: secured('Simulate OTP authentication', ['fps']) },
@@ -93,6 +94,10 @@ export const OPENAPI_SPEC = {
     '/audit-alerts': { get: secured('List audit alerts', ['auditor']) },
     '/audit-alerts/reconcile': { post: secured('Reconcile alerts', ['auditor']) },
     '/audit-alerts/{alertId}/resolve': { post: secured('Resolve audit alert', ['auditor']) },
+    '/ledger-proofs/analytics': { get: secured('Summarize cross-module Fabric proof analytics') },
+    '/ledger-proofs/{eventId}/detail': {
+      get: secured('Get privacy-safe Fabric proof detail', ['auditor', 'management', 'platform-admin'])
+    },
     '/ledger-proofs/{eventId}': { get: secured('Get asynchronous Fabric proof status') },
     '/admin/proofs/summary': { get: secured('Summarize durable proof pipeline states', ['platform-admin', 'auditor']) },
     '/admin/overview': { get: secured('Get application administration overview', ['platform-admin']) },

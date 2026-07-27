@@ -342,6 +342,16 @@ export function WorkflowActionPanel({
         </TabsList>
       </Tabs>
 
+      {role !== 'MANAGEMENT' &&
+      groupsForRole.length > 0 &&
+      groupsForRole.every((group) => group.actions.every((action) => !action.roles.includes(role))) ? (
+        <p className="mb-4 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
+          No runnable actions for this role yet — upstream custody is incomplete. Prep with
+          <code className="mx-1 rounded bg-amber-100 px-1">node scripts/live-lifecycle.mjs</code>
+          or switch to FCI / Godown / DSO and advance the queue in order before BSO allotment or FPS issue.
+        </p>
+      ) : null}
+
       {groupsForRole.length > 0 ? (
         <div className="flex flex-col gap-6">
           {visibleGroups.length > 0 ? (

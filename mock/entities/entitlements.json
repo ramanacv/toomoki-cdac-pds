@@ -71,5 +71,32 @@
     "alreadyLiftedKg": 0,
     "availableBalanceKg": 15,
     "active": true
+  },
+  {
+    "rationCardHash": "demo-ration-card-hash",
+    "commodity": "Rice",
+    "month": "2026-07",
+    "monthlyEntitlementKg": 25,
+    "alreadyLiftedKg": 0,
+    "availableBalanceKg": 25,
+    "active": true
+  },
+  {
+    "rationCardHash": "demo-ration-card-hash",
+    "commodity": "Wheat",
+    "month": "2026-07",
+    "monthlyEntitlementKg": 10,
+    "alreadyLiftedKg": 0,
+    "availableBalanceKg": 10,
+    "active": true
+  },
+  {
+    "rationCardHash": "exception-ration-card-hash",
+    "commodity": "Rice",
+    "month": "2026-07",
+    "monthlyEntitlementKg": 15,
+    "alreadyLiftedKg": 0,
+    "availableBalanceKg": 15,
+    "active": true
   }
 ]

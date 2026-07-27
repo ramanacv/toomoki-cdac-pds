@@ -441,6 +441,16 @@ export type Stakeholder = {
   status: StakeholderStatus;
   jurisdiction?: 'CENTRAL' | 'STATE';
   capacityKg?: number;
+  /** Demo-only FPS dealer display name (fictional). */
+  dealerName?: string;
+  /** Demo-only FPS dealer / nominee ID. */
+  dealerId?: string;
+  /** Demo-only shop number / FPS code. */
+  shopNo?: string;
+  blockName?: string;
+  tehsilName?: string;
+  /** Demo-only human-readable shop location. */
+  location?: string;
 };
 
 export type CommodityLot = {
@@ -608,6 +618,75 @@ export type LedgerProofSummaryResponse = {
   recentCommitted: Array<{ eventId: string; fabricTxId: string; committedAt: string }>;
 };
 
+/** Cross-module bucket for sample Fabric proof analytics on the Trust Overview. */
+export type ProofAnalyticsModule = 'supply-chain' | 'eligibility' | 'fps' | 'other';
+
+export type LedgerProofActor = {
+  subject: string;
+  applicationRole: string;
+  submittingOrganization: string;
+};
+
+export type LedgerProofAnalyticsRow = {
+  eventId: string;
+  operationId: string;
+  eventType: string;
+  entityType: string;
+  entityId: string;
+  schemaVersion: number;
+  payloadHash: string;
+  businessTimestamp: string;
+  status: ProofStatus;
+  fabricTxId?: string;
+  retryCount: number;
+  createdAt: string;
+  committedAt?: string;
+  module: ProofAnalyticsModule;
+  actor?: LedgerProofActor;
+};
+
+export type LedgerProofCompletenessModule = {
+  expected: number;
+  committed: number;
+  missing: number;
+  pendingOrFailed: number;
+  deadLetter: number;
+};
+
+export type LedgerProofCompletenessAlert = {
+  kind: 'MISSING_PROOF' | 'PROOF_PROJECTION_DRIFT' | 'DEAD_LETTER';
+  module: 'beneficiary' | 'eligibility';
+  eventId: string;
+  detail: string;
+};
+
+export type LedgerProofCompleteness = {
+  /** Expected lifecycle/adjudication proofs vs durable outbox outcomes. */
+  byModule: {
+    beneficiary: LedgerProofCompletenessModule;
+    eligibility: LedgerProofCompletenessModule;
+  };
+  missingProofCount: number;
+  deadLetterCount: number;
+  pendingOrFailedCount: number;
+  missingEventIds: string[];
+  alerts: LedgerProofCompletenessAlert[];
+};
+
+export type LedgerProofAnalyticsResponse = {
+  summary: LedgerProofSummaryResponse;
+  byModule: Record<ProofAnalyticsModule, number>;
+  byEventType: Array<{ eventType: string; count: number }>;
+  recentProofs: LedgerProofAnalyticsRow[];
+  completeness: LedgerProofCompleteness;
+};
+
+export type LedgerProofDetailResponse = LedgerProofAnalyticsRow & {
+  proofPayload: Record<string, unknown>;
+  failureCategory?: ProofFailureCategory;
+  rawWorkerError?: string;
+};
+
 /** Canonical, non-sensitive evidence submitted to Fabric after the business transaction commits. */
 export type LedgerProof = {
   eventId: string;
@@ -616,11 +695,7 @@ export type LedgerProof = {
   schemaVersion: 1;
   entityType: LedgerEvent['entityType'];
   entityId: string;
-  actor: {
-    subject: string;
-    applicationRole: string;
-    submittingOrganization: string;
-  };
+  actor: LedgerProofActor;
   payloadHash: string;
   proofPayload: Record<string, unknown>;
   businessTimestamp: string;
@@ -778,3 +853,4 @@ export const hashReference = (value: string): string => {
 export const makeTimestamp = (date: Date = new Date()): string => date.toISOString();
 export * from './eligibility.js';
 export * from './beneficiary-registry.js';
+export * from './epos-auth.js';

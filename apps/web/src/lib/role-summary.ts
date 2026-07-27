@@ -53,9 +53,11 @@ const inboundPending = (transfers: TransferOrder[], orgs: string[]): number =>
 export function roleSummaryCards(
   role: DemoRole,
   data: RoleSummaryInput,
-  liveSummary: DashboardSummary
+  liveSummary: DashboardSummary,
+  options?: { fpsId?: string }
 ): Array<[string, string, string?]> {
-  const orgs = roleOrgs[role] ?? [];
+  const orgs =
+    role === 'FPS' && options?.fpsId ? [options.fpsId] : roleOrgs[role] ?? [];
   const queue = getAllCommoditiesRoleQueue(data, role).flatMap((g) => g.actions);
   const queued = queue.filter((action) => action.status !== 'blocked').length;
   const openAlerts = data.alerts.filter((alert) => alert.status === 'OPEN');

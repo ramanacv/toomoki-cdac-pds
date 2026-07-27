@@ -2,6 +2,8 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { WorkspaceLayout } from '@/pages/WorkspaceLayout.js';
 import { AdminLayout } from '@/pages/AdminLayout.js';
 import { DefaultScreenRedirect, ScreenGuard } from '@/pages/workspace/ScreenGuard.js';
+import { ModuleGuard } from '@/pages/workspace/ModuleGuard.js';
+import { ModuleHomePage } from '@/pages/workspace/ModuleHomePage.js';
 import { OverviewPage } from '@/pages/workspace/OverviewPage.js';
 import { WorkbenchPage } from '@/pages/workspace/WorkbenchPage.js';
 import { StakeholdersPage } from '@/pages/workspace/StakeholdersPage.js';
@@ -28,6 +30,38 @@ export function AppRoutes() {
       <Route path="/role-login" element={<RoleLoginPage />} />
       <Route path="/" element={<WorkspaceLayout />}>
         <Route index element={<DefaultScreenRedirect />} />
+        <Route
+          path="m/supply-chain"
+          element={
+            <ModuleGuard moduleId="supply-chain">
+              <ModuleHomePage moduleId="supply-chain" />
+            </ModuleGuard>
+          }
+        />
+        <Route
+          path="m/eligibility"
+          element={
+            <ModuleGuard moduleId="eligibility">
+              <ModuleHomePage moduleId="eligibility" />
+            </ModuleGuard>
+          }
+        />
+        <Route
+          path="m/fps"
+          element={
+            <ModuleGuard moduleId="fps">
+              <ModuleHomePage moduleId="fps" />
+            </ModuleGuard>
+          }
+        />
+        <Route
+          path="m/trust"
+          element={
+            <ModuleGuard moduleId="trust">
+              <ModuleHomePage moduleId="trust" />
+            </ModuleGuard>
+          }
+        />
         <Route
           path="eligibility"
           element={

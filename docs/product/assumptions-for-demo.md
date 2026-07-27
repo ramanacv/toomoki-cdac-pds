@@ -10,10 +10,16 @@
 - Single-node components are accepted locally. Backup and recovery are limited to the documented reset/reseed procedure.
 - Operational completion and proof completion are distinct UI/API states. Expected Fabric delay must not block normal workflow.
 - Proof payloads contain hashes and non-sensitive evidence only; raw beneficiary identity, OTP, biometric, mobile number and full ration-card values are prohibited.
-- `demo-fps` is assigned to `FPS-101` in the durable authorization tables; the
-  API derives the shop and opaque operator reference from that active
-  subject-scope assignment and filters all FPS-facing reads. If an optional
-  token shop claim is present, it must match the durable assignment.
+- `demo-fps` is assigned to `FPS-101` and `demo-fps-202` to `FPS-202` in the
+  durable authorization tables; the API derives the shop and opaque operator
+  reference from that active subject-scope assignment and filters all
+  FPS-facing reads. If an optional token shop claim is present, it must match
+  the durable assignment. Demo FPS shops include fictional dealer name/ID,
+  shop number, block/tehsil, and location for UI narrative.
+- Eligibility panel beneficiaries are fictional and may display synthetic
+  `9999…` Aadhaar numbers, `90000…` mobile numbers (OTP inbox narrative),
+  addresses, and family members for demo UI only. OTP values themselves are
+  never stored. Fabric proofs and ePoS auth mocks use opaque hashes only.
 - SMART-PDS/RCMS, state-SCM, and AePDS/ePoS records used in the demo are
   provisional fixtures submitted through the canonical integration boundary.
   They are not evidence of a live government integration.
@@ -31,6 +37,21 @@ This limitation is accepted only for a controlled demonstration under all of the
 - Reset and deterministically reseed immediately before the demonstration.
 - Treat the demo as non-crash-safe; restart and repeat the reset lifecycle if the API or database fails during a run.
 - After the scripted lifecycle, verify that the PostgreSQL outbox has no `PENDING`, `SUBMITTING`, `FAILED`, or `DEAD_LETTER` rows and that every `COMMITTED` row has a Fabric transaction ID.
+- Before a multi-persona UI demo, run the ordered custody prep
+  (`node scripts/live-lifecycle.mjs` after an authorized reset/reseed, or
+  workbench actions FCI → Godown → DSO → Godown → BSO → FPS) so BSO allotment
+  and FPS issue actions are unlocked. Switching personas from `/role-login`
+  ends the Keycloak SSO session first; do not clear only `sessionStorage`.
+- Compose demo API defaults raise read/mutation rate limits (600/120) so rapid
+  persona switches are less likely to 429; production/code defaults remain
+  120/30 when those env vars are unset.
+- Operator “Available stock” and dashboard tracked stock are org-grain only
+  (`stock_positions` rows with `lot_id IS NULL AND month IS NULL`). After any
+  seed re-apply on a retained volume, confirm FCI balances are not duplicated.
+- Monthly entitlement `already_lifted_kg` is reconciled from
+  `distribution_transactions` after entitlement/distribution writes. Dirty demo
+  DBs that issued more than the monthly quota during earlier bugs may show
+  lifted above monthly with available 0 until reset.
 
 This waiver does not mark transactional-command hardening complete. Atomic operational writes and outbox insertion are required before pilot use, multi-user concurrency testing, multiple API replicas, or any reliability/near-MVP production claim.
 
@@ -54,3 +75,12 @@ non-blocking. Only a recorded, authorized, effective mock RCMS suspension or
 cancellation blocks the synthetic card's entitlement; dependency failure and
 invalid evidence preserve benefits. Final decisions take operational effect
 independently of asynchronous Fabric proof delivery.
+
+Mock integrity scoring is deterministic and rule-weighted over fixture signals
+(including opaque `linkageDigest` collisions). It is not AI/ML, not a live
+Aadhaar/CRS oracle, and never auto-cancels cards. Authorized adjudication
+checkpoints (notice, verification, recommendation, appeal, decision,
+reinstatement) and beneficiary lifecycle events enqueue privacy-safe Fabric
+proofs; Trust Overview shows expected-vs-COMMITTED completeness and detectable
+drift/missing-proof alerts. Do not claim chaincode mutates beneficiary status
+or “zero silent drift” while the supply-chain snapshot/outbox waiver remains.

@@ -9,14 +9,16 @@ ViksitPDS React application versus the separately deployed
 
 ## Finding
 
-The browser UI is implemented entirely in the ViksitPDS web application at the
-`/eligibility` route. The `eligibility-mock` application has no HTML or browser
-interface; it is an HTTP simulation service used by the ViksitPDS API.
+The browser UI is implemented entirely in the ViksitPDS web application. Entry
+is through the **Card & eligibility** module home (`/m/eligibility`) or the
+legacy `/eligibility` screen route. The `eligibility-mock` application has no
+HTML or browser interface; it is an HTTP simulation service used by the
+ViksitPDS API.
 
 The **Eligibility review** navigation item is available to these roles:
 
-- Control Office: interactive when the web application uses the API data
-  source.
+- Control Office: can open the Card & eligibility module and mutate when the
+  web application uses the API data source.
 - Management: read-only.
 - Auditor: read-only.
 
@@ -119,10 +121,15 @@ testing is performed through its HTTP endpoints or automated tests.
 
 1. Start the eligibility-enabled API, web app, and mock service with the
    required service token.
-2. Sign in as **Control Office** and open **Eligibility review**.
+2. From Role Login, choose **Card & eligibility**, continue as
+   **Eligibility officer (DSO)** (`demo-department`), then open
+   **Eligibility review**.
 3. Confirm the external service summary reports a healthy state.
 4. Select a synthetic beneficiary and run **Run external eligibility check**.
-5. Inspect the returned signal source, risk, evidence digest, and attestation.
+5. Inspect the returned signal source, risk, deterministic integrity score,
+   score breakdown (signal → ruleId → contribution), evidence digest, and
+   attestation. Confirm the UI still labels the source as a mock simulation
+   (not UIDAI/CRS/AI).
 6. Run **Entitlement gate check** and confirm review alone does not block an
    entitlement.
 7. Advance an opened case using only the guided buttons shown for each state.

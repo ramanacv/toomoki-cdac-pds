@@ -79,6 +79,21 @@ export function StakeholdersPanel({ stakeholders }: { stakeholders: Stakeholder[
                 {stakeholder.stakeholderType}
               </span>
               <p className="text-sm text-muted-foreground">{stakeholder.district}</p>
+              {(stakeholder.blockName || stakeholder.tehsilName) && (
+                <p className="text-sm text-muted-foreground">
+                  {[stakeholder.blockName && `Block ${stakeholder.blockName}`, stakeholder.tehsilName && `Tehsil ${stakeholder.tehsilName}`]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </p>
+              )}
+              {stakeholder.dealerName && (
+                <p className="text-sm">
+                  Dealer {stakeholder.dealerName}
+                  {stakeholder.dealerId ? ` · ${stakeholder.dealerId}` : ''}
+                </p>
+              )}
+              {stakeholder.shopNo && <p className="text-sm text-muted-foreground">Shop {stakeholder.shopNo}</p>}
+              {stakeholder.location && <p className="text-sm text-muted-foreground">{stakeholder.location}</p>}
               <code className="mt-1 block break-all text-secondary">{stakeholder.stakeholderId}</code>
             </EntityCard>
           );

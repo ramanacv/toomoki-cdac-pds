@@ -69,7 +69,12 @@ export const readSnapshotRowsFromClient = async (client: Pool | PoolClient): Pro
       client.query('SELECT * FROM distribution_transactions ORDER BY timestamp'),
       client.query('SELECT * FROM audit_alerts ORDER BY created_at'),
       client.query('SELECT * FROM ledger_events ORDER BY timestamp'),
-      client.query('SELECT stakeholder_id, commodity, quantity_kg FROM stock_positions ORDER BY stakeholder_id, commodity')
+      client.query(
+        `SELECT stakeholder_id, commodity, quantity_kg
+         FROM stock_positions
+         WHERE lot_id IS NULL AND month IS NULL
+         ORDER BY stakeholder_id, commodity`
+      )
     ]);
 
   return hydratePdsState({

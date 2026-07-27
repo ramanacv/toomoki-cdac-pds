@@ -15,10 +15,32 @@ const summary: EligibilitySummary = {
     indicativeSubsidyRateInrPerKg: 30, indicativeMonthlySubsidyDeltaInr: 0
   },
   beneficiaries: [{
-    demoBeneficiaryId: 'BEN-DEMO-001', fictionalName: 'Asha Patil (Fictional)',
-    maskedCardRef: 'RC-DEMO-***001', subjectRefHash: 'beneficiary-demo-001-hash',
-    rationCardHash: 'ration-card-demo-001-hash', householdSize: 5,
-    monthlyRiceEntitlementKg: 25, alreadyLiftedKg: 0, eligibilityStatus: 'ELIGIBLE'
+    demoBeneficiaryId: 'BEN-DEMO-001',
+    fictionalName: 'Asha Patil (Fictional)',
+    fictionalAddress: 'House 12, Village Demo-Haveli, Tehsil Haveli, Demo District',
+    maskedCardRef: 'RC-DEMO-***001',
+    demoAadhaarNumber: '999988880001',
+    demoMobileNumber: '9000080001',
+    aadhaarRefHash: 'aadhaar-ref-demo-001-hash',
+    subjectRefHash: 'beneficiary-demo-001-hash',
+    rationCardHash: 'ration-card-demo-001-hash',
+    householdSize: 5,
+    monthlyRiceEntitlementKg: 25,
+    alreadyLiftedKg: 0,
+    fpsId: 'FPS-101',
+    blockName: 'Haveli',
+    tehsilName: 'Haveli',
+    eligibilityStatus: 'ELIGIBLE',
+    familyMembers: [
+      {
+        fictionalName: 'Asha Patil (Fictional)',
+        relation: 'Head',
+        ageYears: 42,
+        demoAadhaarNumber: '999988880001',
+        demoMobileNumber: '9000080001'
+      },
+      { fictionalName: 'Ramesh Patil (Fictional)', relation: 'Spouse', ageYears: 45, demoAadhaarNumber: '999988880011' }
+    ]
   }]
 };
 
@@ -28,7 +50,15 @@ const screening = {
   recommendedReviewAction: 'VERIFY_MEMBER',
   policy: { policyId: 'MH-PANEL-DEMO-2026-V1' as const, simulationOnly: true as const, ruleIds: ['DEATH-01'] },
   assessedAt: '2026-07-23T00:00:00Z', expiresAt: '2099-01-01T00:00:00Z',
-  evidenceDigest: 'a'.repeat(64), responseAttestationHash: 'b'.repeat(64), schemaVersion: '1.0' as const
+  evidenceDigest: 'a'.repeat(64), responseAttestationHash: 'b'.repeat(64), schemaVersion: '1.0' as const,
+  integrityScore: 40,
+  scoreBreakdown: [{
+    ruleId: 'SCORE-DEATH-HIGH',
+    signalFactCode: 'ONE_MEMBER_POSSIBLE_MATCH',
+    weight: 40,
+    contribution: 40,
+    rationaleCode: 'DEATH_REGISTRY_MATCH_HIGH'
+  }]
 };
 const openCase = {
   caseId: 'ELIG-CASE-001', demoBeneficiaryId: 'BEN-DEMO-001',
@@ -79,12 +109,19 @@ describe('eligibility review workspace', () => {
   it('runs external screening and renders source evidence and attestation separately', async () => {
     const user = userEvent.setup();
     render(<EligibilityReviewPage />);
-    await screen.findByText('Asha Patil (Fictional)');
+    expect(await screen.findAllByText('Asha Patil (Fictional)')).not.toHaveLength(0);
     expect(screen.getByText('Registry lifecycle')).toBeInTheDocument();
     expect(screen.getByText('Planning impact · simulation')).toBeInTheDocument();
+    expect(screen.getByText(/Household profile/)).toBeInTheDocument();
+    expect(screen.getAllByText(/9999-8888-0001/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/90000 80001/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Mock OTP inbox|Simulated AePDS OTP/i).length).toBeGreaterThan(0);
     expect(screen.getByRole('button', { name: 'Register lifecycle record' })).toBeEnabled();
     await user.click(screen.getByRole('button', { name: 'Run external eligibility check' }));
     expect(await screen.findByText('DEATH_REGISTRY')).toBeInTheDocument();
+    expect(screen.getByText(/Integrity score 40\/100/)).toBeInTheDocument();
+    expect(screen.getByText(/Explainability \(signal → rule → score\)/)).toBeInTheDocument();
+    expect(screen.getByText('SCORE-DEATH-HIGH')).toBeInTheDocument();
     expect(screen.getByText(/Evidence a{64}/)).toBeInTheDocument();
     expect(screen.getByText(/Signals open human review/)).toBeInTheDocument();
   });
@@ -93,7 +130,7 @@ describe('eligibility review workspace', () => {
     const user = userEvent.setup();
     api.runEligibilityScreening.mockRejectedValueOnce(new Error('Eligibility service timed out'));
     render(<EligibilityReviewPage />);
-    await screen.findByText('Asha Patil (Fictional)');
+    expect(await screen.findAllByText('Asha Patil (Fictional)')).not.toHaveLength(0);
     await user.click(screen.getByRole('button', { name: 'Run external eligibility check' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(/entitlement remains unchanged/i);
     await user.click(screen.getByRole('button', { name: 'Entitlement gate check' }));
@@ -112,6 +149,15 @@ describe('eligibility review workspace', () => {
       'notice',
       expect.objectContaining({ expectedVersion: 1, outcomeCode: 'ISSUED' })
     );
+  });
+
+  it('keeps Record verification available after Issue notice', async () => {
+    api.loadEligibilityCases.mockResolvedValueOnce([{ ...openCase, state: 'NOTICE_ISSUED', version: 2 }]);
+    render(<EligibilityReviewPage />);
+    await screen.findByText('Guided case actions · NOTICE_ISSUED');
+    expect(screen.getByRole('button', { name: 'Record verification' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Recommend ineligible' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: 'Issue notice' })).not.toBeInTheDocument();
   });
 
   it.each(['MANAGEMENT', 'AUDITOR'])('is read-only for %s', async (role) => {

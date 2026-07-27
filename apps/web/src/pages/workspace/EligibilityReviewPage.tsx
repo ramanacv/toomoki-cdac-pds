@@ -70,6 +70,10 @@ export function EligibilityReviewPage() {
     () => cases.find((item) => item.demoBeneficiaryId === selectedId),
     [cases, selectedId]
   );
+  const selectedBeneficiary = useMemo(
+    () => summary.beneficiaries.find((item) => item.demoBeneficiaryId === selectedId),
+    [summary.beneficiaries, selectedId]
+  );
 
   const runScreening = async () => {
     setBusy(true); setWarning(null);
@@ -189,18 +193,59 @@ export function EligibilityReviewPage() {
       <Card>
         <CardHeader><CardTitle>Synthetic beneficiary screening</CardTitle></CardHeader>
         <CardContent className="grid gap-4">
+          <p className="text-xs text-amber-900">
+            Demo identity fields (name, address, 9999-prefixed Aadhaar, 90000… mobile for OTP) are fictional UI-only
+            samples. Fabric proofs and ePoS auth use opaque hashes only — never raw phone or Aadhaar.
+          </p>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead><tr className="border-b"><th className="p-2">Beneficiary</th><th>Masked card</th><th>Status</th><th>Case</th><th>Signal / risk</th><th>Entitlement effect</th></tr></thead>
+              <thead>
+                <tr className="border-b">
+                  <th className="p-2">Beneficiary</th>
+                  <th>FPS / Tehsil</th>
+                  <th>Demo Aadhaar</th>
+                  <th>OTP mobile</th>
+                  <th>Masked card</th>
+                  <th>Status</th>
+                  <th>Case</th>
+                  <th>Entitlement</th>
+                </tr>
+              </thead>
               <tbody>{summary.beneficiaries.map((item) => {
                 const itemCase = cases.find((candidate) => candidate.demoBeneficiaryId === item.demoBeneficiaryId);
-                const primarySignal = itemCase?.screening.signals[0];
+                const mobile = item.demoMobileNumber ?? '';
+                const mobileDisplay = mobile.length === 10 ? mobile.replace(/(\d{5})(\d{5})/, '$1 $2') : mobile || '—';
                 return (
                 <tr key={item.demoBeneficiaryId} className={`cursor-pointer border-b ${selectedId === item.demoBeneficiaryId ? 'bg-primary/5' : ''}`} onClick={() => setSelectedId(item.demoBeneficiaryId)}>
-                  <td className="p-2"><span className="font-medium">{item.fictionalName}</span><br/><span className="text-muted-foreground">{item.demoBeneficiaryId}</span></td>
-                  <td>{item.maskedCardRef}</td><td><Badge variant="outline">{item.eligibilityStatus}</Badge></td>
-                  <td>{item.caseId ?? 'None'}</td>
-                  <td>{primarySignal ? `${primarySignal.source} / ${primarySignal.risk}` : 'Not screened'}</td>
+                  <td className="p-2">
+                    <span className="font-medium">{item.fictionalName}</span>
+                    <br />
+                    <span className="text-muted-foreground">{item.demoBeneficiaryId}</span>
+                    <br />
+                    <span className="text-xs text-muted-foreground">{item.fictionalAddress}</span>
+                  </td>
+                  <td>
+                    {item.fpsId}
+                    <br />
+                    <span className="text-xs text-muted-foreground">
+                      Block {item.blockName} · Tehsil {item.tehsilName}
+                    </span>
+                  </td>
+                  <td>
+                    <code>
+                      {(item.demoAadhaarNumber ?? '—').replace(/(\d{4})(\d{4})(\d{4})/, '$1-$2-$3')}
+                    </code>
+                    <br />
+                    <span className="text-xs text-muted-foreground">{item.familyMembers?.length ?? 0} family members</span>
+                  </td>
+                  <td>
+                    <code>{mobileDisplay}</code>
+                    <br />
+                    <span className="text-xs text-muted-foreground">Mock OTP inbox</span>
+                  </td>
+                  <td>{item.maskedCardRef}</td>
+                  <td><Badge variant="outline">{item.eligibilityStatus}</Badge></td>
+                  <td>{item.caseId ?? itemCase?.caseId ?? 'None'}</td>
                   <td>{item.monthlyRiceEntitlementKg - item.alreadyLiftedKg} kg remaining</td>
                 </tr>
               );})}</tbody>
@@ -214,21 +259,140 @@ export function EligibilityReviewPage() {
         </CardContent>
       </Card>
 
+      {selectedBeneficiary && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Household profile · {selectedBeneficiary.fictionalName}</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3">
+            <p className="text-sm text-muted-foreground">{selectedBeneficiary.fictionalAddress}</p>
+            <dl className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 text-sm">
+              <div>
+                <dt className="text-xs text-muted-foreground">FPS shop</dt>
+                <dd className="font-medium">{selectedBeneficiary.fpsId}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">Block / Tehsil</dt>
+                <dd className="font-medium">
+                  {selectedBeneficiary.blockName} / {selectedBeneficiary.tehsilName}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">Demo Aadhaar (UI only)</dt>
+                <dd className="font-medium">
+                  <code>
+                    {(selectedBeneficiary.demoAadhaarNumber ?? '—').replace(
+                      /(\d{4})(\d{4})(\d{4})/,
+                      '$1-$2-$3'
+                    )}
+                  </code>
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">OTP mobile (UI only)</dt>
+                <dd className="font-medium">
+                  <code>
+                    {(selectedBeneficiary.demoMobileNumber ?? '—').replace(
+                      /(\d{5})(\d{5})/,
+                      '$1 $2'
+                    )}
+                  </code>
+                  <span className="mt-1 block text-xs text-muted-foreground">
+                    Simulated AePDS OTP is narrated as delivered here; OTP values are never stored.
+                  </span>
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">Aadhaar ref hash</dt>
+                <dd className="break-all text-xs">{selectedBeneficiary.aadhaarRefHash}</dd>
+              </div>
+            </dl>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="border-b">
+                    <th className="p-2">Family member</th>
+                    <th>Relation</th>
+                    <th>Age</th>
+                    <th>Demo Aadhaar</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(selectedBeneficiary.familyMembers ?? []).map((member) => (
+                    <tr key={`${member.fictionalName}-${member.relation}`} className="border-b">
+                      <td className="p-2">{member.fictionalName}</td>
+                      <td>{member.relation}</td>
+                      <td>{member.ageYears}</td>
+                      <td>
+                        <code>
+                          {(member.demoAadhaarNumber ?? '—').replace(/(\d{4})(\d{4})(\d{4})/, '$1-$2-$3')}
+                        </code>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {response && <Card><CardHeader><CardTitle>External screening response</CardTitle></CardHeader><CardContent className="grid gap-3">
-        <div className="flex flex-wrap gap-2"><Badge>{response.status}</Badge><Badge variant="outline">{response.recommendedReviewAction}</Badge></div>
+        <div className="flex flex-wrap gap-2">
+          <Badge>{response.status}</Badge>
+          <Badge variant="outline">{response.recommendedReviewAction}</Badge>
+          {typeof response.integrityScore === 'number' ? (
+            <Badge variant="outline">Integrity score {response.integrityScore}/100 (deterministic mock)</Badge>
+          ) : null}
+        </div>
         <p className="text-sm">Policy rules: {response.policy.ruleIds.join(', ')} · expires {new Date(response.expiresAt).toLocaleDateString()}</p>
         <p className="text-xs text-muted-foreground">Screening {response.screeningId} · request {response.screeningRequestId}</p>
-        <div className="grid gap-2 md:grid-cols-3">{response.signals.map((item) => <div key={`${item.source}-${item.factCode}`} className="rounded-xl border p-3"><p className="font-medium">{item.source}</p><p className="text-sm">{item.status} · {item.risk}</p><p className="mt-1 text-xs text-muted-foreground">{item.factCode}</p><p className="mt-1 text-xs text-muted-foreground">Observed {new Date(item.observedAt).toLocaleDateString()}</p></div>)}</div>
+        <p className="text-xs text-muted-foreground">
+          Mock integrity review only — not UIDAI/CRS/AI. Officers must authorize any RCMS decision.
+        </p>
+        <div className="grid gap-2 md:grid-cols-3">{response.signals.map((item) => <div key={`${item.source}-${item.factCode}`} className="rounded-xl border p-3"><p className="font-medium">{item.source}</p><p className="text-sm">{item.status} · {item.risk}</p><p className="mt-1 text-xs text-muted-foreground">{item.factCode}</p>{item.linkageDigest ? <p className="mt-1 break-all text-xs text-muted-foreground">linkageDigest {item.linkageDigest}</p> : null}<p className="mt-1 text-xs text-muted-foreground">Observed {new Date(item.observedAt).toLocaleDateString()}</p></div>)}</div>
+        {response.scoreBreakdown && response.scoreBreakdown.length > 0 ? (
+          <div className="grid gap-2">
+            <p className="text-sm font-medium">Explainability (signal → rule → score)</p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="border-b">
+                    <th className="p-2">Signal</th>
+                    <th>Rule</th>
+                    <th>Contribution</th>
+                    <th>Rationale</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {response.scoreBreakdown.map((row) => (
+                    <tr key={`${row.ruleId}-${row.signalFactCode}-${row.rationaleCode}`} className="border-b">
+                      <td className="p-2 font-mono text-xs">{row.signalFactCode}</td>
+                      <td className="font-mono text-xs">{row.ruleId}</td>
+                      <td>{row.contribution > 0 ? `+${row.contribution}` : row.contribution}</td>
+                      <td className="text-xs text-muted-foreground">{row.rationaleCode}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Recommended action: <strong>{response.recommendedReviewAction}</strong> — human authorization required before entitlement changes.
+            </p>
+          </div>
+        ) : null}
         <p className="break-all text-xs text-muted-foreground">Evidence {response.evidenceDigest} · Attestation {response.responseAttestationHash}</p>
       </CardContent></Card>}
 
       {selectedCase && <Card><CardHeader><CardTitle>Guided case actions · {selectedCase.state}</CardTitle></CardHeader><CardContent className="grid gap-3">
         <p className="text-sm">Operational RCMS: <strong>{selectedCase.rcmsStatus}</strong> · Fabric proof: <strong>{selectedCase.proofStatus}</strong> · version {selectedCase.version}</p>
         <div className="flex flex-wrap gap-2">
-          {['OPEN', 'AWAITING_DATA', 'AWAITING_FIELD_VERIFICATION'].includes(selectedCase.state) && <>
+          {['OPEN', 'AWAITING_DATA', 'AWAITING_FIELD_VERIFICATION'].includes(selectedCase.state) && (
             <Button disabled={!mutable || busy} onClick={() => void act('notice', 'ISSUED', 'GUIDED_NOTICE')}>Issue notice</Button>
+          )}
+          {['OPEN', 'AWAITING_DATA', 'AWAITING_FIELD_VERIFICATION', 'NOTICE_ISSUED'].includes(selectedCase.state) && (
             <Button disabled={!mutable || busy} variant="outline" onClick={() => void act('verification', selectedId === 'BEN-DEMO-004' ? 'STALE_SOURCE_CONFIRMED' : selectedId === 'BEN-DEMO-001' ? 'DECEASED_MEMBER_CONFIRMED' : 'EVIDENCE_RECONCILED', 'FIELD_VERIFIED')}>Record verification</Button>
-          </>}
+          )}
           {['NOTICE_ISSUED', 'REVIEW_READY'].includes(selectedCase.state) && <>
             <Button disabled={!mutable || busy} onClick={() => void act('recommendation', 'INELIGIBLE', 'DEMO_POLICY_MATCH')}>Recommend ineligible</Button>
             <Button disabled={!mutable || busy} variant="outline" onClick={() => void act('recommendation', 'ELIGIBLE', 'EVIDENCE_CLEARED')}>Recommend eligible</Button>

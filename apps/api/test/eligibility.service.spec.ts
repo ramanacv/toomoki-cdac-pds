@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { EligibilityScreeningAdapter } from '../src/modules/eligibility/eligibility-client.js';
 import { EligibilityClient, EligibilityDependencyError } from '../src/modules/eligibility/eligibility-client.js';
 import { EligibilityRepository } from '../src/modules/eligibility/eligibility.repository.js';
@@ -6,6 +6,22 @@ import { EligibilityService } from '../src/modules/eligibility/eligibility.servi
 import { clearEligibilityGates } from '../src/modules/eligibility/eligibility-gate.js';
 import type { EligibilityScreeningRequest, EligibilityScreeningResponse, EligibilityScreeningStatus } from '@pds/shared-types';
 import { createHash } from 'node:crypto';
+
+const priorPersistence = process.env.PDS_PERSISTENCE_BACKEND;
+const priorDsn = process.env.PDS_POSTGRES_DSN;
+
+beforeEach(() => {
+  delete process.env.PDS_PERSISTENCE_BACKEND;
+  delete process.env.PDS_POSTGRES_DSN;
+});
+
+afterEach(() => {
+  if (priorPersistence === undefined) delete process.env.PDS_PERSISTENCE_BACKEND;
+  else process.env.PDS_PERSISTENCE_BACKEND = priorPersistence;
+  if (priorDsn === undefined) delete process.env.PDS_POSTGRES_DSN;
+  else process.env.PDS_POSTGRES_DSN = priorDsn;
+  clearEligibilityGates();
+});
 
 const digest = createHash('sha256').update('eligibility-test').digest('hex');
 const response = (request: EligibilityScreeningRequest, status: EligibilityScreeningStatus): EligibilityScreeningResponse => ({
@@ -73,7 +89,10 @@ describe('eligibility review workflow', () => {
       idempotencyKey: 'VERIFY-ASHA-1', expectedVersion: 1,
       outcomeCode: 'DECEASED_MEMBER_CONFIRMED', reasonCode: 'FIELD_VERIFIED'
     }, 'officer-1');
-    expect(verified).toMatchObject({ householdSize: 4, monthlyRiceEntitlementKg: 20, entitlementBlocked: false });
+    expect(verified).toMatchObject({
+      householdSize: 4, monthlyRiceEntitlementKg: 20, entitlementBlocked: false,
+      proofStatus: 'PENDING', proofEventId: expect.stringMatching(/^ELIG-PROOF-/)
+    });
     expect(service.gate('BEN-DEMO-001', 20)).toMatchObject({ allowed: true, availableBalanceKg: 20 });
     const recommended = await service.recommendation(verified.caseId, {
       idempotencyKey: 'RECOMMEND-ASHA-1', expectedVersion: verified.version,
@@ -119,6 +138,63 @@ describe('eligibility review workflow', () => {
     expect(service.gate('BEN-DEMO-005', 15)).toMatchObject({ allowed: true, availableBalanceKg: 15, alreadyLiftedKg: 10 });
   });
 
+  it('persists refreshed Fabric proof status from the outbox onto eligibility cases', async () => {
+    const pendingCase = {
+      caseId: 'ELIG-CASE-PROOF', demoBeneficiaryId: 'BEN-DEMO-003',
+      subjectRefHash: 'beneficiary-demo-003-hash', rationCardHash: 'ration-card-demo-003-hash',
+      screening: response({
+        screeningRequestId: 'REQ-PROOF', demoBeneficiaryId: 'BEN-DEMO-003',
+        subjectRefHash: 'beneficiary-demo-003-hash', rationCardHash: 'ration-card-demo-003-hash',
+        checks: ['ECONOMIC'], schemaVersion: '1.0'
+      }, 'ECONOMIC_ELIGIBILITY_REVIEW'),
+      state: 'NOTICE_ISSUED' as const, version: 2, rcmsStatus: 'ACTIVE' as const,
+      entitlementBlocked: false, householdSize: 3, monthlyRiceEntitlementKg: 15,
+      alreadyLiftedKg: 0, proofStatus: 'PENDING' as const, proofEventId: 'ELIG-PROOF-1',
+      history: [], updatedAt: '2026-07-23T00:00:00.000Z'
+    };
+    const syncProofStatuses = vi.fn().mockResolvedValue(undefined);
+    const repository = {
+      loadState: vi.fn().mockResolvedValue({ cases: [pendingCase], actions: [], screenings: [] }),
+      persistScreening: vi.fn(), persistCaseAction: vi.fn(), persistFinalDecision: vi.fn(),
+      loadProofStatuses: vi.fn().mockResolvedValue(new Map([['ELIG-PROOF-1', 'COMMITTED']])),
+      syncProofStatuses
+    } as unknown as EligibilityRepository;
+    const service = createService(undefined, repository);
+    await service.onModuleInit();
+    const listed = await service.listCases();
+    expect(listed[0]?.proofStatus).toBe('COMMITTED');
+    expect(syncProofStatuses).toHaveBeenCalledWith([
+      { caseId: 'ELIG-CASE-PROOF', proofEventId: 'ELIG-PROOF-1', proofStatus: 'COMMITTED' }
+    ]);
+  });
+
+  it('restores entitlement gates from durable eligibility cases after restart', async () => {
+    const blockedCase = {
+      caseId: 'ELIG-CASE-GATE', demoBeneficiaryId: 'BEN-DEMO-003',
+      subjectRefHash: 'beneficiary-demo-003-hash', rationCardHash: 'ration-card-demo-003-hash',
+      screening: response({
+        screeningRequestId: 'REQ-GATE', demoBeneficiaryId: 'BEN-DEMO-003',
+        subjectRefHash: 'beneficiary-demo-003-hash', rationCardHash: 'ration-card-demo-003-hash',
+        checks: ['ECONOMIC'], schemaVersion: '1.0'
+      }, 'ECONOMIC_ELIGIBILITY_REVIEW'),
+      state: 'DECIDED' as const, version: 2, decision: 'CARD_CANCELLED' as const,
+      rcmsStatus: 'CANCELLED' as const, entitlementBlocked: true, householdSize: 3,
+      monthlyRiceEntitlementKg: 15, alreadyLiftedKg: 5, proofStatus: 'COMMITTED' as const,
+      proofEventId: 'ELIG-PROOF-GATE', history: [], updatedAt: '2026-07-23T00:00:00.000Z'
+    };
+    const repository = {
+      loadState: vi.fn().mockResolvedValue({ cases: [blockedCase], actions: [], screenings: [] }),
+      persistScreening: vi.fn(), persistCaseAction: vi.fn(), persistFinalDecision: vi.fn(),
+      loadProofStatuses: vi.fn().mockResolvedValue(new Map()),
+      syncProofStatuses: vi.fn().mockResolvedValue(undefined)
+    } as unknown as EligibilityRepository;
+    const service = createService(undefined, repository);
+    await service.onModuleInit();
+    expect(service.gate('BEN-DEMO-003', 1)).toMatchObject({
+      allowed: false, rcmsStatus: 'CANCELLED', reason: 'EFFECTIVE_RCMS_DECISION'
+    });
+  });
+
   it('enforces valid transitions, optimistic versions, identical replay, and conflicting idempotency reuse', async () => {
     const service = createService();
     const screened = await run(service, 'BEN-DEMO-003');
@@ -126,6 +202,7 @@ describe('eligibility review workflow', () => {
       idempotencyKey: 'NOTICE-3', expectedVersion: 1, outcomeCode: 'ISSUED', reasonCode: 'ECONOMIC_REVIEW'
     };
     const first = await service.notice(screened.case!.caseId, action, 'officer');
+    expect(first).toMatchObject({ proofStatus: 'PENDING', proofEventId: expect.stringMatching(/^ELIG-PROOF-/) });
     await expect(service.notice(screened.case!.caseId, action, 'officer')).resolves.toEqual(first);
     await expect(service.notice(screened.case!.caseId, { ...action, reasonCode: 'DIFFERENT' }, 'officer')).rejects.toThrow(/Idempotency/);
     await expect(service.verification(screened.case!.caseId, {

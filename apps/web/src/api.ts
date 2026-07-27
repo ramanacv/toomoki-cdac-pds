@@ -6,15 +6,17 @@ import type {
   DistributionTransaction,
   FPSAllocation,
   LedgerEvent,
+  LedgerProofAnalyticsResponse,
+  LedgerProofDetailResponse,
+  LedgerProofStatusResponse,
   MonthlyEntitlement,
   Stakeholder,
-  TransferOrder
-  ,LedgerProofStatusResponse
-  ,EligibilityCase
-  ,EligibilitySummary
-  ,BeneficiaryLifecycleEvent
-  ,BeneficiaryLifecycleEventResult
-  ,BeneficiaryRegistrySummary
+  TransferOrder,
+  EligibilityCase,
+  EligibilitySummary,
+  BeneficiaryLifecycleEvent,
+  BeneficiaryLifecycleEventResult,
+  BeneficiaryRegistrySummary
 } from '@pds/shared-types';
 import { AuthMode, AuthResult } from '@pds/shared-types';
 import { demoQuantities, getWorkspaceSnapshot, type DemoScenario } from '@pds/fixtures';
@@ -84,8 +86,14 @@ export async function readApiError(response: Response, path: string): Promise<st
       const reason = body.message ?? 'Your authenticated role is not permitted to perform this operation.';
       return `Access denied while loading ${path}: ${reason}`;
     }
+    if (response.status === 429) {
+      return `Rate limit exceeded while loading ${path}. Wait about a minute before switching personas again (demo Compose defaults are higher than production).`;
+    }
     return body.message ?? text ?? `Request failed for ${path}`;
   } catch {
+    if (response.status === 429) {
+      return `Rate limit exceeded while loading ${path}. Wait about a minute before switching personas again.`;
+    }
     return text || `Request failed for ${path}`;
   }
 }
@@ -122,6 +130,11 @@ async function loadFromApiOrMock<T>(
   }
 
   return fetchJson<T>(path);
+}
+
+export async function fetchAssignedFpsId(): Promise<string> {
+  const assignment = await fetchJson<{ fpsId: string }>('/auth/fps-assignment');
+  return assignment.fpsId;
 }
 
 export async function loadDashboardSummary(apiOnline = true): Promise<DashboardSummary> {
@@ -170,6 +183,17 @@ export async function loadStockPositions(apiOnline = true): Promise<StockPositio
 
 export async function loadLedgerProofStatus(eventId: string): Promise<LedgerProofStatusResponse> {
   return fetchJson(`/ledger-proofs/${encodeURIComponent(eventId)}`);
+}
+
+export async function loadLedgerProofAnalytics(apiOnline = true): Promise<LedgerProofAnalyticsResponse | null> {
+  if (!apiOnline || usesMockData(apiOnline)) {
+    return null;
+  }
+  return fetchJson('/ledger-proofs/analytics');
+}
+
+export async function loadLedgerProofDetail(eventId: string): Promise<LedgerProofDetailResponse> {
+  return fetchJson(`/ledger-proofs/${encodeURIComponent(eventId)}/detail`);
 }
 
 export const loadEligibilitySummary = (): Promise<EligibilitySummary> =>
@@ -293,15 +317,52 @@ export async function executeWorkflowAction(request: WorkflowActionRequest): Pro
     case 'auth':
       return postJson('/auth/mock-otp', request.payload);
     case 'distribute':
-      return postJson('/distributions', withoutCallerControlledFpsIdentity(request.payload));
     case 'duplicate-distribute':
-      return postJson('/distributions', withoutCallerControlledFpsIdentity(request.payload));
+      return distributeWithAuth(request.payload, '/auth/mock-otp');
     case 'supervisor-exception-distribute':
-      return postJson('/distributions', withoutCallerControlledFpsIdentity(request.payload));
+      return distributeWithAuth(request.payload, '/auth/supervisor-exception');
     default:
       throw new Error('Unsupported workflow action');
   }
 }
+
+/** Persist the Auth Ledger row before issue so Allocations/Distribution show beneficiary auth. */
+const distributeWithAuth = async (
+  payload: {
+    distributionId: string;
+    rationCardHash: string;
+    beneficiaryRefHash: string;
+    authMode: AuthMode;
+    authResult: AuthResult;
+    authTxnRefHash: string;
+    approvedBy?: string;
+    fpsId?: string;
+    dealerId?: string;
+  },
+  authPath: '/auth/mock-otp' | '/auth/supervisor-exception'
+) => {
+  const authTxnId = `AUTH-${payload.distributionId}`;
+  const authBody: Record<string, string> = {
+    authTxnId,
+    beneficiaryRefHash: payload.beneficiaryRefHash,
+    rationCardHash: payload.rationCardHash,
+    aadhaarRefHash: payload.beneficiaryRefHash,
+    authResult: payload.authResult
+  };
+  if (authPath === '/auth/supervisor-exception') {
+    authBody.approvedBy = payload.approvedBy ?? 'SUPERVISOR-101';
+  }
+  try {
+    await postJson(authPath, authBody);
+  } catch (error) {
+    // Identical auth replay is acceptable when retrying a failed distribute.
+    const message = error instanceof Error ? error.message : String(error);
+    if (!/already exists|409|conflict/i.test(message)) {
+      throw error;
+    }
+  }
+  return postJson('/distributions', withoutCallerControlledFpsIdentity(payload));
+};
 
 const withoutCallerControlledFpsIdentity = <T extends { fpsId?: string; dealerId?: string }>(
   payload: T

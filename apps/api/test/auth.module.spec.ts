@@ -9,6 +9,14 @@ describe('AuthModule', () => {
 
   afterEach(async () => { await fixture?.cleanup(); });
 
+  it('resolves the authenticated FPS shop assignment for UI labeling', async () => {
+    fixture = await createDemoLedgerFixture();
+    controller = await createControllerWithFacade(AuthController, fixture.facade);
+    await expect(controller.fpsAssignment(asFpsRequest('FPS-101'))).resolves.toMatchObject({
+      fpsId: 'FPS-101'
+    });
+  });
+
   it('records mock OTP and supervisor exception auth transactions', async () => {
     fixture = await createDemoLedgerFixture();
     controller = await createControllerWithFacade(AuthController, fixture.facade);

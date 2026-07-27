@@ -64,21 +64,68 @@ export const initializeAuth = async (): Promise<void> => {
   currentUser = user && !user.expired ? user : null;
 };
 
+const PENDING_PERSONA_KEY = 'pds.pendingPersona';
+
+export type PendingPersona = {
+  username: string;
+  returnUrl: string;
+};
+
 export const signIn = async (returnUrl = '/'): Promise<void> => {
   await getManager().signinRedirect({ state: { returnUrl } });
 };
 
+/** Start OIDC login for a demo persona. Ends any existing SSO session first. */
 export const signInAs = async (username: string, returnUrl = '/'): Promise<void> => {
-  await getManager().signinRedirect({
+  const oidc = getManager();
+  const existing = await oidc.getUser();
+  if (existing && !existing.expired) {
+    sessionStorage.setItem(PENDING_PERSONA_KEY, JSON.stringify({ username, returnUrl } satisfies PendingPersona));
+    currentUser = null;
+    await oidc.signoutRedirect({
+      post_logout_redirect_uri: `${window.location.origin}/role-login`
+    });
+    return;
+  }
+  await oidc.signinRedirect({
     state: { returnUrl },
     prompt: 'login',
     login_hint: username
   });
 };
 
+/** Consume a pending persona switch after Keycloak end-session returns to /role-login. */
+export const consumePendingPersonaSignIn = async (): Promise<boolean> => {
+  if (typeof window === 'undefined') return false;
+  const raw = sessionStorage.getItem(PENDING_PERSONA_KEY);
+  if (!raw) return false;
+  let pending: PendingPersona;
+  try {
+    pending = JSON.parse(raw) as PendingPersona;
+  } catch {
+    sessionStorage.removeItem(PENDING_PERSONA_KEY);
+    return false;
+  }
+  if (!pending.username) {
+    sessionStorage.removeItem(PENDING_PERSONA_KEY);
+    return false;
+  }
+  // Clear first so a remount during redirect does not loop; restore if login fails to start.
+  sessionStorage.removeItem(PENDING_PERSONA_KEY);
+  try {
+    await signInAs(pending.username, pending.returnUrl || '/');
+    return true;
+  } catch (error) {
+    sessionStorage.setItem(PENDING_PERSONA_KEY, raw);
+    throw error;
+  }
+};
+
 export const signOut = async (): Promise<void> => {
   currentUser = null;
-  await getManager().signoutRedirect();
+  await getManager().signoutRedirect({
+    post_logout_redirect_uri: `${window.location.origin}/role-login`
+  });
 };
 
 const decodeClaims = (accessToken: string): Record<string, unknown> => {

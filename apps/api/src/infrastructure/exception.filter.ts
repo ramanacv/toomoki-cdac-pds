@@ -21,7 +21,7 @@ import { randomUUID } from 'node:crypto';
 const NOT_FOUND_RE = /not found/i;
 const CONFLICT_RE = /already exists|already received|already in transit|duplicate/i;
 const VALIDATION_RE =
-  /must be|must not|exceeds|invalid|insufficient|cannot proceed|prohibited|not authorized|whitespace|looks like a raw numeric/i;
+  /must be|must not|exceed(?:s|ed)?|invalid|insufficient|cannot proceed|cannot exceed|prohibited|not authorized|requires|whitespace|looks like a raw numeric/i;
 
 type ErrorBody = {
   statusCode: number;

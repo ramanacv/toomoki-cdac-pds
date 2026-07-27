@@ -45,13 +45,21 @@ describe('eligibility contracts', () => {
       status: 'DUPLICATE_RECORD_REVIEW',
       signals: [{
         source: 'REGISTRY_LINKAGE', status: 'MATCH', risk: 'HIGH',
-        observedAt: '2026-07-23T00:00:00.000Z', factCode: 'TWO_ACTIVE_REGISTRY_REFERENCES'
+        observedAt: '2026-07-23T00:00:00.000Z', factCode: 'TWO_ACTIVE_REGISTRY_REFERENCES',
+        linkageDigest: 'c'.repeat(64)
       }],
       recommendedReviewAction: 'VERIFY_CROSS_REGISTRY_LINKAGE',
       policy: { policyId: 'JK-PANEL-DEMO-2026-V1', simulationOnly: true, ruleIds: ['JK-DUPLICATE-LINK-01'] },
       assessedAt: '2026-07-23T00:00:00.000Z', expiresAt: '2099-12-31T00:00:00.000Z',
-      evidenceDigest: 'a'.repeat(64), responseAttestationHash: 'b'.repeat(64), schemaVersion: '1.0'
+      evidenceDigest: 'a'.repeat(64), responseAttestationHash: 'b'.repeat(64), schemaVersion: '1.0',
+      integrityScore: 55,
+      scoreBreakdown: [{
+        ruleId: 'SCORE-LINKAGE-COLLISION', signalFactCode: 'TWO_ACTIVE_REGISTRY_REFERENCES',
+        weight: 35, contribution: 35, rationaleCode: 'LINKAGE_DIGEST_COLLISION'
+      }]
     }, new Date('2026-07-23T01:00:00.000Z'));
     expect(response.status).toBe('DUPLICATE_RECORD_REVIEW');
+    expect(response.integrityScore).toBe(55);
+    expect(response.signals[0]?.linkageDigest).toBe('c'.repeat(64));
   });
 });
