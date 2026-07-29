@@ -12,6 +12,7 @@ import {
   loadEligibilitySummary,
   loadBeneficiaryRegistrySummary,
   performEligibilityAction,
+  removeBeneficiaries,
   runEligibilityScreening,
   submitBeneficiaryLifecycleEvent
 } from '@/api.js';
@@ -49,6 +50,8 @@ export function EligibilityReviewPage() {
   const [selectedId, setSelectedId] = useState('BEN-DEMO-001');
   const [response, setResponse] = useState<EligibilityScreeningResponse | null>(null);
   const [gate, setGate] = useState<{ allowed: boolean; rcmsStatus: string; availableBalanceKg: number; alreadyLiftedKg: number; reason: string } | null>(null);
+  const [removalSelection, setRemovalSelection] = useState<string[]>([]);
+  const [removalReason, setRemovalReason] = useState<'FRAUD_CONFIRMED' | 'DUPLICATE_RECORD'>('FRAUD_CONFIRMED');
   const [busy, setBusy] = useState(false);
   const [warning, setWarning] = useState<string | null>(offline ? 'Offline fixture mode is read-only; external screening actions are disabled.' : null);
 
@@ -111,6 +114,28 @@ export function EligibilityReviewPage() {
     try { setGate(await checkEligibilityGate(selectedId)); }
     catch (error) { setWarning(error instanceof Error ? error.message : 'Gate check failed'); }
     finally { setBusy(false); }
+  };
+
+  const toggleRemovalSelection = (demoBeneficiaryId: string) => {
+    setRemovalSelection((current) =>
+      current.includes(demoBeneficiaryId)
+        ? current.filter((id) => id !== demoBeneficiaryId)
+        : [...current, demoBeneficiaryId]
+    );
+  };
+
+  const removeSelected = async () => {
+    if (removalSelection.length === 0) return;
+    setBusy(true); setWarning(null);
+    try {
+      await removeBeneficiaries(removalSelection, removalReason, `WEB-REMOVAL-${Date.now()}`);
+      setRemovalSelection([]);
+      await refresh();
+    } catch (error) {
+      setWarning(error instanceof Error ? error.message : 'Beneficiary removal failed');
+    } finally {
+      setBusy(false);
+    }
   };
 
   const recordLifecycle = async (eventType: BeneficiaryLifecycleEventType) => {
@@ -201,7 +226,8 @@ export function EligibilityReviewPage() {
             <table className="w-full text-left text-sm">
               <thead>
                 <tr className="border-b">
-                  <th className="p-2">Beneficiary</th>
+                  <th className="p-2" aria-label="Select for removal">Select</th>
+                  <th>Beneficiary</th>
                   <th>FPS / Tehsil</th>
                   <th>Demo Aadhaar</th>
                   <th>OTP mobile</th>
@@ -216,7 +242,16 @@ export function EligibilityReviewPage() {
                 const mobile = item.demoMobileNumber ?? '';
                 const mobileDisplay = mobile.length === 10 ? mobile.replace(/(\d{5})(\d{5})/, '$1 $2') : mobile || '—';
                 return (
-                <tr key={item.demoBeneficiaryId} className={`cursor-pointer border-b ${selectedId === item.demoBeneficiaryId ? 'bg-primary/5' : ''}`} onClick={() => setSelectedId(item.demoBeneficiaryId)}>
+                <tr key={item.demoBeneficiaryId} className={`cursor-pointer border-b ${selectedId === item.demoBeneficiaryId ? 'bg-primary/5' : ''} ${item.removal ? 'opacity-60' : ''}`} onClick={() => setSelectedId(item.demoBeneficiaryId)}>
+                  <td className="p-2" onClick={(event) => event.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      aria-label={`Select ${item.demoBeneficiaryId} for removal`}
+                      disabled={!mutable || busy || Boolean(item.removal)}
+                      checked={removalSelection.includes(item.demoBeneficiaryId)}
+                      onChange={() => toggleRemovalSelection(item.demoBeneficiaryId)}
+                    />
+                  </td>
                   <td className="p-2">
                     <span className="font-medium">{item.fictionalName}</span>
                     <br />
@@ -244,7 +279,16 @@ export function EligibilityReviewPage() {
                     <span className="text-xs text-muted-foreground">Mock OTP inbox</span>
                   </td>
                   <td>{item.maskedCardRef}</td>
-                  <td><Badge variant="outline">{item.eligibilityStatus}</Badge></td>
+                  <td>
+                    <Badge variant={item.removal ? 'destructive' : 'outline'}>
+                      {item.removal ? 'REMOVED' : item.eligibilityStatus}
+                    </Badge>
+                    {item.removal && (
+                      <span className="mt-1 block text-xs text-muted-foreground">
+                        {item.removal.reasonCode === 'VOLUNTARY_SURRENDER' ? 'Card surrendered' : item.removal.reasonCode}
+                      </span>
+                    )}
+                  </td>
                   <td>{item.caseId ?? itemCase?.caseId ?? 'None'}</td>
                   <td>{item.monthlyRiceEntitlementKg - item.alreadyLiftedKg} kg remaining</td>
                 </tr>
@@ -254,6 +298,31 @@ export function EligibilityReviewPage() {
           <div className="flex flex-wrap gap-2">
             <Button onClick={() => void runScreening()} disabled={!mutable || busy}>Run external eligibility check</Button>
             <Button variant="outline" onClick={() => void checkGate()} disabled={offline || busy}>Entitlement gate check</Button>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-destructive/30 bg-destructive/5 p-3">
+            <p className="text-sm font-medium">Remove from beneficiary list</p>
+            <select
+              aria-label="Removal reason"
+              className="rounded-md border bg-background px-2 py-1 text-sm"
+              value={removalReason}
+              disabled={!mutable || busy}
+              onChange={(event) => setRemovalReason(event.target.value as 'FRAUD_CONFIRMED' | 'DUPLICATE_RECORD')}
+            >
+              <option value="FRAUD_CONFIRMED">Fraud confirmed (mock screening)</option>
+              <option value="DUPLICATE_RECORD">Duplicate record</option>
+            </select>
+            <Button
+              variant="destructive"
+              disabled={!mutable || busy || removalSelection.length === 0}
+              onClick={() => void removeSelected()}
+            >
+              Remove selected ({removalSelection.length})
+            </Button>
+            <p className="w-full text-xs text-muted-foreground">
+              Select beneficiaries above after fraud is confirmed via the mock screening services. Removal cancels the
+              card, blocks the FPS entitlement gate, and records a registry deactivation proof. Voluntary surrender
+              happens in the beneficiary self-service portal.
+            </p>
           </div>
           {!mutable && <p className="text-sm text-muted-foreground">{offline ? 'Actions are disabled in offline fixture mode.' : 'Management and Auditor views are read-only.'}</p>}
         </CardContent>

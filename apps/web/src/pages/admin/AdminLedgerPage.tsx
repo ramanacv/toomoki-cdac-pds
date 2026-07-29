@@ -6,7 +6,7 @@ export function AdminLedgerPage() {
   return (
     <div className="grid gap-4">
       <header className="px-1">
-        <p className="eyebrow">ViksitPDS</p>
+        <p className="eyebrow"><span className="brand-name">ViksitPDS</span></p>
         <h2 className="text-3xl font-semibold tracking-tight">Ledger activity</h2>
         <p className="mt-1 leading-relaxed text-muted-foreground">
           Entitlement utilization, stock positions, and recent ledger events.

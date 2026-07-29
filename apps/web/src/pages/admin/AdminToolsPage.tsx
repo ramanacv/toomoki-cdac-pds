@@ -129,7 +129,7 @@ export function AdminToolsPage() {
   return (
     <div className="grid gap-4">
       <header className="px-1">
-        <p className="eyebrow">ViksitPDS</p>
+        <p className="eyebrow"><span className="brand-name">ViksitPDS</span></p>
         <h2 className="text-3xl font-semibold tracking-tight">Admin tools</h2>
         <p className="mt-1 leading-relaxed text-muted-foreground">
           Controlled test-data top-ups and destructive ledger resets for authorized demo operators.

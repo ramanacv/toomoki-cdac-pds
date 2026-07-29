@@ -1,6 +1,5 @@
 import { createHash } from 'node:crypto';
 import {
-  type EposAuthRequest,
   type EposAuthResponse,
   validateEposAuthRequest
 } from '@pds/shared-types';

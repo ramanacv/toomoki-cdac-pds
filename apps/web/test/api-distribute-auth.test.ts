@@ -8,7 +8,7 @@ describe('executeWorkflowAction distribute auth ledger', () => {
   });
 
   it('records mock OTP auth before posting a distribution', async () => {
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
       const url = String(input);
       if (url.endsWith('/auth/mock-otp')) {
         return new Response(JSON.stringify({ authTxnId: 'AUTH-DIST-1' }), { status: 201 });

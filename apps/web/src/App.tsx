@@ -21,6 +21,7 @@ import { AdminLedgerPage } from '@/pages/admin/AdminLedgerPage.js';
 import { AdminAlertsPage } from '@/pages/admin/AdminAlertsPage.js';
 import { AdminToolsPage } from '@/pages/admin/AdminToolsPage.js';
 import { RoleLoginPage } from '@/pages/RoleLoginPage.js';
+import { CitizenPortalPage } from '@/pages/citizen/CitizenPortalPage.js';
 import { Toaster } from '@/components/ui/sonner.js';
 import { TooltipProvider } from '@/components/ui/tooltip.js';
 
@@ -28,6 +29,7 @@ export function AppRoutes() {
   return (
     <Routes>
       <Route path="/role-login" element={<RoleLoginPage />} />
+      <Route path="/citizen" element={<CitizenPortalPage />} />
       <Route path="/" element={<WorkspaceLayout />}>
         <Route index element={<DefaultScreenRedirect />} />
         <Route

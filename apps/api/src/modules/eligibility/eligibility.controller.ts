@@ -4,7 +4,7 @@ import { Plane } from '../../infrastructure/plane.decorator.js';
 import { Roles } from '../auth/roles.decorator.js';
 import type { AuthenticatedRequest } from '../auth/identity-provider.js';
 import { EligibilityService } from './eligibility.service.js';
-import { EligibilityActionDto, EligibilityDecisionDto, EligibilityGateDto, RunEligibilityScreeningDto } from './dto/eligibility.dto.js';
+import { BeneficiaryRemovalDto, EligibilityActionDto, EligibilityDecisionDto, EligibilityGateDto, RunEligibilityScreeningDto } from './dto/eligibility.dto.js';
 
 @Plane('control')
 @Controller('/eligibility/v1')
@@ -60,6 +60,17 @@ export class EligibilityController {
 
   @Post('/entitlement-gate')
   gate(@Body() body: EligibilityGateDto) { return this.service.gate(body.demoBeneficiaryId, body.requestedQtyKg); }
+
+  /** Officer bulk removal after fraud confirmation from the mock screening services. */
+  @Post('/beneficiaries/removals')
+  @Roles('department')
+  removeBeneficiaries(@Body() body: BeneficiaryRemovalDto, @Req() request: AuthenticatedRequest) {
+    return this.service.removeBeneficiaries(
+      body,
+      request.user?.subject ?? 'department',
+      'DEPARTMENT_ACTION'
+    );
+  }
 
   @Post('/demo/reset')
   @HttpCode(200)

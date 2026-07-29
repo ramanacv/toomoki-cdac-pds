@@ -1,4 +1,8 @@
-import { render, screen } from '@testing-library/react';
+import { render as renderBase, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
+import type { ReactElement } from 'react';
+
+const render = (ui: ReactElement) => renderBase(<MemoryRouter>{ui}</MemoryRouter>);
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 

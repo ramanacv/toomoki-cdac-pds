@@ -1,8 +1,13 @@
 import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException, OnModuleInit, Optional, ServiceUnavailableException } from '@nestjs/common';
 import { createHash, randomUUID } from 'node:crypto';
 import {
+  BENEFICIARY_REMOVAL_REASONS,
   ELIGIBILITY_POLICY_ID,
   type BeneficiaryLifecycleEvent,
+  type BeneficiaryRemovalReason,
+  type BeneficiaryRemovalResponse,
+  type BeneficiaryRemovalResult,
+  type BeneficiaryRemovalSource,
   type EligibilityBeneficiary,
   type EligibilityCase,
   type EligibilityCaseAction,
@@ -49,6 +54,7 @@ export class EligibilityService implements OnModuleInit {
   private readonly screeningCounts = new Map<string, number>();
   private readonly idempotency = new Map<string, { fingerprint: string; result: EligibilityCase }>();
   private readonly screeningIdempotency = new Map<string, { fingerprint: string; result: ScreeningResult }>();
+  private readonly removalIdempotency = new Map<string, { fingerprint: string; result: BeneficiaryRemovalResponse }>();
   private serviceState: EligibilitySummary['service'] = { status: 'NOT_CONFIGURED' };
   private quarantined = 0;
 
@@ -409,10 +415,133 @@ export class EligibilityService implements OnModuleInit {
     };
   }
 
+  /** Read-only snapshot of a synthetic beneficiary, including live status and removal record. */
+  getBeneficiary(demoBeneficiaryId: string): EligibilityBeneficiary {
+    return structuredClone(this.mustBeneficiary(demoBeneficiaryId));
+  }
+
+  /**
+   * Removes beneficiaries from the active list (officer bulk action after
+   * fraud confirmation, or a beneficiary's own card surrender).
+   *
+   * Effects per beneficiary: status becomes CANCELLED, the entitlement gate is
+   * blocked (FPS distribution is refused), and a `RECORD_DEACTIVATED`
+   * beneficiary-registry lifecycle event is recorded with a Fabric proof.
+   * Repeat requests with the same idempotency key replay; conflicting reuse
+   * returns 409. Already-removed beneficiaries report ALREADY_REMOVED.
+   */
+  async removeBeneficiaries(
+    input: { idempotencyKey: string; reasonCode: BeneficiaryRemovalReason; demoBeneficiaryIds: string[]; note?: string },
+    actorRef: string,
+    source: BeneficiaryRemovalSource
+  ): Promise<BeneficiaryRemovalResponse> {
+    if (!BENEFICIARY_REMOVAL_REASONS.includes(input.reasonCode)) {
+      throw new BadRequestException(`reasonCode must be one of: ${BENEFICIARY_REMOVAL_REASONS.join(', ')}`);
+    }
+    const ids = [...new Set(input.demoBeneficiaryIds)];
+    if (ids.length === 0) throw new BadRequestException('demoBeneficiaryIds must not be empty');
+    if (ids.length > 20) throw new BadRequestException('At most 20 beneficiaries can be removed per request');
+
+    const fingerprint = hash({ action: 'BENEFICIARY_REMOVAL', ids, reasonCode: input.reasonCode, note: input.note, source });
+    const previous = this.removalIdempotency.get(input.idempotencyKey);
+    if (previous) {
+      if (previous.fingerprint !== fingerprint) {
+        throw new ConflictException('Idempotency key was reused with different removal content');
+      }
+      return structuredClone(previous.result);
+    }
+
+    // Validate every target before mutating any of them.
+    for (const id of ids) this.mustBeneficiary(id);
+
+    const results: BeneficiaryRemovalResult[] = [];
+    for (const id of ids) {
+      const beneficiary = this.mustBeneficiary(id);
+      if (beneficiary.removal) {
+        results.push({
+          demoBeneficiaryId: id,
+          disposition: 'ALREADY_REMOVED',
+          eligibilityStatus: 'CANCELLED',
+          removal: structuredClone(beneficiary.removal)
+        });
+        continue;
+      }
+      const removedAt = new Date().toISOString();
+      const registryProofEventId = await this.recordRegistryDeactivation(beneficiary, input, actorRef, removedAt);
+      const removal: NonNullable<EligibilityBeneficiary['removal']> = {
+        reasonCode: input.reasonCode,
+        source,
+        removedAt,
+        removedBy: actorRef,
+        ...(input.note ? { note: input.note } : {}),
+        ...(registryProofEventId ? { registryProofEventId } : {})
+      };
+      beneficiary.eligibilityStatus = 'CANCELLED';
+      beneficiary.removal = removal;
+      setEligibilityGate(beneficiary.rationCardHash, {
+        blocked: true,
+        rcmsStatus: 'CANCELLED',
+        caseId: beneficiary.caseId ?? 'BENEFICIARY_REMOVAL'
+      });
+      results.push({ demoBeneficiaryId: id, disposition: 'REMOVED', eligibilityStatus: 'CANCELLED', removal: structuredClone(removal) });
+    }
+
+    const result: BeneficiaryRemovalResponse = { simulationOnly: true, idempotencyKey: input.idempotencyKey, results };
+    this.removalIdempotency.set(input.idempotencyKey, { fingerprint, result: structuredClone(result) });
+    return result;
+  }
+
+  /**
+   * Records the removal as a privacy-safe registry lifecycle event
+   * (RECORD_DEACTIVATED), auto-creating the registry record first when the
+   * beneficiary was never registered — same ensure-then-apply pattern as the
+   * deceased-member bridge. Event IDs derive from the idempotency key so
+   * identical replays succeed and conflicting reuse fails in the registry.
+   */
+  private async recordRegistryDeactivation(
+    beneficiary: EligibilityBeneficiary,
+    input: { idempotencyKey: string; reasonCode: BeneficiaryRemovalReason },
+    actorRef: string,
+    removedAt: string
+  ): Promise<string | undefined> {
+    if (!this.registry) return undefined;
+    const eventKey = hash({ key: input.idempotencyKey, id: beneficiary.demoBeneficiaryId }).slice(0, 24);
+    const base = {
+      beneficiaryRefHash: beneficiary.subjectRefHash,
+      rationCardHash: beneficiary.rationCardHash,
+      sourceSystem: 'VIKSITPDS_DEMO' as const,
+      occurredAt: removedAt,
+      effectiveAt: removedAt,
+      policyId: ELIGIBILITY_POLICY_ID,
+      evidenceDigest: hash({ eventKey, reasonCode: input.reasonCode, actorRef }),
+      districtCode: beneficiary.districtCode ?? 'MH-DEMO-01',
+      schemaVersion: '1.0' as const
+    };
+    const deactivation: BeneficiaryLifecycleEvent = {
+      ...base,
+      eventId: `BEN-REMOVAL-${eventKey}`,
+      eventType: 'RECORD_DEACTIVATED',
+      reasonCode: input.reasonCode
+    };
+    try {
+      return (await this.registry.apply(deactivation)).proofEventId;
+    } catch {
+      await this.registry.apply({
+        ...base,
+        eventId: `BEN-REMOVAL-CREATE-${eventKey}`,
+        eventType: 'BENEFICIARY_CREATED',
+        reasonCode: 'DEMO_REGISTRY_ENSURE',
+        householdSizeDelta: beneficiary.householdSize,
+        newState: 'ACTIVE'
+      });
+      return (await this.registry.apply(deactivation)).proofEventId;
+    }
+  }
+
   reset(): { reset: true } {
     this.beneficiaries = new Map(beneficiariesSeed.map((item) => [item.demoBeneficiaryId, structuredClone(item)]));
     this.cases.clear(); this.caseByBeneficiary.clear(); this.screeningCounts.clear(); this.idempotency.clear();
-    this.screeningIdempotency.clear();
+    this.screeningIdempotency.clear(); this.removalIdempotency.clear();
     this.quarantined = 0; this.serviceState = { status: 'NOT_CONFIGURED' }; clearEligibilityGates();
     return { reset: true };
   }

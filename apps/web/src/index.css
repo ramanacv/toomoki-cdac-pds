@@ -111,6 +111,11 @@
     @apply m-0 mb-2 text-[11px] font-extrabold uppercase tracking-[0.16em] text-primary;
   }
 
+  /* Product name emphasis inside eyebrows and headers. */
+  .brand-name {
+    @apply text-lg font-extrabold normal-case tracking-tight text-primary;
+  }
+
   .pill {
     @apply inline-flex items-center rounded-full bg-primary/[0.12] px-3 py-2 text-[0.82rem] font-bold text-primary;
   }

@@ -6,7 +6,7 @@ export function AdminStakeholdersPage() {
   return (
     <div className="grid gap-4">
       <header className="px-1">
-        <p className="eyebrow">ViksitPDS</p>
+        <p className="eyebrow"><span className="brand-name">ViksitPDS</span></p>
         <h2 className="text-3xl font-semibold tracking-tight">Stakeholders</h2>
         <p className="mt-1 leading-relaxed text-muted-foreground">
           Org type and status breakdown across registered PDS actors.
