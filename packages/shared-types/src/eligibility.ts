@@ -146,6 +146,40 @@ export type EligibilityFamilyMember = {
   aadhaarRefHash?: string;
 };
 
+export const BENEFICIARY_REMOVAL_REASONS = [
+  'FRAUD_CONFIRMED',
+  'DUPLICATE_RECORD',
+  'VOLUNTARY_SURRENDER'
+] as const;
+export type BeneficiaryRemovalReason = (typeof BENEFICIARY_REMOVAL_REASONS)[number];
+
+/** How a beneficiary left the active list: officer action or self-surrender. */
+export type BeneficiaryRemovalSource = 'DEPARTMENT_ACTION' | 'BENEFICIARY_SURRENDER';
+
+export type BeneficiaryRemovalRecord = {
+  reasonCode: BeneficiaryRemovalReason;
+  source: BeneficiaryRemovalSource;
+  removedAt: string;
+  /** Officer subject or beneficiary subjectRefHash — never a raw identity. */
+  removedBy: string;
+  note?: string;
+  /** Registry lifecycle proof event, when the registry recorded the deactivation. */
+  registryProofEventId?: string;
+};
+
+export type BeneficiaryRemovalResult = {
+  demoBeneficiaryId: string;
+  disposition: 'REMOVED' | 'ALREADY_REMOVED';
+  eligibilityStatus: 'CANCELLED';
+  removal: BeneficiaryRemovalRecord;
+};
+
+export type BeneficiaryRemovalResponse = {
+  simulationOnly: true;
+  idempotencyKey: string;
+  results: BeneficiaryRemovalResult[];
+};
+
 export type EligibilityBeneficiary = {
   demoBeneficiaryId: string;
   fictionalName: string;
@@ -177,6 +211,8 @@ export type EligibilityBeneficiary = {
   districtCode?: string;
   eligibilityStatus: 'ELIGIBLE' | 'UNDER_REVIEW' | 'SUSPENDED' | 'CANCELLED';
   caseId?: string;
+  /** Present when the beneficiary was removed from the active list. */
+  removal?: BeneficiaryRemovalRecord;
 };
 
 export type EligibilitySummary = {

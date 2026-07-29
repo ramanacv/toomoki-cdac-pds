@@ -29,7 +29,7 @@ export function Sidebar({ role, onNavigate, onOpenDemoControls }: SidebarProps) 
   return (
     <div className="flex h-full flex-col gap-6 border-r border-border bg-card/60 px-4 py-6">
       <div className="px-2">
-        <span className="pill">ViksitPDS</span>
+        <span className="pill px-4 text-lg">ViksitPDS</span>
         <p className="eyebrow compact mt-3">{activeDefinition.title}</p>
       </div>
 

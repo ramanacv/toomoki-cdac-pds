@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { consumePendingPersonaSignIn, getCurrentIdentity, signInAs, signOut } from '@/auth-token.js';
 import { Panel } from '@/components/Panel';
 import { Button } from '@/components/ui/button';
@@ -120,7 +121,7 @@ export function RoleLoginPage() {
   return (
     <main id="main" className="mx-auto min-h-screen w-full max-w-[1040px] px-4 py-10">
       <section className="mb-6 px-1 py-2">
-        <p className="eyebrow">ViksitPDS · local testing</p>
+        <p className="eyebrow"><span className="brand-name">ViksitPDS</span> · local testing</p>
         <h1 className="text-3xl font-semibold tracking-tight">Choose a demo module</h1>
         <p className="mt-2 max-w-3xl leading-relaxed text-muted-foreground">
           Step 1: select a module. Step 2: choose a Keycloak persona below. This page only pre-fills the username;
@@ -183,6 +184,25 @@ export function RoleLoginPage() {
           Controlled PoC: ViksitPDS complements SMART-PDS/RCMS, IAeSCM/state SCM, and AePDS/ePoS.
           Fixture-backed actions simulate authoritative source-system events; they are not live state integrations.
         </p>
+      </Panel>
+
+      <Panel
+        eyebrow="Citizen journey"
+        title="Beneficiary self-service"
+        pill="Simulated RCMS public login"
+        className="mt-6 p-6"
+      >
+        <p className="text-sm leading-relaxed text-muted-foreground">
+          Separate from the Keycloak personas above: a beneficiary signs in with a <strong>synthetic demo Aadhaar
+          number</strong> and a simulated OTP, mirroring the J&amp;K and Maharashtra RCMS citizen portals, then sees
+          their masked card, entitlement balance, and FPS issue history with Fabric proof status. In a state
+          deployment this journey belongs to SMART-PDS/RCMS.
+        </p>
+        <div className="mt-4">
+          <Button asChild>
+            <Link to="/citizen">Open beneficiary self-service</Link>
+          </Button>
+        </div>
       </Panel>
 
       {selectedModule ? (

@@ -19,7 +19,7 @@ export function AdminOverviewPage() {
     <div className="grid gap-4">
       <section className="grid gap-6 md:grid-cols-[minmax(0,1.3fr)_minmax(290px,0.7fr)]">
         <div className="surface-blur rounded-3xl p-8">
-          <p className="eyebrow">ViksitPDS operator console</p>
+          <p className="eyebrow"><span className="brand-name">ViksitPDS</span> operator console</p>
           <h2 className="text-3xl font-semibold tracking-tight">
             Monitor ledger health, network status, and recent activity.
           </h2>

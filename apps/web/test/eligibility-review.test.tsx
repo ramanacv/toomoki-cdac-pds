@@ -41,6 +41,24 @@ const summary: EligibilitySummary = {
       },
       { fictionalName: 'Ramesh Patil (Fictional)', relation: 'Spouse', ageYears: 45, demoAadhaarNumber: '999988880011' }
     ]
+  }, {
+    demoBeneficiaryId: 'BEN-DEMO-002',
+    fictionalName: 'Ravi Shinde (Fictional)',
+    fictionalAddress: 'House 8, Village Demo-Mulshi, Tehsil Mulshi, Demo District',
+    maskedCardRef: 'RC-DEMO-***002',
+    demoAadhaarNumber: '999988880002',
+    demoMobileNumber: '9000080002',
+    aadhaarRefHash: 'aadhaar-ref-demo-002-hash',
+    subjectRefHash: 'beneficiary-demo-002-hash',
+    rationCardHash: 'ration-card-demo-002-hash',
+    householdSize: 4,
+    monthlyRiceEntitlementKg: 20,
+    alreadyLiftedKg: 0,
+    fpsId: 'FPS-101',
+    blockName: 'Mulshi',
+    tehsilName: 'Mulshi',
+    eligibilityStatus: 'ELIGIBLE',
+    familyMembers: []
   }]
 };
 
@@ -76,7 +94,8 @@ const api = vi.hoisted(() => ({
   runEligibilityScreening: vi.fn(),
   performEligibilityAction: vi.fn(),
   checkEligibilityGate: vi.fn(),
-  submitBeneficiaryLifecycleEvent: vi.fn()
+  submitBeneficiaryLifecycleEvent: vi.fn(),
+  removeBeneficiaries: vi.fn()
 }));
 const context = vi.hoisted(() => ({ role: 'CONTROL_OFFICE' }));
 
@@ -102,6 +121,11 @@ beforeEach(() => {
   api.checkEligibilityGate.mockResolvedValue({
     allowed: true, rcmsStatus: 'ACTIVE', monthlyEntitlementKg: 25,
     alreadyLiftedKg: 0, availableBalanceKg: 25, reason: 'ELIGIBLE'
+  });
+  api.removeBeneficiaries.mockResolvedValue({
+    simulationOnly: true,
+    idempotencyKey: 'WEB-REMOVAL-TEST',
+    results: []
   });
 });
 
@@ -158,6 +182,49 @@ describe('eligibility review workspace', () => {
     expect(screen.getByRole('button', { name: 'Record verification' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Recommend ineligible' })).toBeEnabled();
     expect(screen.queryByRole('button', { name: 'Issue notice' })).not.toBeInTheDocument();
+  });
+
+  it('removes multiple selected beneficiaries with the chosen reason', async () => {
+    const user = userEvent.setup();
+    render(<EligibilityReviewPage />);
+    expect(await screen.findAllByText('Asha Patil (Fictional)')).not.toHaveLength(0);
+
+    const removeButton = screen.getByRole('button', { name: /Remove selected \(0\)/ });
+    expect(removeButton).toBeDisabled();
+
+    await user.click(screen.getByLabelText('Select BEN-DEMO-001 for removal'));
+    await user.click(screen.getByLabelText('Select BEN-DEMO-002 for removal'));
+    await user.selectOptions(screen.getByLabelText('Removal reason'), 'FRAUD_CONFIRMED');
+    await user.click(screen.getByRole('button', { name: /Remove selected \(2\)/ }));
+
+    expect(api.removeBeneficiaries).toHaveBeenCalledWith(
+      ['BEN-DEMO-001', 'BEN-DEMO-002'],
+      'FRAUD_CONFIRMED',
+      expect.stringMatching(/^WEB-REMOVAL-/)
+    );
+  });
+
+  it('marks removed beneficiaries and blocks re-selecting them', async () => {
+    api.loadEligibilitySummary.mockResolvedValue({
+      ...summary,
+      beneficiaries: [
+        summary.beneficiaries[0],
+        {
+          ...summary.beneficiaries[1],
+          eligibilityStatus: 'CANCELLED' as const,
+          removal: {
+            reasonCode: 'VOLUNTARY_SURRENDER' as const,
+            source: 'BENEFICIARY_SURRENDER' as const,
+            removedAt: '2026-07-29T10:00:00Z',
+            removedBy: 'beneficiary-demo-002-hash'
+          }
+        }
+      ]
+    });
+    render(<EligibilityReviewPage />);
+    expect(await screen.findByText('REMOVED')).toBeInTheDocument();
+    expect(screen.getByText('Card surrendered')).toBeInTheDocument();
+    expect(screen.getByLabelText('Select BEN-DEMO-002 for removal')).toBeDisabled();
   });
 
   it.each(['MANAGEMENT', 'AUDITOR'])('is read-only for %s', async (role) => {

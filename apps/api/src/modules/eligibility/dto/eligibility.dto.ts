@@ -1,5 +1,10 @@
-import { IsArray, IsIn, IsInt, IsOptional, IsString, Min } from 'class-validator';
-import { ELIGIBILITY_CHECKS, ELIGIBILITY_DECISIONS } from '@pds/shared-types';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsIn, IsInt, IsOptional, IsString, Min } from 'class-validator';
+import {
+  BENEFICIARY_REMOVAL_REASONS,
+  ELIGIBILITY_CHECKS,
+  ELIGIBILITY_DECISIONS,
+  type BeneficiaryRemovalReason
+} from '@pds/shared-types';
 
 export class RunEligibilityScreeningDto {
   @IsString() screeningRequestId!: string;
@@ -22,4 +27,12 @@ export class EligibilityDecisionDto extends EligibilityActionDto {
 export class EligibilityGateDto {
   @IsString() demoBeneficiaryId!: string;
   @IsOptional() @IsInt() @Min(1) requestedQtyKg = 1;
+}
+
+/** Officer bulk removal of beneficiaries confirmed fraudulent (or duplicates). */
+export class BeneficiaryRemovalDto {
+  @IsString() idempotencyKey!: string;
+  @IsIn(BENEFICIARY_REMOVAL_REASONS) reasonCode!: BeneficiaryRemovalReason;
+  @IsArray() @ArrayMinSize(1) @ArrayMaxSize(20) @IsString({ each: true }) demoBeneficiaryIds!: string[];
+  @IsOptional() @IsString() note?: string;
 }

@@ -22,6 +22,7 @@ import { ProofsModule } from './modules/proofs/proofs.module.js';
 import { IntegrationsModule } from './modules/integrations/integrations.module.js';
 import { EligibilityModule } from './modules/eligibility/eligibility.module.js';
 import { BeneficiaryRegistryModule } from './modules/beneficiary-registry/beneficiary-registry.module.js';
+import { BeneficiaryPortalModule } from './modules/beneficiary-portal/beneficiary-portal.module.js';
 
 @Module({
   imports: [
@@ -45,7 +46,8 @@ import { BeneficiaryRegistryModule } from './modules/beneficiary-registry/benefi
     ProofsModule,
     IntegrationsModule,
     EligibilityModule,
-    BeneficiaryRegistryModule
+    BeneficiaryRegistryModule,
+    BeneficiaryPortalModule
   ],
   providers: [
     {

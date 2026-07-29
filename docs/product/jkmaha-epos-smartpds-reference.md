@@ -152,6 +152,12 @@ The state systems remain authoritative for their business records. PostgreSQL is
 > live state-system integration. The pilot gates in this document remain open,
 > including approved Maharashtra contracts and row-scoped atomic command
 > persistence.
+>
+> Update, 29 July 2026: a simulated beneficiary self-service journey
+> (`/citizen`, `/beneficiary-portal/v1`) now models the J&K/Maharashtra RCMS
+> public login (synthetic demo Aadhaar + displayed demo OTP). It is a labelled
+> simulation of the state citizen journey, not a ViksitPDS citizen service;
+> see `docs/implementation/beneficiary-self-service-portal.md`.
 
 ### What already exists
 

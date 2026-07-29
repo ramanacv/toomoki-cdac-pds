@@ -16,7 +16,9 @@ import type {
   EligibilitySummary,
   BeneficiaryLifecycleEvent,
   BeneficiaryLifecycleEventResult,
-  BeneficiaryRegistrySummary
+  BeneficiaryRegistrySummary,
+  BeneficiaryRemovalReason,
+  BeneficiaryRemovalResponse
 } from '@pds/shared-types';
 import { AuthMode, AuthResult } from '@pds/shared-types';
 import { demoQuantities, getWorkspaceSnapshot, type DemoScenario } from '@pds/fixtures';
@@ -237,6 +239,20 @@ export const checkEligibilityGate = (
   availableBalanceKg: number;
   reason: string;
 }> => postJson('/eligibility/v1/entitlement-gate', { demoBeneficiaryId, requestedQtyKg });
+
+/** Officer bulk removal of beneficiaries from the active list (fraud/duplicate). */
+export const removeBeneficiaries = (
+  demoBeneficiaryIds: string[],
+  reasonCode: BeneficiaryRemovalReason,
+  idempotencyKey: string,
+  note?: string
+): Promise<BeneficiaryRemovalResponse> =>
+  postJson('/eligibility/v1/beneficiaries/removals', {
+    idempotencyKey,
+    reasonCode,
+    demoBeneficiaryIds,
+    ...(note ? { note } : {})
+  });
 
 export async function fetchApiHealth(): Promise<ApiHealth> {
   if (getDataSourceMode() === 'mock') {
