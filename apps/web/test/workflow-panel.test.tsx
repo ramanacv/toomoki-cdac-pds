@@ -14,7 +14,7 @@ vi.mock('@/auth-token.js', () => ({
 import { executeWorkflowAction } from '@/api.js';
 import { demoEntitlements, demoLots } from '@/demo-model.js';
 import { demoQuantities } from '@pds/fixtures';
-import { TransferStatus } from '@pds/shared-types';
+import { COMMODITIES, TransferStatus } from '@pds/shared-types';
 
 const receivedTransfer = (transferId: string, fromOrg: string, toOrg: string, lotId = 'LOT-RICE-2026-001') => ({
   transferId,
@@ -75,6 +75,105 @@ beforeEach(() => {
 });
 
 describe('WorkflowActionPanel', () => {
+  it('keeps retained FCI stock visible after a partial dispatch', () => {
+    render(
+      <WorkflowActionPanel
+        {...baseProps}
+        apiOnline
+        role="FCI_DEPOT"
+        stockPositions={[
+          { entityId: 'FCI-001', commodity: 'Wheat', quantityKg: 6000 },
+          { entityId: 'GODOWN-S-001', commodity: 'Wheat', quantityKg: 1000 }
+        ]}
+      />
+    );
+
+    const stockSection = within(screen.getByTestId('role-stock-on-hand'));
+    const stockCard = within(screen.getByTestId('role-stock-FCI-001-Wheat'));
+    expect(screen.getByRole('heading', { name: 'FCI stock on hand' })).toBeInTheDocument();
+    expect(screen.getByText('Retained stock at FCI-001, available for future Stage-I dispatches.')).toBeInTheDocument();
+    expect(stockCard.getByText('6,000 kg')).toBeInTheDocument();
+    expect(stockCard.getByText('Available at FCI-001')).toBeInTheDocument();
+    expect(stockSection.queryByText('1,000 kg')).not.toBeInTheDocument();
+  });
+
+  it.each([
+    {
+      role: 'FCI_DEPOT' as const,
+      title: 'FCI stock on hand',
+      fpsId: undefined,
+      visible: ['role-stock-FCI-001-Wheat'],
+      hidden: ['role-stock-GODOWN-S-001-Rice', 'role-stock-GODOWN-B-001-Rice', 'role-stock-FPS-101-Rice']
+    },
+    {
+      role: 'GODOWN' as const,
+      title: 'Godown stock on hand',
+      fpsId: undefined,
+      visible: ['role-stock-GODOWN-S-001-Rice', 'role-stock-GODOWN-B-001-Rice'],
+      hidden: ['role-stock-FCI-001-Wheat', 'role-stock-FPS-101-Rice']
+    },
+    {
+      role: 'CONTROL_OFFICE' as const,
+      title: 'Godown stock under DSO oversight',
+      fpsId: undefined,
+      visible: ['role-stock-GODOWN-S-001-Rice', 'role-stock-GODOWN-B-001-Rice'],
+      hidden: ['role-stock-FCI-001-Wheat', 'role-stock-FPS-101-Rice']
+    },
+    {
+      role: 'BLOCK_OFFICE' as const,
+      title: 'Block stock available for FPS allotment',
+      fpsId: undefined,
+      visible: ['role-stock-GODOWN-B-001-Rice'],
+      hidden: ['role-stock-FCI-001-Wheat', 'role-stock-GODOWN-S-001-Rice', 'role-stock-FPS-101-Rice']
+    },
+    {
+      role: 'FPS' as const,
+      title: 'FPS stock on hand',
+      fpsId: 'FPS-202',
+      visible: ['role-stock-FPS-202-Rice'],
+      hidden: ['role-stock-FPS-101-Rice', 'role-stock-FCI-001-Wheat', 'role-stock-GODOWN-B-001-Rice']
+    },
+    {
+      role: 'MANAGEMENT' as const,
+      title: 'Network stock overview',
+      fpsId: undefined,
+      visible: ['role-stock-FCI-001-Wheat', 'role-stock-GODOWN-S-001-Rice', 'role-stock-GODOWN-B-001-Rice', 'role-stock-FPS-101-Rice'],
+      hidden: []
+    },
+    {
+      role: 'AUDITOR' as const,
+      title: 'Network stock audit view',
+      fpsId: undefined,
+      visible: ['role-stock-FCI-001-Wheat', 'role-stock-GODOWN-S-001-Rice', 'role-stock-GODOWN-B-001-Rice', 'role-stock-FPS-101-Rice'],
+      hidden: []
+    }
+  ])('shows correctly scoped stock for $role', ({ role, title, fpsId, visible, hidden }) => {
+    render(
+      <WorkflowActionPanel
+        {...baseProps}
+        apiOnline
+        role={role}
+        {...(fpsId ? { fpsId } : {})}
+        stockPositions={[
+          { entityId: 'FCI-001', commodity: 'Wheat', quantityKg: 6000 },
+          { entityId: 'GODOWN-S-001', commodity: 'Rice', quantityKg: 100 },
+          { entityId: 'GODOWN-B-001', commodity: 'Rice', quantityKg: 700 },
+          { entityId: 'FPS-101', commodity: 'Rice', quantityKg: 265 },
+          { entityId: 'FPS-202', commodity: 'Rice', quantityKg: 400 }
+        ]}
+      />
+    );
+
+    const stockSection = within(screen.getByTestId('role-stock-on-hand'));
+    expect(stockSection.getByRole('heading', { name: title })).toBeInTheDocument();
+    for (const testId of visible) {
+      expect(stockSection.getByTestId(testId)).toBeInTheDocument();
+    }
+    for (const testId of hidden) {
+      expect(stockSection.queryByTestId(testId)).not.toBeInTheDocument();
+    }
+  });
+
   it('renders FCI Stage-I dispatch as the first action', () => {
     render(<WorkflowActionPanel {...baseProps} apiOnline={false} role="FCI_DEPOT" />);
 
@@ -118,6 +217,39 @@ describe('WorkflowActionPanel', () => {
 
     expect(baseProps.onMockComplete).toHaveBeenCalledTimes(1);
     expect(screen.getByText(/Ledger event MOCK-RO_LITE_APPROVED/)).toBeInTheDocument();
+  });
+
+  it('marks only the clicked commodity approval as complete', async () => {
+    const user = userEvent.setup();
+    const allCommoditiesReady = {
+      ...depotReady,
+      transfers: COMMODITIES.map((commodity) => ({
+        ...depotReady.transfers[0]!,
+        transferId: `TR-POC-${commodity.slug.toUpperCase()}-FCI-DEPOT`,
+        lotId: `LOT-${commodity.slug.toUpperCase()}-2026-001`
+      }))
+    };
+    render(
+      <WorkflowActionPanel
+        {...baseProps}
+        {...allCommoditiesReady}
+        apiOnline={false}
+        role="CONTROL_OFFICE"
+      />
+    );
+
+    const riceGroup = within(screen.getByTestId('commodity-group-Rice'));
+    const wheatGroup = within(screen.getByTestId('commodity-group-Wheat'));
+    await user.click(riceGroup.getByRole('button', { name: 'Run action' }));
+
+    expect(riceGroup.getByRole('button', { name: 'Done' })).toBeDisabled();
+    expect(wheatGroup.getByRole('button', { name: 'Run action' })).toBeEnabled();
+    expect(baseProps.onMockComplete).toHaveBeenCalledTimes(1);
+    expect(baseProps.onMockComplete).toHaveBeenCalledWith(
+      expect.objectContaining({
+        evidence: expect.objectContaining({ entityId: 'TR-POC-RICE-DEPOT-BLOCK' })
+      })
+    );
   });
 
   it('posts live actions through the API when online', async () => {

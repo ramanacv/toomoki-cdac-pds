@@ -18,6 +18,10 @@ This folder contains implementation guidance derived from the product and techni
 - [Demo docs](../demo/README.md) — final VM blockchain script + POC test-case checklist
 - [Provenance badge wiring (2026-07-30)](provenance-badge-wiring-2026-07-30.md)
   — auth/allocation/entitlement/distribution `ledgerTxId` → `ProvenanceBadges`
+- [Child-lot allocation review and Fabric 1.1 deployment (2026-07-30)](child-lot-allocation-fabric-upgrade-2026-07-30.md)
+  — lineage/stock review, corrective changes, test evidence, and two-peer deployment result
+- [Live Fabric demo evidence](fabric-demo-evidence.md)
+  — current local two-peer topology, committed definition, and proof regression evidence
 - [Mocks-only integrity + proof completeness](mocks-integrity-proof-completeness-plan.md)
   — includes `npm run test:beneficiaries` and `npm run live:beneficiaries` for the
   fraud-prevention / lifecycle focus shift

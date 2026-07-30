@@ -351,11 +351,21 @@ export class PdsDataContract extends Contract {
       throw new Error(`Lot ${payload.lotId} not found`);
     }
     const partialState = await loadSelective(ctx, {
-      stakeholders: [payload.fromOrg, payload.toOrg],
+      stakeholders: [payload.fromOrg, payload.toOrg, payload.transporterId],
       lots: [payload.lotId],
       transfers: [payload.transferId],
       stock: [{ org: payload.fromOrg, commodity: lot.commodity }]
     });
+    if (lot.currentOwner !== payload.fromOrg) {
+      const targetRoot = lot.rootLotId ?? lot.lotId;
+      const lineageLots = (await loadCollection<CommodityLot>(ctx, 'lots')).filter(
+        (item) =>
+          item.lotId === lot.lotId ||
+          (item.commodity === lot.commodity &&
+            (item.rootLotId === targetRoot || item.parentLotId === lot.lotId || item.lotId === targetRoot))
+      );
+      partialState.lots = lineageLots;
+    }
     const events = await queryState<LedgerEvent>(ctx, {
       selector: {
         docType: 'event',
@@ -416,7 +426,7 @@ export class PdsDataContract extends Contract {
     const txId = ctx.stub.getTxID();
     const payload = JSON.parse(payloadJson);
     const partialState = await loadSelective(ctx, {
-      stakeholders: [payload.fpsId, payload.sourceGodownId],
+      stakeholders: [payload.fpsId, payload.sourceGodownId, payload.transporterId],
       allocations: [payload.allocationId],
       stock: [{ org: payload.sourceGodownId, commodity: payload.commodity }]
     });

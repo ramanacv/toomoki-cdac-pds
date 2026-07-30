@@ -528,25 +528,29 @@ export class PdsLedgerEngine {
     this.assertActiveStakeholder(input.fromOrg);
     this.assertActiveStakeholder(input.toOrg);
     const transporter = this.resolveActiveTransporter(input.transporterId);
+    if (input.dispatchedQtyKg <= 0) {
+      throw new Error('dispatchedQtyKg must be positive');
+    }
     if (lot.currentOwner !== input.fromOrg) {
       const targetRoot = lot.rootLotId ?? lot.lotId;
-      const ownedSlice = [...this.lots.values()].find(
-        (item) =>
-          item.commodity === lot.commodity &&
-          item.currentOwner === input.fromOrg &&
-          (item.rootLotId === targetRoot || item.parentLotId === lot.lotId || item.lotId === targetRoot)
-      );
+      const ownedSlice = [...this.lots.values()]
+        .filter(
+          (item) =>
+            item.commodity === lot.commodity &&
+            item.currentOwner === input.fromOrg &&
+            item.status !== LotStatus.DISPATCHED &&
+            (item.remainingQuantityKg ?? item.quantityKg) >= input.dispatchedQtyKg &&
+            (item.rootLotId === targetRoot || item.parentLotId === lot.lotId || item.lotId === targetRoot)
+        )
+        .sort((left, right) => left.lotId.localeCompare(right.lotId))[0];
       if (ownedSlice) {
         lot = ownedSlice;
-      } else if ((this.stock.get(keyFor(input.fromOrg, lot.commodity)) ?? 0) < input.dispatchedQtyKg) {
+      } else {
         throw new Error(`Lot ${lot.lotId} is owned by ${lot.currentOwner}, not ${input.fromOrg}`);
       }
     }
     if (lot.status === LotStatus.DISPATCHED) {
       throw new Error(`Lot ${lot.lotId} is already in transit (DISPATCHED); cannot re-dispatch until received`);
-    }
-    if (input.dispatchedQtyKg <= 0) {
-      throw new Error('dispatchedQtyKg must be positive');
     }
     if (lot.currentOwner !== input.fromOrg) {
       throw new Error(`Lot ${lot.lotId} is owned by ${lot.currentOwner}, not ${input.fromOrg}`);
@@ -583,15 +587,19 @@ export class PdsLedgerEngine {
       });
       throw new Error('Stage-II dispatch requires roRef and authorizedBy');
     }
-    // Validate against the stock currently held by the sender for this lot's commodity.
-    this.consumeStock(input.fromOrg, lot.commodity, input.dispatchedQtyKg);
-
     // Partial movement: leave the parent lot at the sender with remaining qty and
     // put only the dispatched slice on a child lot (AGENTS.md domain invariant).
-    const movingLotId =
-      input.dispatchedQtyKg < availableOnLot
-        ? this.splitLotForPartialDispatch(lot, input.transferId, input.dispatchedQtyKg).lotId
-        : lot.lotId;
+    const isPartialDispatch = input.dispatchedQtyKg < availableOnLot;
+    const childLotId = `${lot.lotId}-SPLIT-${input.transferId}`;
+    if (isPartialDispatch && this.lots.has(childLotId)) {
+      throw new Error(`Child lot ${childLotId} already exists`);
+    }
+
+    // Validate against the stock currently held by the sender for this lot's commodity.
+    this.consumeStock(input.fromOrg, lot.commodity, input.dispatchedQtyKg);
+    const movingLotId = isPartialDispatch
+      ? this.splitLotForPartialDispatch(lot, childLotId, input.dispatchedQtyKg).lotId
+      : lot.lotId;
 
     const transfer: TransferOrder = {
       transferId: input.transferId,
@@ -637,15 +645,11 @@ export class PdsLedgerEngine {
    */
   private splitLotForPartialDispatch(
     parent: CommodityLot,
-    transferId: string,
+    childLotId: string,
     dispatchedQtyKg: number
   ): CommodityLot {
     const availableOnLot = parent.remainingQuantityKg ?? parent.quantityKg;
     const remainingQtyKg = availableOnLot - dispatchedQtyKg;
-    const childLotId = `${parent.lotId}-SPLIT-${transferId}`;
-    if (this.lots.has(childLotId)) {
-      throw new Error(`Child lot ${childLotId} already exists`);
-    }
     const child: CommodityLot = {
       lotId: childLotId,
       commodity: parent.commodity,
@@ -1659,7 +1663,7 @@ export class PdsLedgerEngine {
       case 'CreateCommodityLot': {
         const lot = payload as unknown as CommodityLot;
         this.lots.set(lot.lotId, lot);
-        if (!lot.parentLotId && !lot.transformedFromLotId) {
+        if (!lot.parentLotId) {
           this.stock.set(keyFor(lot.currentOwner, lot.commodity), lot.quantityKg);
         }
         break;

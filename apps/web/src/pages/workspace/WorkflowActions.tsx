@@ -1,8 +1,10 @@
 import { WorkflowActionPanel } from '@/components/WorkflowActionPanel.js';
+import { useAssignedFpsId } from '@/hooks/use-assigned-fps-id.js';
 import { useWorkspaceContext } from '@/hooks/use-workspace-context.js';
 
 export function WorkflowActions() {
   const { role, workspace } = useWorkspaceContext();
+  const fpsId = useAssignedFpsId(role, workspace.apiOnline);
   return (
     <WorkflowActionPanel
       apiOnline={workspace.apiOnline}
@@ -17,6 +19,7 @@ export function WorkflowActions() {
       alerts={workspace.alerts}
       ledgerEvents={workspace.ledgerEvents}
       stockPositions={workspace.stockPositions}
+      {...(fpsId ? { fpsId } : {})}
       onComplete={workspace.refresh}
       onMockComplete={workspace.applyMockResult}
     />
