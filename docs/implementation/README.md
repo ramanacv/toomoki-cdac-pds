@@ -13,6 +13,8 @@ This folder contains implementation guidance derived from the product and techni
 - [External ghost-beneficiary screening and review implementation](ghost-detection-impl.md)
 - [Beneficiary registry and fraud-detection alignment](beneficiary-registry-alignment.md)
 - [POC test-case gap analysis (all 14 draft TCs)](poc-test-case-gap-analysis.md)
+- [Application → Fabric payload inventory](fabric-proof-submission-inventory.md)
+- [User-case Fabric payloads](../usercases/application-to-fabric-payloads.md) — exact `RecordLedgerProof` envelopes by use case
 - [Demo docs](../demo/README.md) — final VM blockchain script + POC test-case checklist
 - [Provenance badge wiring (2026-07-30)](provenance-badge-wiring-2026-07-30.md)
   — auth/allocation/entitlement/distribution `ledgerTxId` → `ProvenanceBadges`
