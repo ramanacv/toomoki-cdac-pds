@@ -321,7 +321,7 @@ export function AuthLedgerPanel({ authTransactions }: { authTransactions: AuthTr
                 { label: 'Auth time', value: formatDateTime(auth.timestamp) }
               ]}
             />
-            <ProvenanceBadges provenance={auth.provenance} />
+            <ProvenanceBadges provenance={auth.provenance} eventId={auth.ledgerTxId} />
           </EntityCard>
         ))}
       </div>
@@ -363,7 +363,7 @@ export function AllocationPanel({ allocations }: { allocations: FPSAllocation[] 
                 { label: 'Receive time', value: formatDateTime(allocation.receiveTimestamp) }
               ]}
             />
-            <ProvenanceBadges provenance={allocation.provenance} />
+            <ProvenanceBadges provenance={allocation.provenance} eventId={allocation.ledgerTxId} />
           </EntityCard>
         ))}
       </div>
@@ -391,7 +391,7 @@ export function EntitlementsPanel({ entitlements }: { entitlements: MonthlyEntit
                 { label: 'Balance', value: `${entitlement.availableBalanceKg} kg` }
               ]}
             />
-            <ProvenanceBadges provenance={entitlement.provenance} />
+            <ProvenanceBadges provenance={entitlement.provenance} eventId={entitlement.ledgerTxId} />
           </EntityCard>
         ))}
       </div>

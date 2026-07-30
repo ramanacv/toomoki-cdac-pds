@@ -31,4 +31,24 @@ describe('source provenance and proof status', () => {
     expect(screen.getByText('Operational: RECONCILED')).toBeInTheDocument();
     expect(await screen.findByText('Blockchain proof committed · fabric-tx-1')).toBeInTheDocument();
   });
+
+  it('shows Fabric proof not linked when no event id is provided', () => {
+    render(
+      <ProvenanceBadges
+        provenance={{
+          sourceSystem: 'AEPDS_EPOS',
+          sourceEventId: 'EPOS-1',
+          schemaVersion: 'fixture-1',
+          occurredAt: '2026-07-23T08:00:00.000Z',
+          ingestedAt: '2026-07-23T08:00:01.000Z',
+          approvedPayloadHash: 'b'.repeat(64),
+          operationId: 'operation-2',
+          status: 'ACCEPTED'
+        }}
+      />
+    );
+    expect(screen.getByText('AePDS/ePoS event')).toBeInTheDocument();
+    expect(screen.getByText('Operational: ACCEPTED')).toBeInTheDocument();
+    expect(screen.getByText('Fabric proof: not linked')).toBeInTheDocument();
+  });
 });

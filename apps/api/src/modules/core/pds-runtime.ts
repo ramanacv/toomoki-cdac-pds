@@ -200,64 +200,129 @@ export class PdsRuntime extends PdsLedgerEngine {
   override listAllocations(): any {
     const pool = this.getDbPool();
     if (pool) {
-      return pool.query('SELECT * FROM fps_allocations ORDER BY month, allocation_id').then(res => res.rows.map((row) => mapAllocationRow(row)));
+      return pool
+        .query(
+          `SELECT f.*, idx.ledger_tx_id AS resolved_ledger_tx_id
+           FROM fps_allocations f
+           LEFT JOIN ledger_tx_index idx
+             ON idx.entity_type = 'allocation' AND idx.entity_id = f.allocation_id
+           ORDER BY f.month, f.allocation_id`
+        )
+        .then((res) => res.rows.map((row) => mapAllocationRow(row)));
     }
-    return super.listAllocations();
+    return this.attachProofIdsFromEvents(super.listAllocations(), 'allocation', (item) => item.allocationId);
   }
 
   override getAllocation(allocationId: string): any {
     const pool = this.getDbPool();
     if (pool) {
-      return pool.query('SELECT * FROM fps_allocations WHERE allocation_id = $1', [allocationId]).then(res => {
-        if (res.rows.length === 0) {
-          throw new Error(`Allocation ${allocationId} not found`);
-        }
-        return mapAllocationRow(res.rows[0]);
-      });
+      return pool
+        .query(
+          `SELECT f.*, idx.ledger_tx_id AS resolved_ledger_tx_id
+           FROM fps_allocations f
+           LEFT JOIN ledger_tx_index idx
+             ON idx.entity_type = 'allocation' AND idx.entity_id = f.allocation_id
+           WHERE f.allocation_id = $1`,
+          [allocationId]
+        )
+        .then((res) => {
+          if (res.rows.length === 0) {
+            throw new Error(`Allocation ${allocationId} not found`);
+          }
+          return mapAllocationRow(res.rows[0]);
+        });
     }
-    return super.getAllocation(allocationId);
+    return this.attachProofIdsFromEvents([super.getAllocation(allocationId)], 'allocation', (item) => item.allocationId)[0];
   }
 
   override listEntitlements(): any {
     const pool = this.getDbPool();
     if (pool) {
-      return pool.query('SELECT * FROM monthly_entitlements ORDER BY month, ration_card_hash, commodity').then(res => res.rows.map(mapEntitlementRow));
+      return pool
+        .query(
+          `SELECT e.*, idx.ledger_tx_id AS resolved_ledger_tx_id
+           FROM monthly_entitlements e
+           LEFT JOIN ledger_tx_index idx
+             ON idx.entity_type = 'distribution' AND idx.entity_id = e.ration_card_hash
+           ORDER BY e.month, e.ration_card_hash, e.commodity`
+        )
+        .then((res) => res.rows.map(mapEntitlementRow));
     }
-    return super.listEntitlements();
+    return this.attachProofIdsFromEvents(
+      super.listEntitlements(),
+      'distribution',
+      (item) => item.rationCardHash,
+      'CreateMonthlyEntitlement'
+    );
   }
 
   override getEntitlement(rationCardHash: string, commodity: string, month: string): any {
     const pool = this.getDbPool();
     if (pool) {
-      return pool.query('SELECT * FROM monthly_entitlements WHERE ration_card_hash = $1 AND commodity = $2 AND month = $3', [rationCardHash, commodity, month]).then(res => {
-        if (res.rows.length === 0) {
-          throw new Error(`Entitlement not found for ${rationCardHash} ${commodity} ${month}`);
-        }
-        return mapEntitlementRow(res.rows[0]);
-      });
+      return pool
+        .query(
+          `SELECT e.*, idx.ledger_tx_id AS resolved_ledger_tx_id
+           FROM monthly_entitlements e
+           LEFT JOIN ledger_tx_index idx
+             ON idx.entity_type = 'distribution' AND idx.entity_id = e.ration_card_hash
+           WHERE e.ration_card_hash = $1 AND e.commodity = $2 AND e.month = $3`,
+          [rationCardHash, commodity, month]
+        )
+        .then((res) => {
+          if (res.rows.length === 0) {
+            throw new Error(`Entitlement not found for ${rationCardHash} ${commodity} ${month}`);
+          }
+          return mapEntitlementRow(res.rows[0]);
+        });
     }
-    return super.getEntitlement(rationCardHash, commodity, month);
+    return this.attachProofIdsFromEvents(
+      [super.getEntitlement(rationCardHash, commodity, month)],
+      'distribution',
+      (item) => item.rationCardHash,
+      'CreateMonthlyEntitlement'
+    )[0];
   }
 
   override listDistributions(): any {
     const pool = this.getDbPool();
     if (pool) {
-      return pool.query('SELECT * FROM distribution_transactions ORDER BY timestamp').then(res => res.rows.map(row => mapDistributionRow(row)));
+      return pool
+        .query(
+          `SELECT d.*, COALESCE(d.ledger_tx_id, idx.ledger_tx_id) AS resolved_ledger_tx_id
+           FROM distribution_transactions d
+           LEFT JOIN ledger_tx_index idx
+             ON idx.entity_type = 'distribution' AND idx.entity_id = d.distribution_id
+           ORDER BY d.timestamp`
+        )
+        .then((res) => res.rows.map((row) => mapDistributionRow(row)));
     }
-    return super.listDistributions();
+    return this.attachProofIdsFromEvents(super.listDistributions(), 'distribution', (item) => item.distributionId);
   }
 
   override getDistributionReceipt(distributionId: string): any {
     const pool = this.getDbPool();
     if (pool) {
-      return pool.query('SELECT * FROM distribution_transactions WHERE distribution_id = $1', [distributionId]).then(res => {
-        if (res.rows.length === 0) {
-          throw new Error(`Distribution ${distributionId} not found`);
-        }
-        return mapDistributionRow(res.rows[0]);
-      });
+      return pool
+        .query(
+          `SELECT d.*, COALESCE(d.ledger_tx_id, idx.ledger_tx_id) AS resolved_ledger_tx_id
+           FROM distribution_transactions d
+           LEFT JOIN ledger_tx_index idx
+             ON idx.entity_type = 'distribution' AND idx.entity_id = d.distribution_id
+           WHERE d.distribution_id = $1`,
+          [distributionId]
+        )
+        .then((res) => {
+          if (res.rows.length === 0) {
+            throw new Error(`Distribution ${distributionId} not found`);
+          }
+          return mapDistributionRow(res.rows[0]);
+        });
     }
-    return super.getDistributionReceipt(distributionId);
+    return this.attachProofIdsFromEvents(
+      [super.getDistributionReceipt(distributionId)],
+      'distribution',
+      (item) => item.distributionId
+    )[0];
   }
 
   override listLedgerEvents(): any {
@@ -279,9 +344,17 @@ export class PdsRuntime extends PdsLedgerEngine {
   override listAuthTransactions(): any {
     const pool = this.getDbPool();
     if (pool) {
-      return pool.query('SELECT * FROM auth_transactions ORDER BY timestamp').then(res => res.rows.map(row => mapAuthTransactionRow(row)));
+      return pool
+        .query(
+          `SELECT a.*, idx.ledger_tx_id AS resolved_ledger_tx_id
+           FROM auth_transactions a
+           LEFT JOIN ledger_tx_index idx
+             ON idx.entity_type = 'auth' AND idx.entity_id = a.auth_txn_id
+           ORDER BY a.timestamp`
+        )
+        .then((res) => res.rows.map((row) => mapAuthTransactionRow(row)));
     }
-    return super.listAuthTransactions();
+    return this.attachProofIdsFromEvents(super.listAuthTransactions(), 'auth', (item) => item.authTxnId);
   }
 
   listStockPositions(): any {
@@ -340,14 +413,23 @@ export class PdsRuntime extends PdsLedgerEngine {
   override getAuthTransaction(authTxnId: string): any {
     const pool = this.getDbPool();
     if (pool) {
-      return pool.query('SELECT * FROM auth_transactions WHERE auth_txn_id = $1', [authTxnId]).then(res => {
-        if (res.rows.length === 0) {
-          throw new Error(`Auth transaction ${authTxnId} not found`);
-        }
-        return mapAuthTransactionRow(res.rows[0]);
-      });
+      return pool
+        .query(
+          `SELECT a.*, idx.ledger_tx_id AS resolved_ledger_tx_id
+           FROM auth_transactions a
+           LEFT JOIN ledger_tx_index idx
+             ON idx.entity_type = 'auth' AND idx.entity_id = a.auth_txn_id
+           WHERE a.auth_txn_id = $1`,
+          [authTxnId]
+        )
+        .then((res) => {
+          if (res.rows.length === 0) {
+            throw new Error(`Auth transaction ${authTxnId} not found`);
+          }
+          return mapAuthTransactionRow(res.rows[0]);
+        });
     }
-    return super.getAuthTransaction(authTxnId);
+    return this.attachProofIdsFromEvents([super.getAuthTransaction(authTxnId)], 'auth', (item) => item.authTxnId)[0];
   }
 
   // ==========================================
@@ -449,6 +531,27 @@ export class PdsRuntime extends PdsLedgerEngine {
     const object = result as Record<string, unknown>;
     if (object.ledgerTxId) return result;
     return { ...object, ledgerTxId } as T;
+  }
+
+  /** Attach outbox/ledger event ids from in-memory events when Postgres joins are unavailable. */
+  private attachProofIdsFromEvents<T extends { ledgerTxId?: string }>(
+    items: T[],
+    entityType: string,
+    idOf: (item: T) => string,
+    eventType?: string
+  ): T[] {
+    const events = this.exportState().events ?? [];
+    const byEntityId = new Map<string, string>();
+    for (const event of events) {
+      if (event.entityType !== entityType) continue;
+      if (eventType && event.eventType !== eventType) continue;
+      byEntityId.set(event.entityId, event.ledgerTxId);
+    }
+    return items.map((item) => {
+      if (item.ledgerTxId) return item;
+      const ledgerTxId = byEntityId.get(idOf(item));
+      return ledgerTxId ? { ...item, ledgerTxId } : item;
+    });
   }
 
   /**
