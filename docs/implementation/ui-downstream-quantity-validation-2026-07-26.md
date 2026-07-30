@@ -100,9 +100,12 @@ before allotment **4,750**; after allotments **200 kg** at block
 | `ALLOC-LIVE-…-RICE-FPS` | 4,500 | 4,400 | 100 | **PASS** |
 | `ALLOC-LIVE-…-SHORT` | 50 | 49 | 1 | **PASS** |
 
-Shop scope correct (FPS-101 only). Operational badge `ACCEPTED`; Fabric proof
-chip often **not linked** on these cards despite committed distribution proofs
-elsewhere.
+Shop scope correct (FPS-101 only). Operational badge `ACCEPTED`. Fabric proof
+chips were often **not linked** on these cards at the time of this audit
+(UI/API wiring gap: auth/allocation/entitlement panels omitted `eventId`).
+**Fixed 2026-07-30** — list/get joins `ledger_tx_index` and panels pass
+`ledgerTxId` into `ProvenanceBadges`. Seed rows still without an index entry
+correctly remain “not linked.”
 
 ### FPS-101 — Distribution / entitlements
 
@@ -132,7 +135,7 @@ Scoped summary metrics:
 | **HIGH** | Beneficiary entitlement ledger only showed 1 kg lifted while 29 kg Rice was issued on the same card hash. **Fixed 2026-07-26 evening** (reconcile + live repair). |
 | **MEDIUM** | Lots filter chips under-count lots / mislabel status buckets. |
 | **MEDIUM** | Workbench checkpoint counter stuck at 0/43 despite completed Rice custody. |
-| **LOW** | Allocation cards show Fabric proof “not linked” while distribution receipts show committed proofs. |
+| **LOW** | Allocation cards show Fabric proof “not linked” while distribution receipts show committed proofs. **Fixed 2026-07-30** (proof-link wiring). |
 | **INFO** | Transfer, allocation shortage arithmetic, and FPS shop stock conservation check out when read from the DOM. |
 
 ## Fix applied (2026-07-26 evening)

@@ -733,8 +733,10 @@ export class PdsLedgerEngine {
       dispatchTimestamp: input.dispatchTimestamp ?? this.timestamp()
     };
     this.allocations.set(allocation.allocationId, allocation);
-    this.recordEvent('allocation', allocation.allocationId, 'AllocateToFPS', allocation);
-    return allocation;
+    const { ledgerTxId } = this.recordEvent('allocation', allocation.allocationId, 'AllocateToFPS', allocation);
+    const withProof = { ...allocation, ledgerTxId };
+    this.allocations.set(allocation.allocationId, withProof);
+    return withProof;
   }
 
   recordFpsReceipt(input: { allocationId: string; receivedQtyKg: number; receiveTimestamp?: string }): FPSAllocation {
@@ -821,8 +823,10 @@ export class PdsLedgerEngine {
           timestamp: this.timestamp()
         };
     this.authTransactions.set(input.authTxnId, authTransaction);
-    this.recordEvent('auth', input.authTxnId, 'AuthTransaction', authTransaction);
-    return authTransaction;
+    const { ledgerTxId: authLedgerTxId } = this.recordEvent('auth', input.authTxnId, 'AuthTransaction', authTransaction);
+    const authWithProof = { ...authTransaction, ledgerTxId: authLedgerTxId };
+    this.authTransactions.set(input.authTxnId, authWithProof);
+    return authWithProof;
   }
 
   createOrUpdateEntitlement(input: MonthlyEntitlement): MonthlyEntitlement {
@@ -839,9 +843,10 @@ export class PdsLedgerEngine {
       }
     }
     const key = this.entitlementKey(input.rationCardHash, input.commodity, input.month);
-    this.entitlements.set(key, input);
-    this.recordEvent('distribution', input.rationCardHash, 'CreateMonthlyEntitlement', input);
-    return input;
+    const { ledgerTxId: entitlementLedgerTxId } = this.recordEvent('distribution', input.rationCardHash, 'CreateMonthlyEntitlement', input);
+    const entitlementWithProof = { ...input, ledgerTxId: entitlementLedgerTxId };
+    this.entitlements.set(key, entitlementWithProof);
+    return entitlementWithProof;
   }
 
   validateEntitlement(input: {

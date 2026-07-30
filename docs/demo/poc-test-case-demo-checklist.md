@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-29  
 **Branch:** `docs/poc-test-case-gap-analysis`  
-**Companion analysis:** [poc-test-case-gap-analysis.md](poc-test-case-gap-analysis.md)  
+**Companion analysis:** [poc-test-case-gap-analysis.md](../implementation/poc-test-case-gap-analysis.md)  
 **Source TCs:** [Draft a test case document…](../requirements/Draft%20a%20test%20case%20document%20for%20the%20attached%20file.%20....pdf)
 
 Use this checklist when evaluators walk the draft POC test cases against
@@ -24,7 +24,7 @@ and the facilitator uses the **Say / Do not say** lines.
 
 1. Reset and reseed the controlled demo (authorized only).
 2. Compose online with API + Keycloak + Postgres; enable profiles `eligibility`
-   and `epos` / `mocks` as needed ([three-module-mock-services.md](three-module-mock-services.md)).
+   and `epos` / `mocks` as needed ([three-module-mock-services.md](../implementation/three-module-mock-services.md)).
 3. Prefer `http://localhost:4173` for OIDC (not bare `127.0.0.1` redirect URIs).
 4. Run custody prep so FPS issue is unlocked:
    `node scripts/live-lifecycle.mjs` after reset/reseed, or workbench FCI →
@@ -327,4 +327,4 @@ Record separately:
 3. Any environment blockers (OIDC, eligibility mock down, empty FPS stock)
 
 Do not mark the near-MVP complete from a single checklist pass while
-[mvp-hardening-plan.md](mvp-hardening-plan.md) critical gates remain open.
+[mvp-hardening-plan.md](../implementation/mvp-hardening-plan.md) critical gates remain open.

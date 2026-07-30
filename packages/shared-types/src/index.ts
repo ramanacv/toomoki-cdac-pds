@@ -518,6 +518,8 @@ export type FPSAllocation = {
   /** Doorstep ship time (allotment / dispatch). */
   dispatchTimestamp: string;
   receiveTimestamp?: string;
+  /** Linked ledger/outbox event id when a Fabric proof was queued for this allocation. */
+  ledgerTxId?: string;
   provenance?: SourceProvenance;
 };
 
@@ -530,6 +532,8 @@ export type MonthlyEntitlement = {
   availableBalanceKg: number;
   active: boolean;
   category?: RationCardType;
+  /** Linked ledger/outbox event id when a CreateMonthlyEntitlement proof exists. */
+  ledgerTxId?: string;
   provenance?: SourceProvenance;
 };
 
@@ -546,6 +550,8 @@ export type AuthTransaction = {
   authTxnRefHash: string;
   approvedBy?: string;
   timestamp: string;
+  /** Linked ledger/outbox event id when an AuthTransaction proof was queued. */
+  ledgerTxId?: string;
   provenance?: SourceProvenance;
 };
 

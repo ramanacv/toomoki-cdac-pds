@@ -81,6 +81,11 @@ export const mapTransferRow = (row: Record<string, unknown>, toIsoString = toIso
   ...(row.transformed_from_lot_id == null ? {} : { transformedFromLotId: asString(row.transformed_from_lot_id) })
 });
 
+const optionalLedgerTxId = (row: Record<string, unknown>): { ledgerTxId?: string } => {
+  const raw = row.resolved_ledger_tx_id ?? row.ledger_tx_id;
+  return raw == null || raw === '' ? {} : { ledgerTxId: asString(raw) };
+};
+
 export const mapAllocationRow = (row: Record<string, unknown>, toIsoString = toIsoStringDefault): FPSAllocation => ({
   allocationId: asString(row.allocation_id),
   fpsId: asString(row.fps_id),
@@ -95,7 +100,8 @@ export const mapAllocationRow = (row: Record<string, unknown>, toIsoString = toI
   transporterName: asString(row.transporter_name),
   vehicleNo: asString(row.vehicle_no),
   dispatchTimestamp: toIsoString(row.dispatch_timestamp),
-  ...(row.receive_timestamp == null ? {} : { receiveTimestamp: toIsoString(row.receive_timestamp) })
+  ...(row.receive_timestamp == null ? {} : { receiveTimestamp: toIsoString(row.receive_timestamp) }),
+  ...optionalLedgerTxId(row)
 });
 
 export const mapEntitlementRow = (row: Record<string, unknown>): MonthlyEntitlement => ({
@@ -105,7 +111,8 @@ export const mapEntitlementRow = (row: Record<string, unknown>): MonthlyEntitlem
   monthlyEntitlementKg: asNumber(row.monthly_entitlement_kg),
   alreadyLiftedKg: asNumber(row.already_lifted_kg),
   availableBalanceKg: asNumber(row.available_balance_kg),
-  active: Boolean(row.active)
+  active: Boolean(row.active),
+  ...optionalLedgerTxId(row)
 });
 
 export const mapAuthTransactionRow = (row: Record<string, unknown>, toIsoString = toIsoStringDefault): AuthTransaction => ({
@@ -118,7 +125,8 @@ export const mapAuthTransactionRow = (row: Record<string, unknown>, toIsoString 
   authResult: asString(row.auth_result) as AuthResult,
   authTxnRefHash: asString(row.auth_txn_ref_hash),
   ...(row.approved_by == null ? {} : { approvedBy: asString(row.approved_by) }),
-  timestamp: toIsoString(row.timestamp)
+  timestamp: toIsoString(row.timestamp),
+  ...optionalLedgerTxId(row)
 });
 
 export const mapDistributionRow = (row: Record<string, unknown>, toIsoString = toIsoStringDefault): DistributionTransaction => ({
@@ -132,7 +140,7 @@ export const mapDistributionRow = (row: Record<string, unknown>, toIsoString = t
   authResult: asString(row.auth_result) as AuthResult,
   authTxnRefHash: asString(row.auth_txn_ref_hash),
   dealerId: asString(row.dealer_id),
-  ...(row.ledger_tx_id == null ? {} : { ledgerTxId: asString(row.ledger_tx_id) }),
+  ...optionalLedgerTxId(row),
   timestamp: toIsoString(row.timestamp)
 });
 
