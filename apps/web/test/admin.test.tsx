@@ -227,6 +227,8 @@ describe('Admin console', () => {
     }
     expect(within(table).getByText('Timestamp')).toBeInTheDocument();
     expect(within(table).getByText('Event')).toBeInTheDocument();
+    expect(within(table).queryByText('2026-06-09T10:00:00.000Z')).not.toBeInTheDocument();
+    expect(within(table).getByText(/\b(?:AM|PM)\b/)).toBeInTheDocument();
   });
 
   it('exposes a skip link targeting admin content', async () => {

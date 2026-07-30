@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Panel } from '@/components/Panel';
 import { Button } from '@/components/ui/button';
+import { formatDateTime } from '@/lib/constants.js';
 import {
   citizenLogout,
   clearCitizenSession,
@@ -19,11 +20,6 @@ import {
 } from '@/citizen-api.js';
 
 type Step = 'aadhaar' | 'otp' | 'dashboard';
-
-const formatTimestamp = (value: string): string => {
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString();
-};
 
 export function CitizenPortalPage() {
   const [step, setStep] = useState<Step>('aadhaar');
@@ -217,7 +213,7 @@ export function CitizenPortalPage() {
               {profile.removal.reasonCode === 'VOLUNTARY_SURRENDER'
                 ? 'This demo ration card has been surrendered and removed from the active beneficiary list.'
                 : 'This demo ration card has been removed from the active beneficiary list by the department.'}{' '}
-              No further ration can be issued against it. Recorded on {formatTimestamp(profile.removal.removedAt)}.
+              No further ration can be issued against it. Recorded on {formatDateTime(profile.removal.removedAt)}.
             </p>
           ) : null}
           <Panel
@@ -310,7 +306,7 @@ export function CitizenPortalPage() {
                 <tbody>
                   {distributions.map((item) => (
                     <tr key={item.distributionId} className="border-b border-border/60 align-top">
-                      <td className="py-2 pr-3">{formatTimestamp(item.timestamp)}</td>
+                      <td className="py-2 pr-3">{formatDateTime(item.timestamp)}</td>
                       <td className="py-2 pr-3">{item.fpsId}</td>
                       <td className="py-2 pr-3">{item.commodity}</td>
                       <td className="py-2 pr-3">{item.deliveredKg} kg</td>
@@ -340,7 +336,7 @@ export function CitizenPortalPage() {
                 {authHistory.map((item) => (
                   <li key={item.authTxnId} className="rounded-xl border border-border/60 px-3 py-2">
                     <span className="font-medium">{item.authMode}</span> · {item.authResult} ·{' '}
-                    {formatTimestamp(item.timestamp)}
+                    {formatDateTime(item.timestamp)}
                     {item.fpsId ? <span className="text-muted-foreground"> · {item.fpsId}</span> : null}
                   </li>
                 ))}
