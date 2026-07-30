@@ -13,7 +13,7 @@ This folder contains implementation guidance derived from the product and techni
 - [External ghost-beneficiary screening and review implementation](ghost-detection-impl.md)
 - [Beneficiary registry and fraud-detection alignment](beneficiary-registry-alignment.md)
 - [POC test-case gap analysis (all 14 draft TCs)](poc-test-case-gap-analysis.md)
-- [POC test-case demo checklist (SHOW / REMAP / DEFER runbook)](poc-test-case-demo-checklist.md)
+- [Demo docs](../demo/README.md) — final VM blockchain script + POC test-case checklist
 - [Provenance badge wiring (2026-07-30)](provenance-badge-wiring-2026-07-30.md)
   — auth/allocation/entitlement/distribution `ledgerTxId` → `ProvenanceBadges`
 - [Mocks-only integrity + proof completeness](mocks-integrity-proof-completeness-plan.md)

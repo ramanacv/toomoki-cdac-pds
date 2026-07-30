@@ -6,7 +6,7 @@
 **Requirement document:** [Blockchain-Enabled Beneficiary Registry Management and Fraud Detection for Public Distribution System (PDS).pdf](../requirements/Blockchain-Enabled%20Beneficiary%20Registry%20Management%20and%20Fraud%20Detection%20for%20Public%20Distribution%20System%20(PDS).pdf)  
 **Target application cited in test doc:** `https://demo.vikshitpds.in`
 
-**Related maintained docs:** [poc-test-case-demo-checklist.md](poc-test-case-demo-checklist.md) (facilitator runbook), [beneficiary-registry-alignment.md](beneficiary-registry-alignment.md), [challenge-readiness-plan.md](challenge-readiness-plan.md), [ghost-detection-impl.md](ghost-detection-impl.md), [eligibility-trust-lifecycle-capability-audit.md](eligibility-trust-lifecycle-capability-audit.md), [audit-logging-poc-assessment.md](audit-logging-poc-assessment.md), [mvp-hardening-plan.md](mvp-hardening-plan.md), [assumptions-for-demo.md](../product/assumptions-for-demo.md).
+**Related maintained docs:** [poc-test-case-demo-checklist.md](../demo/poc-test-case-demo-checklist.md) (facilitator runbook), [beneficiary-registry-alignment.md](beneficiary-registry-alignment.md), [challenge-readiness-plan.md](challenge-readiness-plan.md), [ghost-detection-impl.md](ghost-detection-impl.md), [eligibility-trust-lifecycle-capability-audit.md](eligibility-trust-lifecycle-capability-audit.md), [audit-logging-poc-assessment.md](audit-logging-poc-assessment.md), [mvp-hardening-plan.md](mvp-hardening-plan.md), [assumptions-for-demo.md](../product/assumptions-for-demo.md).
 
 ## Verdict
 
