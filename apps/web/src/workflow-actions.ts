@@ -336,7 +336,7 @@ export const getSessionStockKg = (
       (!relevantCommodity || lot.commodity === relevantCommodity) &&
       (lot.currentOwner === org || lot.lotId === lotId)
   );
-  const registered = sumKg(rootLots.map((lot) => lot.quantityKg));
+  const registered = sumKg(rootLots.map((lot) => lot.originalQuantityKg ?? lot.quantityKg));
   return registered + allocationInflow - outflow - allocationOutflow;
 };
 
