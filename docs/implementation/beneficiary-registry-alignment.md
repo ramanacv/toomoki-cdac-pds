@@ -5,6 +5,12 @@
 This document maps the controlled ViksitPDS demonstration to
 `docs/requirements/Blockchain-Enabled Beneficiary Registry Management and Fraud Detection for Public Distribution System (PDS).pdf`.
 
+For gap coverage against the draft POC test-case document (TC_BR / TC_FD /
+TC_INT / TC_BC / TC_SYNC / TC_PERF), see
+[poc-test-case-gap-analysis.md](poc-test-case-gap-analysis.md). For the
+facilitator SHOW / REMAP / DEFER runbook, see
+[poc-test-case-demo-checklist.md](poc-test-case-demo-checklist.md).
+
 The source is a problem statement, not a detailed functional specification.
 ViksitPDS interprets a **blockchain-enabled beneficiary registry** as:
 

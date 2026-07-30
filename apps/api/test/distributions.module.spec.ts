@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { afterEach, describe, expect, it } from 'vitest';
+import { BadRequestException } from '@nestjs/common';
 import { AlertType, AuthMode, AuthResult } from '@pds/shared-types';
 import { DistributionsController } from '../src/modules/distributions/distributions.controller.js';
 import { asFpsRequest, createControllerWithFacade, createDemoLedgerFixture, prepareFpsStock, type DemoLedgerFixture } from './helpers/demo-ledger.js';
@@ -123,18 +124,28 @@ describe('DistributionsModule', () => {
       blocked: true, rcmsStatus: 'CANCELLED', caseId: 'ELIG-CASE-DISTRIBUTION'
     });
     try {
-      await expect(controller.distribute({
-        distributionId: 'DIST-ELIGIBILITY-BLOCKED',
-        fpsId: 'FPS-101',
-        rationCardHash: 'demo-ration-card-hash',
-        beneficiaryRefHash: 'beneficiary-hash',
-        commodity: 'Rice',
-        deliveredKg: 1,
-        authMode: AuthMode.MOCK_OTP,
-        authResult: AuthResult.SUCCESS,
-        authTxnRefHash: 'auth-ref-eligibility',
-        timestamp: '2026-06-09T10:10:00.000Z'
-      }, asFpsRequest())).rejects.toThrow(/effective RCMS eligibility decision/);
+      let blocked: unknown;
+      try {
+        await controller.distribute({
+          distributionId: 'DIST-ELIGIBILITY-BLOCKED',
+          fpsId: 'FPS-101',
+          rationCardHash: 'demo-ration-card-hash',
+          beneficiaryRefHash: 'beneficiary-hash',
+          commodity: 'Rice',
+          deliveredKg: 1,
+          authMode: AuthMode.MOCK_OTP,
+          authResult: AuthResult.SUCCESS,
+          authTxnRefHash: 'auth-ref-eligibility',
+          timestamp: '2026-06-09T10:10:00.000Z'
+        }, asFpsRequest());
+      } catch (error) {
+        blocked = error;
+      }
+      expect(blocked).toBeInstanceOf(BadRequestException);
+      expect((blocked as BadRequestException).getResponse()).toEqual(expect.objectContaining({
+        message: 'Ineligible Beneficiary',
+        code: 'INELIGIBLE_BENEFICIARY'
+      }));
     } finally {
       removeEligibilityGate('demo-ration-card-hash');
     }

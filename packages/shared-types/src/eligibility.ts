@@ -4,6 +4,17 @@ export const JK_ELIGIBILITY_POLICY_ID = 'JK-PANEL-DEMO-2026-V1' as const;
 export const ELIGIBILITY_POLICY_IDS = [ELIGIBILITY_POLICY_ID, JK_ELIGIBILITY_POLICY_ID] as const;
 export type EligibilityPolicyId = (typeof ELIGIBILITY_POLICY_IDS)[number];
 
+/** FPS / entitlement-gate notice when an authorized RCMS decision blocks distribution (TC_INT_003). */
+export const INELIGIBLE_BENEFICIARY_CODE = 'INELIGIBLE_BENEFICIARY' as const;
+export const INELIGIBLE_BENEFICIARY_NOTICE = 'Ineligible Beneficiary' as const;
+
+export const ENTITLEMENT_GATE_REASONS = [
+  'ELIGIBLE',
+  'INSUFFICIENT_BALANCE',
+  'EFFECTIVE_RCMS_DECISION'
+] as const;
+export type EntitlementGateReason = (typeof ENTITLEMENT_GATE_REASONS)[number];
+
 export const ELIGIBILITY_CHECKS = ['DEATH', 'ACTIVITY', 'ECONOMIC', 'LAND', 'DUPLICATE'] as const;
 export type EligibilityCheck = (typeof ELIGIBILITY_CHECKS)[number];
 

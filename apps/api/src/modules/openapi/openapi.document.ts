@@ -95,6 +95,12 @@ export const OPENAPI_SPEC = {
     '/audit-alerts/reconcile': { post: secured('Reconcile alerts', ['auditor']) },
     '/audit-alerts/{alertId}/resolve': { post: secured('Resolve audit alert', ['auditor']) },
     '/ledger-proofs/analytics': { get: secured('Summarize cross-module Fabric proof analytics') },
+    '/ledger-proofs': {
+      get: secured(
+        'List hash-keyed ledger proofs by entityId or beneficiaryRefHash with fabric_tx_id',
+        ['auditor', 'management', 'platform-admin']
+      )
+    },
     '/ledger-proofs/{eventId}/detail': {
       get: secured('Get privacy-safe Fabric proof detail', ['auditor', 'management', 'platform-admin'])
     },

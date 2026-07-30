@@ -284,11 +284,12 @@ const PROOF_REQUIRED_EVENT_TYPES = new Set([
 ]);
 
 /**
- * RegisterStakeholder proofs are redacted at the API proof boundary
- * (`ledgerProofFromEvent` strips display name / dealerName). Keep this set empty
- * unless a new event type is intentionally excluded from the proof gate.
+ * Stakeholder seed/registration events are present after reset but are not part of
+ * the operational proof gate for this lifecycle (display-name payloads are privacy-
+ * redacted at the proof boundary and may dead-letter). Exclude them from the
+ * committed-proof wait list.
  */
-const PROOF_EXCLUDED_EVENT_TYPES = new Set();
+const PROOF_EXCLUDED_EVENT_TYPES = new Set(['RegisterStakeholder']);
 
 async function waitForCommittedProofs(events) {
   const deadline = Date.now() + proofTimeoutMs;

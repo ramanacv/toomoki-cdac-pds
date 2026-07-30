@@ -191,7 +191,10 @@ describe('eligibility review workflow', () => {
     const service = createService(undefined, repository);
     await service.onModuleInit();
     expect(service.gate('BEN-DEMO-003', 1)).toMatchObject({
-      allowed: false, rcmsStatus: 'CANCELLED', reason: 'EFFECTIVE_RCMS_DECISION'
+      allowed: false,
+      rcmsStatus: 'CANCELLED',
+      reason: 'EFFECTIVE_RCMS_DECISION',
+      notice: 'Ineligible Beneficiary'
     });
   });
 

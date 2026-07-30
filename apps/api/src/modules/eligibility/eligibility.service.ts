@@ -404,14 +404,22 @@ export class EligibilityService implements OnModuleInit {
     const beneficiary = this.mustBeneficiary(demoBeneficiaryId);
     const gate = getEligibilityGate(beneficiary.rationCardHash);
     const remainingKg = Math.max(0, beneficiary.monthlyRiceEntitlementKg - beneficiary.alreadyLiftedKg);
+    const blocked = Boolean(gate?.blocked);
+    const reason = blocked
+      ? 'EFFECTIVE_RCMS_DECISION'
+      : requestedQtyKg > remainingKg
+        ? 'INSUFFICIENT_BALANCE'
+        : 'ELIGIBLE';
     return {
       demoBeneficiaryId, rationCardHash: beneficiary.rationCardHash,
-      allowed: !gate?.blocked && requestedQtyKg <= remainingKg,
+      allowed: !blocked && requestedQtyKg <= remainingKg,
       rcmsStatus: gate?.rcmsStatus ?? 'ACTIVE',
       monthlyEntitlementKg: beneficiary.monthlyRiceEntitlementKg,
       alreadyLiftedKg: beneficiary.alreadyLiftedKg,
       availableBalanceKg: remainingKg,
-      reason: gate?.blocked ? 'EFFECTIVE_RCMS_DECISION' : requestedQtyKg > remainingKg ? 'INSUFFICIENT_BALANCE' : 'ELIGIBLE'
+      reason,
+      /** POC-facing notice when distribution is blocked by an effective RCMS decision. */
+      ...(blocked ? { notice: 'Ineligible Beneficiary' as const } : {})
     };
   }
 

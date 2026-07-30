@@ -1,4 +1,4 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import type {
   LedgerEvent,
   LedgerProofAnalyticsResponse,
@@ -7,6 +7,7 @@ import type {
   LedgerProofCompletenessAlert,
   LedgerProofCompletenessModule,
   LedgerProofDetailResponse,
+  LedgerProofEntityQueryResponse,
   LedgerProofStatusResponse,
   LedgerProofSummaryResponse,
   ProofAnalyticsModule,
@@ -19,6 +20,8 @@ import { PdsLedgerFacade } from '../core/pds-ledger.facade.js';
 const STATUSES: ProofStatus[] = ['PENDING', 'SUBMITTING', 'COMMITTED', 'FAILED', 'DEAD_LETTER'];
 const MODULES: ProofAnalyticsModule[] = ['supply-chain', 'eligibility', 'fps', 'other'];
 const RECENT_PROOF_LIMIT = 50;
+const ENTITY_PROOF_LIMIT_DEFAULT = 50;
+const ENTITY_PROOF_LIMIT_MAX = 200;
 const MISSING_EVENT_LIMIT = 25;
 const ALERT_LIMIT = 40;
 const ELIGIBILITY_PROOF_ACTION_TYPES = [
@@ -117,6 +120,97 @@ export class ProofsService {
     if (category) response.failureCategory = category;
     if (includeRawError && row.last_error) response.rawWorkerError = String(row.last_error);
     return response;
+  }
+
+  /**
+   * Hash-keyed auditor trail: ledger_events filtered by entityId and/or
+   * beneficiaryRefHash, left-joined to ledger_outbox for fabric_tx_id.
+   * Cleartext Beneficiary IDs are intentionally not accepted.
+   */
+  async listByEntity(query: {
+    entityId?: string;
+    beneficiaryRefHash?: string;
+    limit?: number;
+  }): Promise<LedgerProofEntityQueryResponse> {
+    const entityId = query.entityId?.trim() || undefined;
+    const beneficiaryRefHash = query.beneficiaryRefHash?.trim() || undefined;
+    if (!entityId && !beneficiaryRefHash) {
+      throw new BadRequestException('Provide entityId and/or beneficiaryRefHash (opaque hash references only)');
+    }
+    const limit = Math.min(
+      Math.max(1, Number.isFinite(query.limit) ? Number(query.limit) : ENTITY_PROOF_LIMIT_DEFAULT),
+      ENTITY_PROOF_LIMIT_MAX
+    );
+
+    const pool = this.ledger.getOperationalPool();
+    if (!pool) {
+      const events = (await Promise.resolve(this.ledger.listLedgerEvents())) as LedgerEvent[];
+      const items = events
+        .filter((event) => {
+          if (entityId && event.entityId !== entityId) return false;
+          if (beneficiaryRefHash) {
+            const payloadRef =
+              typeof event.payload?.beneficiaryRefHash === 'string'
+                ? event.payload.beneficiaryRefHash
+                : undefined;
+            if (event.entityId !== beneficiaryRefHash && payloadRef !== beneficiaryRefHash) return false;
+          }
+          return true;
+        })
+        .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
+        .slice(0, limit)
+        .map((event) => this.rowFromMemoryEvent(event));
+      return {
+        items,
+        ...(entityId ? { entityId } : {}),
+        ...(beneficiaryRefHash ? { beneficiaryRefHash } : {})
+      };
+    }
+
+    const result = await pool.query(
+      `SELECT e.ledger_tx_id AS event_id,
+              COALESCE(o.operation_id, e.ledger_tx_id) AS operation_id,
+              o.status,
+              o.fabric_tx_id,
+              COALESCE(o.retry_count, 0) AS retry_count,
+              COALESCE(o.schema_version, 1) AS schema_version,
+              COALESCE(o.created_at, e.timestamp) AS created_at,
+              o.committed_at,
+              jsonb_build_object(
+                'ledgerTxId', e.ledger_tx_id,
+                'entityType', e.entity_type,
+                'entityId', e.entity_id,
+                'eventType', e.event_type,
+                'payload', e.payload,
+                'timestamp', e.timestamp
+              ) AS event_payload
+         FROM ledger_events e
+         LEFT JOIN ledger_outbox o ON o.event_id = e.ledger_tx_id
+        WHERE ($1::text IS NULL OR e.entity_id = $1)
+          AND (
+            $2::text IS NULL
+            OR e.entity_id = $2
+            OR e.payload->>'beneficiaryRefHash' = $2
+          )
+        ORDER BY e.timestamp DESC
+        LIMIT $3`,
+      [entityId ?? null, beneficiaryRefHash ?? null, limit]
+    );
+
+    const items: LedgerProofAnalyticsRow[] = [];
+    for (const row of result.rows) {
+      const analyticsRow = this.rowFromOutbox({
+        ...row,
+        status: row.status ?? 'COMMITTED'
+      });
+      if (analyticsRow) items.push(analyticsRow);
+    }
+
+    return {
+      items,
+      ...(entityId ? { entityId } : {}),
+      ...(beneficiaryRefHash ? { beneficiaryRefHash } : {})
+    };
   }
 
   async getSummary(): Promise<LedgerProofSummaryResponse> {

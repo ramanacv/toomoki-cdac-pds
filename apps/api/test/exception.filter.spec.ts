@@ -101,4 +101,20 @@ describe('GlobalExceptionFilter (T5.2 / T6.2)', () => {
     expect((res.body as { message: string }).message).toContain('field1 must be a string');
     expect((res.body as { message: string }).message).toContain('field2 must not be empty');
   });
+
+  it('forwards structured error codes from BadRequestException response objects', () => {
+    const res = makeResponse();
+    const exc = new BadRequestException({
+      statusCode: 400,
+      error: 'Bad Request',
+      message: 'Ineligible Beneficiary',
+      code: 'INELIGIBLE_BENEFICIARY'
+    });
+    filter.catch(exc, makeHost(res));
+    expect(res.statusCode).toBe(HttpStatus.BAD_REQUEST);
+    expect(res.body).toEqual(expect.objectContaining({
+      message: 'Ineligible Beneficiary',
+      code: 'INELIGIBLE_BENEFICIARY'
+    }));
+  });
 });

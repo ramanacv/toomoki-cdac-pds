@@ -273,15 +273,35 @@ const riceStock = (Array.isArray(stock) ? stock : []).find(
 );
 const stockKg = Number(riceStock?.quantityKg ?? 0);
 
-await post('/entitlements', {
-  rationCardHash,
-  commodity,
-  month,
-  monthlyEntitlementKg: 25,
-  alreadyLiftedKg: 0,
-  availableBalanceKg: 25,
-  active: true
-});
+// Upsert uses GREATEST(already_lifted), so zeroing lifts is a no-op after live-lifecycle.
+// Raise monthly entitlement so available_balance = monthly - prior_lifts covers both lifts.
+async function ensureDistributionEntitlement() {
+  const neededKg = distributionKg * 2;
+  const existing = await get(
+    `/entitlements?rationCardHash=${encodeURIComponent(rationCardHash)}&commodity=${encodeURIComponent(commodity)}&month=${encodeURIComponent(month)}`
+  );
+  const row = (Array.isArray(existing) ? existing : []).find(
+    (item) =>
+      item.rationCardHash === rationCardHash &&
+      item.commodity === commodity &&
+      item.month === month
+  );
+  const liftedKg = Number(row?.alreadyLiftedKg ?? 0);
+  const balanceKg = Number(row?.availableBalanceKg ?? 0);
+  if (balanceKg >= neededKg) return;
+  const monthlyKg = Math.max(Number(row?.monthlyEntitlementKg ?? 0), liftedKg + neededKg + 10);
+  await post('/entitlements', {
+    rationCardHash,
+    commodity,
+    month,
+    monthlyEntitlementKg: monthlyKg,
+    alreadyLiftedKg: liftedKg,
+    availableBalanceKg: monthlyKg - liftedKg,
+    active: true
+  });
+}
+
+await ensureDistributionEntitlement();
 
 // FAILURE distribution is rejected before stock is consumed — always exercise it.
 const failedAuth = failedAuths[0];
@@ -316,6 +336,8 @@ assert(
   stockKg >= requiredStockKg,
   `FPS-101 ${commodity} stock ${stockKg}kg < ${requiredStockKg}kg required for exception+success distributions (run live-lifecycle first)`
 );
+
+await ensureDistributionEntitlement();
 
 const exceptionAuth = await post(
   '/auth/supervisor-exception',
@@ -365,15 +387,7 @@ record('distribution-after-supervisor-exception', {
 });
 
 // Happy-path OTP distribution using the earlier success auth ref.
-await post('/entitlements', {
-  rationCardHash,
-  commodity,
-  month,
-  monthlyEntitlementKg: 25,
-  alreadyLiftedKg: 0,
-  availableBalanceKg: 25,
-  active: true
-});
+await ensureDistributionEntitlement();
 const happy = await post('/distributions', {
   distributionId: txnId('DIST-OK'),
   rationCardHash,

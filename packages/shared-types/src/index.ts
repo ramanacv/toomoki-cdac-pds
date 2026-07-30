@@ -645,6 +645,13 @@ export type LedgerProofAnalyticsRow = {
   actor?: LedgerProofActor;
 };
 
+/** Auditor/management query of ledger events joined to outbox fabric_tx_id (hash-keyed). */
+export type LedgerProofEntityQueryResponse = {
+  items: LedgerProofAnalyticsRow[];
+  entityId?: string;
+  beneficiaryRefHash?: string;
+};
+
 export type LedgerProofCompletenessModule = {
   expected: number;
   committed: number;

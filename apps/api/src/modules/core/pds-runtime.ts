@@ -1039,6 +1039,9 @@ export class PdsRuntime extends PdsLedgerEngine {
   }
 
   override recordDistribution(...args: Parameters<PdsLedgerEngine['recordDistribution']>) {
+    // Gate must run before executeMutationTx: the inner plain engine does not
+    // inherit this subclass's validateEntitlement override.
+    assertEligibilityGateOpen(args[0].rationCardHash);
     const pool = this.getDbPool();
     if (!pool) {
       const result = super.recordDistribution(...args);

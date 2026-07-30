@@ -8,6 +8,7 @@ import type {
   LedgerEvent,
   LedgerProofAnalyticsResponse,
   LedgerProofDetailResponse,
+  LedgerProofEntityQueryResponse,
   LedgerProofStatusResponse,
   MonthlyEntitlement,
   Stakeholder,
@@ -198,6 +199,19 @@ export async function loadLedgerProofDetail(eventId: string): Promise<LedgerProo
   return fetchJson(`/ledger-proofs/${encodeURIComponent(eventId)}/detail`);
 }
 
+/** Hash-keyed auditor trail with fabric_tx_id (requires auditor/management/platform-admin). */
+export async function loadLedgerProofsByEntity(params: {
+  entityId?: string;
+  beneficiaryRefHash?: string;
+  limit?: number;
+}): Promise<LedgerProofEntityQueryResponse> {
+  const search = new URLSearchParams();
+  if (params.entityId?.trim()) search.set('entityId', params.entityId.trim());
+  if (params.beneficiaryRefHash?.trim()) search.set('beneficiaryRefHash', params.beneficiaryRefHash.trim());
+  if (params.limit != null) search.set('limit', String(params.limit));
+  return fetchJson(`/ledger-proofs?${search.toString()}`);
+}
+
 export const loadEligibilitySummary = (): Promise<EligibilitySummary> =>
   fetchJson('/eligibility/v1/summary');
 
@@ -238,6 +252,7 @@ export const checkEligibilityGate = (
   alreadyLiftedKg: number;
   availableBalanceKg: number;
   reason: string;
+  notice?: string;
 }> => postJson('/eligibility/v1/entitlement-gate', { demoBeneficiaryId, requestedQtyKg });
 
 /** Officer bulk removal of beneficiaries from the active list (fraud/duplicate). */

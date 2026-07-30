@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { validateEligibilityScreeningRequest, validateEligibilityScreeningResponse } from '../src/eligibility.js';
+import {
+  INELIGIBLE_BENEFICIARY_CODE,
+  INELIGIBLE_BENEFICIARY_NOTICE,
+  validateEligibilityScreeningRequest,
+  validateEligibilityScreeningResponse
+} from '../src/eligibility.js';
 
 describe('eligibility contracts', () => {
+  it('exports the FPS ineligible-beneficiary notice constants used by the API gate', () => {
+    expect(INELIGIBLE_BENEFICIARY_CODE).toBe('INELIGIBLE_BENEFICIARY');
+    expect(INELIGIBLE_BENEFICIARY_NOTICE).toBe('Ineligible Beneficiary');
+  });
   it('rejects unknown, malformed, and expired responses', () => {
     const base = {
       screeningId: 'SCREENING-001', screeningRequestId: 'REQUEST-001', status: 'CLEAR',

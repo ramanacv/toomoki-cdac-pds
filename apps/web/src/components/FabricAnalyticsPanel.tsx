@@ -5,11 +5,12 @@ import type {
   LedgerProofDetailResponse,
   ProofAnalyticsModule
 } from '@pds/shared-types';
-import { loadLedgerProofAnalytics, loadLedgerProofDetail } from '@/api.js';
+import { loadLedgerProofAnalytics, loadLedgerProofDetail, loadLedgerProofsByEntity } from '@/api.js';
 import { Panel } from '@/components/Panel.js';
 import { SummaryCards } from '@/components/SummaryCards.js';
 import { Badge } from '@/components/ui/badge.js';
 import { Button } from '@/components/ui/button.js';
+import { Input } from '@/components/ui/input.js';
 import {
   Dialog,
   DialogContent,
@@ -44,6 +45,10 @@ export function FabricAnalyticsPanel({ apiOnline, canOpenDetail }: FabricAnalyti
   const [detail, setDetail] = useState<LedgerProofDetailResponse | null>(null);
   const [detailError, setDetailError] = useState<string | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [entityQuery, setEntityQuery] = useState('');
+  const [entitySearchBusy, setEntitySearchBusy] = useState(false);
+  const [entitySearchError, setEntitySearchError] = useState<string | null>(null);
+  const [entitySearchRows, setEntitySearchRows] = useState<LedgerProofAnalyticsRow[] | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -91,6 +96,28 @@ export function FabricAnalyticsPanel({ apiOnline, canOpenDetail }: FabricAnalyti
   const openRow = (row: LedgerProofAnalyticsRow) => {
     if (!canOpenDetail) return;
     setSelectedEventId(row.eventId);
+  };
+
+  const runEntitySearch = async () => {
+    const value = entityQuery.trim();
+    if (!value) {
+      setEntitySearchError('Enter an opaque entityId or beneficiaryRefHash');
+      return;
+    }
+    setEntitySearchBusy(true);
+    setEntitySearchError(null);
+    try {
+      const result = await loadLedgerProofsByEntity({
+        entityId: value,
+        beneficiaryRefHash: value
+      });
+      setEntitySearchRows(result.items);
+    } catch (err: unknown) {
+      setEntitySearchRows(null);
+      setEntitySearchError(err instanceof Error ? err.message : 'Entity proof lookup failed');
+    } finally {
+      setEntitySearchBusy(false);
+    }
   };
 
   if (loading) {
@@ -247,6 +274,93 @@ export function FabricAnalyticsPanel({ apiOnline, canOpenDetail }: FabricAnalyti
           </Table>
         )}
       </Panel>
+
+      {canOpenDetail ? (
+        <Panel
+          eyebrow="Auditor"
+          title="Hash-keyed proof trail"
+          pill="entityId / beneficiaryRefHash"
+          lead="Search opaque entity or beneficiary reference hashes. Results join ledger events to Fabric fabric_tx_id. Cleartext Beneficiary IDs and Aadhaar are not accepted."
+          wide
+        >
+          <form
+            className="mb-4 flex flex-wrap items-end gap-2"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void runEntitySearch();
+            }}
+          >
+            <label className="grid min-w-[16rem] flex-1 gap-1 text-sm">
+              <span className="text-muted-foreground">Opaque entityId or beneficiaryRefHash</span>
+              <Input
+                value={entityQuery}
+                onChange={(event) => setEntityQuery(event.target.value)}
+                placeholder="e.g. beneficiary-demo-001-hash"
+                autoComplete="off"
+              />
+            </label>
+            <Button type="submit" disabled={entitySearchBusy || !apiOnline}>
+              {entitySearchBusy ? 'Searching…' : 'Search proofs'}
+            </Button>
+          </form>
+          {entitySearchError ? <p className="mb-3 text-sm text-destructive">{entitySearchError}</p> : null}
+          {entitySearchRows ? (
+            entitySearchRows.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No ledger events matched that opaque reference.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead scope="col">Event</TableHead>
+                      <TableHead scope="col">Entity</TableHead>
+                      <TableHead scope="col">Status</TableHead>
+                      <TableHead scope="col">Fabric TX</TableHead>
+                      <TableHead scope="col">Business time</TableHead>
+                      <TableHead scope="col">Detail</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {entitySearchRows.map((row) => (
+                      <TableRow key={`entity-${row.eventId}`}>
+                        <TableCell>
+                          <div className="grid gap-0.5">
+                            <span>{row.eventType}</span>
+                            <span className="text-xs text-muted-foreground">{row.eventId}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="grid gap-0.5">
+                            <span>{row.entityType}</span>
+                            <span className="text-xs text-muted-foreground">{row.entityId}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={row.status === 'COMMITTED' ? 'secondary' : 'destructive'}>
+                            {row.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="font-mono text-xs">{shortHash(row.fabricTxId)}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{row.businessTimestamp}</TableCell>
+                        <TableCell>
+                          <Button type="button" variant="outline" size="sm" onClick={() => openRow(row)}>
+                            Open
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Run a search after a beneficiary lifecycle create to show cryptographic Fabric transaction IDs
+              for that hash-keyed trail.
+            </p>
+          )}
+        </Panel>
+      ) : null}
 
       <Panel
         eyebrow="Fabric"

@@ -194,4 +194,86 @@ describe('ProofsService', () => {
     expect(analytics.completeness.missingProofCount).toBe(0);
     expect(analytics.completeness.alerts).toEqual([]);
   });
+
+  it('requires an opaque entityId or beneficiaryRefHash for entity proof lookup', async () => {
+    const service = new ProofsService(facade());
+    await expect(service.listByEntity({})).rejects.toThrow(/entityId and\/or beneficiaryRefHash/);
+  });
+
+  it('filters in-memory ledger events by beneficiaryRefHash and entityId', async () => {
+    const service = new ProofsService({
+      getOperationalPool: () => null,
+      listLedgerEvents: () => [
+        {
+          ledgerTxId: 'TX-BEN-1',
+          entityType: 'beneficiary',
+          entityId: 'beneficiary-demo-001-hash',
+          eventType: 'BENEFICIARY_CREATED',
+          payload: { beneficiaryRefHash: 'beneficiary-demo-001-hash' },
+          timestamp: '2026-01-02T00:00:00.000Z'
+        },
+        {
+          ledgerTxId: 'TX-AUTH-1',
+          entityType: 'auth',
+          entityId: 'AUTH-1',
+          eventType: 'AuthTransaction',
+          payload: { beneficiaryRefHash: 'beneficiary-demo-001-hash', authResult: 'SUCCESS' },
+          timestamp: '2026-01-03T00:00:00.000Z'
+        },
+        {
+          ledgerTxId: 'TX-OTHER',
+          entityType: 'lot',
+          entityId: 'LOT-9',
+          eventType: 'DispatchLot',
+          payload: { quantityKg: 10 },
+          timestamp: '2026-01-04T00:00:00.000Z'
+        }
+      ]
+    } as unknown as PdsLedgerFacade);
+
+    const byHash = await service.listByEntity({ beneficiaryRefHash: 'beneficiary-demo-001-hash' });
+    expect(byHash.items.map((row) => row.eventId)).toEqual(['TX-AUTH-1', 'TX-BEN-1']);
+    expect(byHash.beneficiaryRefHash).toBe('beneficiary-demo-001-hash');
+
+    const byEntity = await service.listByEntity({ entityId: 'LOT-9' });
+    expect(byEntity.items).toHaveLength(1);
+    expect(byEntity.items[0]?.eventId).toBe('TX-OTHER');
+  });
+
+  it('joins postgres ledger_events to outbox fabric_tx_id for entity queries', async () => {
+    const query = vi.fn().mockResolvedValue({
+      rows: [{
+        event_id: 'TX-JOIN-1',
+        operation_id: 'TX-JOIN-1',
+        status: 'COMMITTED',
+        fabric_tx_id: 'fabric-join-1',
+        retry_count: 0,
+        schema_version: 1,
+        created_at: new Date('2026-01-01T00:00:00Z'),
+        committed_at: new Date('2026-01-01T00:00:05Z'),
+        event_payload: {
+          ledgerTxId: 'TX-JOIN-1',
+          entityType: 'beneficiary',
+          entityId: 'beneficiary-demo-001-hash',
+          eventType: 'BENEFICIARY_CREATED',
+          payload: { beneficiaryRefHash: 'beneficiary-demo-001-hash' },
+          timestamp: '2026-01-01T00:00:00.000Z'
+        }
+      }]
+    });
+    const service = new ProofsService({
+      getOperationalPool: () => ({ query }),
+      listLedgerEvents: () => []
+    } as unknown as PdsLedgerFacade);
+
+    const result = await service.listByEntity({ entityId: 'beneficiary-demo-001-hash' });
+    expect(query).toHaveBeenCalled();
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]).toEqual(expect.objectContaining({
+      eventId: 'TX-JOIN-1',
+      entityId: 'beneficiary-demo-001-hash',
+      status: 'COMMITTED',
+      fabricTxId: 'fabric-join-1'
+    }));
+  });
 });

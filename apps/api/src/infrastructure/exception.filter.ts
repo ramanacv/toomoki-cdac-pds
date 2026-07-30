@@ -28,6 +28,8 @@ type ErrorBody = {
   error: string;
   message: string;
   requestId?: string;
+  /** Structured client code (e.g. INELIGIBLE_BENEFICIARY) when provided by HttpException. */
+  code?: string;
 };
 
 type HttpResponse = {
@@ -92,6 +94,15 @@ export class GlobalExceptionFilter implements ExceptionFilter {
               : String((res as { message: string }).message)
             : exception.message;
       body = { statusCode: status, error: titleFor(status), message, requestId };
+      if (
+        typeof res === 'object'
+        && res !== null
+        && 'code' in res
+        && typeof (res as { code: unknown }).code === 'string'
+        && (res as { code: string }).code.trim()
+      ) {
+        body.code = (res as { code: string }).code.trim();
+      }
     } else if (exception instanceof Error) {
       status = statusFromError(exception);
       message = exception.message;

@@ -12,6 +12,8 @@ This folder contains implementation guidance derived from the product and techni
 - [Near-MVP hardening tracker](mvp-hardening-plan.md)
 - [External ghost-beneficiary screening and review implementation](ghost-detection-impl.md)
 - [Beneficiary registry and fraud-detection alignment](beneficiary-registry-alignment.md)
+- [POC test-case gap analysis (all 14 draft TCs)](poc-test-case-gap-analysis.md)
+- [POC test-case demo checklist (SHOW / REMAP / DEFER runbook)](poc-test-case-demo-checklist.md)
 - [Mocks-only integrity + proof completeness](mocks-integrity-proof-completeness-plan.md)
   — includes `npm run test:beneficiaries` and `npm run live:beneficiaries` for the
   fraud-prevention / lifecycle focus shift

@@ -49,7 +49,14 @@ export function EligibilityReviewPage() {
   const [registry, setRegistry] = useState<BeneficiaryRegistrySummary>(offlineRegistry);
   const [selectedId, setSelectedId] = useState('BEN-DEMO-001');
   const [response, setResponse] = useState<EligibilityScreeningResponse | null>(null);
-  const [gate, setGate] = useState<{ allowed: boolean; rcmsStatus: string; availableBalanceKg: number; alreadyLiftedKg: number; reason: string } | null>(null);
+  const [gate, setGate] = useState<{
+    allowed: boolean;
+    rcmsStatus: string;
+    availableBalanceKg: number;
+    alreadyLiftedKg: number;
+    reason: string;
+    notice?: string;
+  } | null>(null);
   const [removalSelection, setRemovalSelection] = useState<string[]>([]);
   const [removalReason, setRemovalReason] = useState<'FRAUD_CONFIRMED' | 'DUPLICATE_RECORD'>('FRAUD_CONFIRMED');
   const [busy, setBusy] = useState(false);
@@ -478,7 +485,13 @@ export function EligibilityReviewPage() {
       </CardContent></Card>}
 
       {gate && <Card><CardHeader><CardTitle>Entitlement gate result</CardTitle></CardHeader><CardContent>
-        <p className={gate.allowed ? 'text-emerald-700' : 'text-destructive'}>{gate.allowed ? 'Distribution allowed' : 'Distribution blocked'} · {gate.reason}</p>
+        <p className={gate.allowed ? 'text-emerald-700' : 'text-destructive'}>
+          {gate.allowed
+            ? 'Distribution allowed'
+            : (gate.notice ?? (gate.reason === 'EFFECTIVE_RCMS_DECISION' ? 'Ineligible Beneficiary' : 'Distribution blocked'))}
+          {' · '}
+          {gate.reason}
+        </p>
         <p className="text-sm">RCMS {gate.rcmsStatus} · {gate.availableBalanceKg} kg available after {gate.alreadyLiftedKg} kg already lifted.</p>
       </CardContent></Card>}
     </div>

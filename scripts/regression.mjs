@@ -33,15 +33,29 @@ const run = (label, command, args, env = {}) => {
 const probeFabricStack = async () => {
   const apiBase = process.env.API_BASE ?? 'http://127.0.0.1:3000';
   try {
-    const response = await fetch(`${apiBase}/health`);
-    if (!response.ok) {
-      throw new Error(`health returned ${response.status}`);
+    const healthResponse = await fetch(`${apiBase}/health`);
+    if (!healthResponse.ok) {
+      throw new Error(`health returned ${healthResponse.status}`);
     }
-    const health = await response.json();
-    if (health.ledgerMode !== 'fabric') {
-      throw new Error(`ledgerMode=${health.ledgerMode ?? 'unknown'} (expected fabric)`);
+    const health = await healthResponse.json();
+    if (!health.ok) {
+      throw new Error('health.ok is not true');
     }
-    return health;
+
+    // /health is intentionally minimal; ledger mode lives on /admin/network.
+    const { getServiceAccessToken } = await import('./iam/service-token.mjs');
+    const token = await getServiceAccessToken();
+    const networkResponse = await fetch(`${apiBase}/admin/network`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!networkResponse.ok) {
+      throw new Error(`/admin/network returned ${networkResponse.status}`);
+    }
+    const network = await networkResponse.json();
+    if (network.ledgerMode !== 'fabric') {
+      throw new Error(`ledgerMode=${network.ledgerMode ?? 'unknown'} (expected fabric)`);
+    }
+    return { health, network };
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     throw new Error(
@@ -78,7 +92,7 @@ const main = async () => {
       run('Fabric gateway smoke', 'npm', ['run', 'smoke:fabric'])
     );
     step('fabric-e2e', () =>
-      run('Fabric API e2e (opt-in)', 'npm', ['test', '--workspace=apps/api', '--', 'test/e2e/fabric-api.e2e.spec.ts'], {
+      run('Fabric API e2e (opt-in)', 'npm', ['run', 'test:fabric', '--workspace=@pds/api'], {
         PDS_E2E_FABRIC: 'true'
       })
     );

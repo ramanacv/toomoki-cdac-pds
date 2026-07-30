@@ -210,7 +210,7 @@ services:
       KC_METRICS_ENABLED: 'true'
       KC_HOSTNAME_STRICT: 'false'
       KC_HTTP_ENABLED: ${KC_HTTP_ENABLED:-true}
-      KC_PROXY_HEADERS: ${KC_PROXY_HEADERS:-}
+      # Do not pass empty KC_PROXY_HEADERS — Keycloak 26 rejects "". Set only for edge/HTTPS demos.
       KC_HOSTNAME: ${KC_HOSTNAME:-}
       KC_HOSTNAME_URL: ${KC_HOSTNAME_URL:-}
       KC_HOSTNAME_ADMIN_URL: ${KC_HOSTNAME_ADMIN_URL:-}
