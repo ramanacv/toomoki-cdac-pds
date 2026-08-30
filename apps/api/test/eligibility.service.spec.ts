@@ -156,13 +156,17 @@ describe('eligibility review workflow', () => {
     const repository = {
       loadState: vi.fn().mockResolvedValue({ cases: [pendingCase], actions: [], screenings: [] }),
       persistScreening: vi.fn(), persistCaseAction: vi.fn(), persistFinalDecision: vi.fn(),
-      loadProofStatuses: vi.fn().mockResolvedValue(new Map([['ELIG-PROOF-1', 'COMMITTED']])),
+      loadProofStatuses: vi.fn().mockResolvedValue(new Map([[
+        'ELIG-PROOF-1',
+        { status: 'COMMITTED', fabricTxId: 'fabric-eligibility-proof-1' }
+      ]])),
       syncProofStatuses
     } as unknown as EligibilityRepository;
     const service = createService(undefined, repository);
     await service.onModuleInit();
     const listed = await service.listCases();
     expect(listed[0]?.proofStatus).toBe('COMMITTED');
+    expect(listed[0]?.proofFabricTxId).toBe('fabric-eligibility-proof-1');
     expect(syncProofStatuses).toHaveBeenCalledWith([
       { caseId: 'ELIG-CASE-PROOF', proofEventId: 'ELIG-PROOF-1', proofStatus: 'COMMITTED' }
     ]);

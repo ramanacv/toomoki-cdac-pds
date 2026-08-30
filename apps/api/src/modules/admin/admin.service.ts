@@ -241,7 +241,8 @@ export class AdminService {
       fabricOrgMapping: this.loadFabricOrganizations().map((org) => ({
         orgName: org.name,
         role: org.role,
-        mspId: org.mspId
+        mspId: org.mspId,
+        deploymentStatus: org.deploymentStatus
       }))
     };
   }

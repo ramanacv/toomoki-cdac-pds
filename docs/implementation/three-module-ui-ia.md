@@ -21,7 +21,7 @@ Platform admin as a separate non-PDS entry.
 | Supply chain | `/m/supply-chain` | workbench, lots, transfers, allocations | FCI, godown, DSO (RO), BSO |
 | Card & eligibility | `/m/eligibility` | eligibility-review | DSO eligibility journey, management, auditor |
 | FPS authentication | `/m/fps` | workbench, allocations, distribution | FPS dealer |
-| Trust & reconcile | `/m/trust` | dashboard (sample Fabric proof analytics), stakeholders, audit-alerts, verify | auditor, management (+ secondary for ops) |
+| Trust & reconcile | `/m/trust` | dashboard (sample Fabric proof analytics), stakeholders, audit-alerts, verify | auditor, management |
 
 Legacy flat routes (`/workbench`, `/lots`, `/eligibility`, `/distribution`, and
 so on) remain the canonical screen URLs. Module homes are launchpads only.
@@ -48,6 +48,8 @@ The department username `demo-department` has two journeys:
 | Auditor / Management | `/m/trust` |
 
 Forbidden screens and modules redirect to the role’s default module home.
+Operational roles see proof status alongside their own workflow records; they do
+not receive the cross-system Trust & reconcile module.
 
 ## Demo script order
 

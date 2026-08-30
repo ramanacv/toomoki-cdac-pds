@@ -73,10 +73,13 @@ describe('@pds/fixtures', () => {
   });
 
   it('exports Maharashtra and J&K canonical fictional eligibility panel profiles', () => {
-    expect(eligibilityBeneficiaries).toHaveLength(9);
+    expect(eligibilityBeneficiaries).toHaveLength(20);
     expect(eligibilityBeneficiaries.map((item) => item.demoBeneficiaryId)).toEqual([
       'BEN-DEMO-001', 'BEN-DEMO-002', 'BEN-DEMO-003', 'BEN-DEMO-004', 'BEN-DEMO-005',
-      'BEN-JK-DEMO-001', 'BEN-JK-DEMO-002', 'BEN-JK-DEMO-003', 'BEN-JK-DEMO-004'
+      'BEN-JK-DEMO-001', 'BEN-JK-DEMO-002', 'BEN-JK-DEMO-003', 'BEN-JK-DEMO-004',
+      'BEN-DEMO-006', 'BEN-DEMO-007', 'BEN-DEMO-008', 'BEN-DEMO-009', 'BEN-DEMO-010',
+      'BEN-DEMO-011', 'BEN-DEMO-012', 'BEN-DEMO-013', 'BEN-DEMO-014', 'BEN-DEMO-015',
+      'BEN-DEMO-016'
     ]);
     expect(eligibilityBeneficiaries.every((item) =>
       item.fictionalName.includes('(Fictional)') &&
@@ -90,7 +93,7 @@ describe('@pds/fixtures', () => {
       Array.isArray(item.familyMembers) &&
       item.familyMembers.length >= 2
     )).toBe(true);
-    expect(eligibilityBeneficiaries.filter((item) => item.fpsId === 'FPS-101' && item.jurisdictionCode === 'MH')).toHaveLength(3);
-    expect(eligibilityBeneficiaries.filter((item) => item.fpsId === 'FPS-202' && item.jurisdictionCode === 'MH')).toHaveLength(2);
+    expect(eligibilityBeneficiaries.filter((item) => item.fpsId === 'FPS-101')).toHaveLength(10);
+    expect(eligibilityBeneficiaries.filter((item) => item.fpsId === 'FPS-202')).toHaveLength(10);
   });
 });

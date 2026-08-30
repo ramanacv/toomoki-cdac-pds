@@ -460,6 +460,22 @@ export function getAllCommoditiesRoleQueue(context: WorkflowContext, role: DemoR
     .filter((group) => group.actions.length > 0);
 }
 
+export function getActiveWorkflowCommodities(context: WorkflowContext): Set<CommodityName> {
+  const commodityByLotId = new Map(context.lots.map((lot) => [lot.lotId, lot.commodity]));
+  const active = new Set<CommodityName>();
+  const add = (commodity: string | undefined): void => {
+    if (COMMODITIES.some((definition) => definition.name === commodity)) {
+      active.add(commodity as CommodityName);
+    }
+  };
+
+  context.transfers.forEach((transfer) => add(commodityByLotId.get(transfer.lotId)));
+  context.allocations.forEach((allocation) => add(allocation.commodity));
+  context.distributions.forEach((distribution) => add(distribution.commodity));
+
+  return active;
+}
+
 export function getWorkflowActions(context: WorkflowContext, commodity: string = DEFAULT_WORKFLOW_COMMODITY): WorkflowActionSpec[] {
   const route = getWorkflowRoute(commodity, context.lots);
   const plannedLegs = getPlannedLegs(route.commodity, context.lots);

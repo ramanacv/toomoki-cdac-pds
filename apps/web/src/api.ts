@@ -233,7 +233,7 @@ export const runEligibilityScreening = (
   postJson('/eligibility/v1/screenings', {
     demoBeneficiaryId,
     screeningRequestId,
-    checks: ['DEATH', 'ACTIVITY', 'ECONOMIC', 'LAND']
+    checks: ['DEATH', 'ACTIVITY', 'ECONOMIC', 'LAND', 'DUPLICATE']
   });
 
 export const performEligibilityAction = (

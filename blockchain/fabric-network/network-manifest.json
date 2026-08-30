@@ -13,35 +13,40 @@
       "mspId": "FoodAndCivilSuppliesMSP",
       "peerHost": "peer0.food.example.com",
       "peerPort": 7051,
-      "role": "DISTRICT_SUPPLY_OFFICE"
+      "role": "DISTRICT_SUPPLY_OFFICE",
+      "deploymentStatus": "DEPLOYED"
     },
     {
       "name": "ProcurementMiller",
       "mspId": "ProcurementMillerMSP",
       "peerHost": "peer0.procurement.example.com",
       "peerPort": 8051,
-      "role": "PROCUREMENT_CENTER"
+      "role": "PROCUREMENT_CENTER",
+      "deploymentStatus": "PLANNED"
     },
     {
       "name": "GodownWarehouse",
       "mspId": "GodownWarehouseMSP",
       "peerHost": "peer0.godown.example.com",
       "peerPort": 9051,
-      "role": "STATE_GODOWN"
+      "role": "STATE_GODOWN",
+      "deploymentStatus": "DEPLOYED"
     },
     {
       "name": "FairPriceShop",
       "mspId": "FairPriceShopMSP",
       "peerHost": "peer0.fps.example.com",
       "peerPort": 10051,
-      "role": "FAIR_PRICE_SHOP"
+      "role": "FAIR_PRICE_SHOP",
+      "deploymentStatus": "PLANNED"
     },
     {
       "name": "AuditAuthority",
       "mspId": "AuditAuthorityMSP",
       "peerHost": "peer0.audit.example.com",
       "peerPort": 11051,
-      "role": "AUDITOR"
+      "role": "AUDITOR",
+      "deploymentStatus": "PLANNED"
     }
   ],
   "chaincode": {

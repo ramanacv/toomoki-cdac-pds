@@ -99,6 +99,9 @@ describe('citizen self-service portal', () => {
     expect(screen.getByText(/Simulation only/)).toBeInTheDocument();
     expect(screen.getByText(/Never enter a real Aadhaar number/)).toBeInTheDocument();
     expect(screen.getByLabelText(/Demo Aadhaar number/)).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: /Affected demo beneficiary/ })).toBeInTheDocument();
+    expect(screen.getAllByText('123456').length).toBeGreaterThan(2);
+    expect(screen.getByText('Nandita Salve (Fictional)')).toBeInTheDocument();
   });
 
   it('walks through Aadhaar → OTP → dashboard and shows masked data with proof status', async () => {
@@ -158,6 +161,30 @@ describe('citizen self-service portal', () => {
     renderPage();
 
     expect(await screen.findByRole('status')).toHaveTextContent(/removed from the active beneficiary list by the department/);
+    expect(screen.getByRole('status')).toHaveTextContent(/Reason: Fraud confirmed after departmental verification/);
+    expect(screen.queryByText('Surrender my ration card')).not.toBeInTheDocument();
+  });
+
+  it('shows the case-based ineligibility notification and appeal guidance', async () => {
+    citizenApi.getCitizenSession.mockReturnValue('session-1');
+    citizenApi.fetchCitizenProfile.mockResolvedValue({
+      ...profile,
+      eligibility: { ...profile.eligibility, status: 'CANCELLED', availableBalanceKg: 0 },
+      statusNotification: {
+        title: 'Your ration card status has changed',
+        reason: 'Death-registry match confirmed after departmental review.',
+        message: 'The department marked this demo ration card ineligible after completing review of a death-registry match.',
+        effectiveAt: '2026-07-29T12:00:00Z',
+        caseId: 'ELIG-CASE-001',
+        appealMessage: 'Contact the DSO/RCMS help desk to request review or lodge an appeal in this simulation.'
+      }
+    });
+    renderPage();
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/ration card status has changed/i);
+    expect(screen.getByRole('alert')).toHaveTextContent(/Reason: Death-registry match confirmed/i);
+    expect(screen.getByRole('alert')).toHaveTextContent(/death-registry match/i);
+    expect(screen.getByRole('alert')).toHaveTextContent(/lodge an appeal/i);
     expect(screen.queryByText('Surrender my ration card')).not.toBeInTheDocument();
   });
 

@@ -143,11 +143,11 @@ export const screenDefinitions: ScreenDefinition[] = [
 
 export const roleScreens: Record<DemoRole, DemoScreen[]> = {
   MANAGEMENT: ['dashboard', 'workbench', 'stakeholders', 'transfers', 'distribution', 'audit-alerts', 'eligibility-review', 'verify'],
-  CONTROL_OFFICE: ['dashboard', 'workbench', 'transfers', 'audit-alerts', 'eligibility-review', 'verify'],
-  BLOCK_OFFICE: ['dashboard', 'workbench', 'allocations', 'transfers', 'verify'],
-  FCI_DEPOT: ['dashboard', 'workbench', 'lots', 'transfers', 'verify'],
-  GODOWN: ['dashboard', 'workbench', 'lots', 'transfers', 'audit-alerts', 'verify'],
-  FPS: ['dashboard', 'workbench', 'allocations', 'distribution', 'verify'],
+  CONTROL_OFFICE: ['workbench', 'transfers', 'audit-alerts', 'eligibility-review'],
+  BLOCK_OFFICE: ['workbench', 'allocations', 'transfers'],
+  FCI_DEPOT: ['workbench', 'lots', 'transfers'],
+  GODOWN: ['workbench', 'lots', 'transfers', 'audit-alerts'],
+  FPS: ['workbench', 'allocations', 'distribution'],
   AUDITOR: ['dashboard', 'stakeholders', 'lots', 'transfers', 'allocations', 'distribution', 'audit-alerts', 'eligibility-review', 'verify']
 };
 

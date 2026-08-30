@@ -93,6 +93,15 @@ export type CitizenProfileResponse = {
   }>;
   /** Present when the card was surrendered or removed from the active list. */
   removal?: BeneficiaryRemovalRecord;
+  /** Present after an authorized eligibility-case decision changes the card status. */
+  statusNotification?: {
+    title: string;
+    reason: string;
+    message: string;
+    effectiveAt: string;
+    caseId: string;
+    appealMessage: string;
+  };
 };
 
 export type CitizenDistributionEntry = {
@@ -118,6 +127,44 @@ export type CitizenAuthHistoryEntry = {
 
 const maskDemoAadhaar = (value: string): string => `XXXX-XXXX-${value.slice(-4)}`;
 const maskDemoMobile = (value: string): string => `XXXXXX${value.slice(-4)}`;
+
+const cancellationMessage = (status: string): string => {
+  switch (status) {
+    case 'DEATH_MATCH_REVIEW':
+      return 'The department marked this demo ration card ineligible after completing review of a death-registry match.';
+    case 'INACTIVITY_REVIEW':
+      return 'The department marked this demo ration card ineligible after completing inactivity and portability verification.';
+    case 'ECONOMIC_ELIGIBILITY_REVIEW':
+      return 'The department marked this demo ration card ineligible after completing review under the fictional economic eligibility policy.';
+    case 'LANDHOLDING_REVIEW':
+      return 'The department marked this demo ration card ineligible after completing land-record and policy verification.';
+    case 'DUPLICATE_RECORD_REVIEW':
+      return 'The department marked this demo ration card ineligible after resolving a duplicate active-record review.';
+    case 'MULTI_SOURCE_CONFLICT':
+      return 'The department marked this demo ration card ineligible after reconciling conflicting eligibility records.';
+    default:
+      return 'The department marked this demo ration card ineligible after an authorized eligibility review.';
+  }
+};
+
+const cancellationReason = (status: string): string => {
+  switch (status) {
+    case 'DEATH_MATCH_REVIEW':
+      return 'Death-registry match confirmed after departmental review.';
+    case 'INACTIVITY_REVIEW':
+      return 'Inactivity concern confirmed after portability and migration checks.';
+    case 'ECONOMIC_ELIGIBILITY_REVIEW':
+      return 'Household found ineligible under the fictional economic eligibility policy.';
+    case 'LANDHOLDING_REVIEW':
+      return 'Landholding criterion confirmed after record verification.';
+    case 'DUPLICATE_RECORD_REVIEW':
+      return 'Duplicate active beneficiary record confirmed.';
+    case 'MULTI_SOURCE_CONFLICT':
+      return 'Conflicting eligibility records reconciled by the department.';
+    default:
+      return 'Authorized departmental eligibility decision.';
+  }
+};
 
 @Injectable()
 export class BeneficiaryPortalService {
@@ -315,13 +362,28 @@ export class BeneficiaryPortalService {
     let monthlyRiceEntitlementKg = beneficiary.monthlyRiceEntitlementKg;
     let alreadyLiftedKg = beneficiary.alreadyLiftedKg;
     let availableBalanceKg = Math.max(0, monthlyRiceEntitlementKg - alreadyLiftedKg);
+    let statusNotification: CitizenProfileResponse['statusNotification'];
     if (this.eligibility) {
       try {
         const gate = this.eligibility.gate(demoBeneficiaryId, 0);
         status = gate.rcmsStatus === 'ACTIVE' ? 'ELIGIBLE' : gate.rcmsStatus;
         monthlyRiceEntitlementKg = gate.monthlyEntitlementKg;
         alreadyLiftedKg = gate.alreadyLiftedKg;
-        availableBalanceKg = gate.availableBalanceKg;
+        availableBalanceKg = gate.rcmsStatus === 'ACTIVE' ? gate.availableBalanceKg : 0;
+        const eligibilityCase = this.eligibility.getCaseForBeneficiary(demoBeneficiaryId);
+        const decisionAction = [...(eligibilityCase?.history ?? [])]
+          .reverse()
+          .find((action) => action.action === 'DECISION');
+        if (eligibilityCase?.decision === 'CARD_CANCELLED' && decisionAction) {
+          statusNotification = {
+            title: 'Your ration card status has changed',
+            reason: cancellationReason(eligibilityCase.screening.status),
+            message: cancellationMessage(eligibilityCase.screening.status),
+            effectiveAt: decisionAction.occurredAt,
+            caseId: eligibilityCase.caseId,
+            appealMessage: 'Contact the DSO/RCMS help desk to request review or lodge an appeal in this simulation.'
+          };
+        }
       } catch {
         // Keep fixture values when the eligibility module cannot resolve live state.
       }
@@ -345,7 +407,8 @@ export class BeneficiaryPortalService {
         ageYears: member.ageYears,
         ...(member.demoAadhaarNumber ? { maskedAadhaar: maskDemoAadhaar(member.demoAadhaarNumber) } : {})
       })),
-      ...(beneficiary.removal ? { removal: structuredClone(beneficiary.removal) } : {})
+      ...(beneficiary.removal ? { removal: structuredClone(beneficiary.removal) } : {}),
+      ...(statusNotification ? { statusNotification } : {})
     };
   }
 

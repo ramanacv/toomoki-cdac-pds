@@ -76,6 +76,33 @@ const scenarios: Record<string, Scenario> = {
     ruleIds: ['MULTI-CONFLICT-01'],
     signals: [signal('EMPLOYMENT', 'MATCH', 'HIGH', 'FORMAL_EMPLOYMENT_BAND'), signal('AEPDS_ONORC', 'CONFLICT', 'MEDIUM', 'ACTIVE_LIFT_CONTRADICTS_SOURCE')]
   },
+  'BEN-DEMO-006': {
+    status: 'INACTIVITY_REVIEW',
+    action: 'CHECK_PORTABILITY_BEFORE_FIELD_REVIEW',
+    ruleIds: ['INACTIVE-12M-01'],
+    signals: [
+      signal('AEPDS_ONORC', 'MATCH', 'MEDIUM', 'NO_RECENT_ACTIVITY_OBSERVED'),
+      signal('RCMS', 'CLEAR', 'LOW', 'CARD_ACTIVE')
+    ]
+  },
+  'BEN-DEMO-007': {
+    status: 'LANDHOLDING_REVIEW',
+    action: 'FIELD_VERIFY_SOURCE_FRESHNESS',
+    ruleIds: ['LAND-FRESHNESS-01'],
+    signals: [
+      signal('LAND_RECORDS', 'STALE', 'MEDIUM', 'OWNERSHIP_SNAPSHOT_REQUIRES_REVIEW'),
+      signal('RCMS', 'CLEAR', 'LOW', 'CARD_ACTIVE')
+    ]
+  },
+  'BEN-DEMO-011': {
+    status: 'ECONOMIC_ELIGIBILITY_REVIEW',
+    action: 'ISSUE_NOTICE_AND_REVIEW_CORROBORATED_BANDS',
+    ruleIds: ['ECON-ITR-GST-01'],
+    signals: [
+      signal('INCOME_TAX', 'MATCH', 'HIGH', 'ABOVE_DEMO_POLICY_BAND'),
+      signal('GST_TURNOVER', 'MATCH', 'HIGH', 'CORROBORATED_TURNOVER_BAND')
+    ]
+  },
   'BEN-JK-DEMO-001': {
     status: 'DUPLICATE_RECORD_REVIEW',
     action: 'VERIFY_CROSS_REGISTRY_LINKAGE_WITHOUT_AUTOMATIC_DEACTIVATION',

@@ -428,6 +428,13 @@ export class EligibilityService implements OnModuleInit {
     return structuredClone(this.mustBeneficiary(demoBeneficiaryId));
   }
 
+  /** Read-only case snapshot used by the citizen portal to explain an effective status change. */
+  getCaseForBeneficiary(demoBeneficiaryId: string): EligibilityCase | undefined {
+    const caseId = this.caseByBeneficiary.get(demoBeneficiaryId);
+    const item = caseId ? this.cases.get(caseId) : undefined;
+    return item ? structuredClone(item) : undefined;
+  }
+
   /**
    * Removes beneficiaries from the active list (officer bulk action after
    * fraud confirmation, or a beneficiary's own card surrender).
@@ -700,13 +707,15 @@ export class EligibilityService implements OnModuleInit {
     }> = [];
     for (const item of this.cases.values()) {
       if (item.proofEventId && statuses.has(item.proofEventId)) {
-        const next = statuses.get(item.proofEventId)!;
-        if (item.proofStatus !== next) {
-          item.proofStatus = next;
+        const proof = statuses.get(item.proofEventId)!;
+        if (proof.fabricTxId) item.proofFabricTxId = proof.fabricTxId;
+        else delete item.proofFabricTxId;
+        if (item.proofStatus !== proof.status) {
+          item.proofStatus = proof.status;
           updates.push({
             caseId: item.caseId,
             proofEventId: item.proofEventId,
-            proofStatus: next
+            proofStatus: proof.status
           });
         }
       }

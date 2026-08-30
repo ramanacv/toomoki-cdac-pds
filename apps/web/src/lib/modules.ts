@@ -50,7 +50,7 @@ export const moduleDefinitions: ModuleDefinition[] = [
     boundary: 'ViksitPDS trust layer — reconcile views and privacy-safe proof evidence.',
     path: '/m/trust',
     screens: ['dashboard', 'stakeholders', 'audit-alerts', 'verify'],
-    roles: ['MANAGEMENT', 'AUDITOR', 'CONTROL_OFFICE', 'BLOCK_OFFICE', 'FCI_DEPOT', 'GODOWN', 'FPS']
+    roles: ['MANAGEMENT', 'AUDITOR']
   }
 ];
 

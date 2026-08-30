@@ -76,7 +76,8 @@ describe('AdminService', () => {
     expect(activity.recentEvents.length).toBeGreaterThan(0);
     expect(stakeholders.byType.length).toBeGreaterThan(0);
     expect(stakeholders.byStatus.length).toBeGreaterThan(0);
-    expect(stakeholders.fabricOrgMapping.length).toBeGreaterThan(0);
+    expect(stakeholders.fabricOrgMapping.filter((org) => org.deploymentStatus === 'DEPLOYED')).toHaveLength(2);
+    expect(stakeholders.fabricOrgMapping.filter((org) => org.deploymentStatus === 'PLANNED')).toHaveLength(3);
   });
 
   it('resets transactional data while leaving stakeholders intact', async () => {

@@ -16,6 +16,7 @@ import { hasAccessToken } from '@/auth-token.js';
 import type { DemoRole } from '@/demo-model.js';
 import {
   applyMockWorkflowAction,
+  getActiveWorkflowCommodities,
   getActionStockInfo,
   getAllCommoditiesRoleQueue,
   getAllCommoditiesWorkflowActions,
@@ -247,7 +248,7 @@ export function WorkflowActionPanel({
   onComplete,
   onMockComplete
 }: WorkflowActionPanelProps) {
-  const [busy, setBusy] = useState(false);
+  const [busyActionId, setBusyActionId] = useState<string | null>(null);
   const [quantityInputs, setQuantityInputs] = useState<Record<string, string>>({});
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -262,13 +263,15 @@ export function WorkflowActionPanel({
 
   const strictGroups: CommodityActionGroup[] =
     role === 'MANAGEMENT' ? getAllCommoditiesWorkflowActions(context) : getAllCommoditiesRoleQueue(context, role);
+  const activeCommodities = getActiveWorkflowCommodities(context);
   // When a role has nothing of its own queued in any commodity, fall back to
-  // showing the next pending action per commodity anyway (read-only "waiting
-  // for" view) so operators can see what's blocking the pipeline instead of
-  // an empty screen that looks like the whole journey finished.
+  // showing the next pending action for commodities that have recorded activity
+  // (read-only "waiting for" view) so operators can see the relevant blocker
+  // without exposing untouched commodity routes as current work.
   const groupsForRole: CommodityActionGroup[] =
     role !== 'MANAGEMENT' && strictGroups.length === 0
       ? getAllCommoditiesWorkflowActions(context)
+          .filter((group) => activeCommodities.has(group.commodity))
           .map((group) => ({ commodity: group.commodity, actions: group.actions.slice(0, 1) }))
           .filter((group) => group.actions.length > 0)
       : strictGroups;
@@ -336,7 +339,7 @@ export function WorkflowActionPanel({
       return;
     }
 
-    setBusy(true);
+    setBusyActionId(action.id);
     setMessage(null);
     setError(null);
     setCompletedActionId(null);
@@ -382,7 +385,7 @@ export function WorkflowActionPanel({
         await onComplete();
       }
     } finally {
-      setBusy(false);
+      setBusyActionId(null);
     }
   };
 
@@ -570,10 +573,10 @@ export function WorkflowActionPanel({
                           <Button
                             type="button"
                             className="mt-3"
-                            disabled={busy || action.status === 'blocked' || completedActionId === action.id}
+                            disabled={busyActionId !== null || action.status === 'blocked' || completedActionId === action.id}
                             onClick={() => void runAction(action)}
                           >
-                            {busy
+                            {busyActionId === action.id
                               ? 'Submitting...'
                               : completedActionId === action.id
                                 ? 'Done'
@@ -601,7 +604,9 @@ export function WorkflowActionPanel({
         </div>
       ) : (
         <p className="leading-relaxed text-muted-foreground">
-          Journey complete for the current API state. Reset or seed the backend to replay.
+          {role === 'MANAGEMENT' || activeCommodities.size > 0
+            ? 'Journey complete for the current API state. Reset or seed the backend to replay.'
+            : 'No active commodity workflow has reached this role yet.'}
         </p>
       )}
 

@@ -22,6 +22,14 @@ import { eligibilityBeneficiaries } from '@pds/fixtures';
 import { Badge } from '@/components/ui/badge.js';
 import { Button } from '@/components/ui/button.js';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card.js';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from '@/components/ui/dialog.js';
 
 const offlineSummary: EligibilitySummary = {
   simulationOnly: true,
@@ -40,6 +48,37 @@ const offlineRegistry: BeneficiaryRegistrySummary = {
   byEventType: {}, projections: []
 };
 
+const reviewStatuses = new Set<EligibilityScreeningResponse['status']>([
+  'DEATH_MATCH_REVIEW',
+  'INACTIVITY_REVIEW',
+  'ECONOMIC_ELIGIBILITY_REVIEW',
+  'LANDHOLDING_REVIEW',
+  'MULTI_SOURCE_CONFLICT',
+  'DUPLICATE_RECORD_REVIEW'
+]);
+
+const screeningExplanation = (status: EligibilityScreeningResponse['status']): string => {
+  switch (status) {
+    case 'DEATH_MATCH_REVIEW':
+      return 'A simulated death-registry signal matched one household member. The DSO must verify the member before changing the card.';
+    case 'INACTIVITY_REVIEW':
+      return 'No recent local lifting activity was found. The DSO must check ONORC portability and migration before deciding.';
+    case 'ECONOMIC_ELIGIBILITY_REVIEW':
+      return 'Simulated income-tax and turnover bands matched the fictional policy threshold. Notice and verification are required.';
+    case 'LANDHOLDING_REVIEW':
+      return 'A simulated land-record signal requires freshness and ownership verification against the fictional policy.';
+    case 'MULTI_SOURCE_CONFLICT':
+      return 'The simulated sources disagree. The DSO must reconcile the evidence and allow the review or appeal process.';
+    case 'DUPLICATE_RECORD_REVIEW':
+      return 'An opaque cross-registry linkage indicates two active references. The DSO must resolve the duplicate before cancellation.';
+    case 'PORTABILITY_ACTIVITY_FOUND':
+      return 'Current ONORC portability activity was found, so the inactivity concern is cleared and the card remains eligible.';
+    case 'CLEAR':
+    default:
+      return 'No configured review signal was found. The card remains eligible.';
+  }
+};
+
 export function EligibilityReviewPage() {
   const { role } = useWorkspaceContext();
   const offline = getDataSourceMode() === 'mock';
@@ -49,6 +88,8 @@ export function EligibilityReviewPage() {
   const [registry, setRegistry] = useState<BeneficiaryRegistrySummary>(offlineRegistry);
   const [selectedId, setSelectedId] = useState('BEN-DEMO-001');
   const [response, setResponse] = useState<EligibilityScreeningResponse | null>(null);
+  const [screeningDialogOpen, setScreeningDialogOpen] = useState(false);
+  const [decisionCase, setDecisionCase] = useState<EligibilityCase | null>(null);
   const [gate, setGate] = useState<{
     allowed: boolean;
     rcmsStatus: string;
@@ -90,11 +131,31 @@ export function EligibilityReviewPage() {
     try {
       const result = await runEligibilityScreening(selectedId, `WEB-${selectedId}-${Date.now()}`);
       setResponse(result.screening);
+      setScreeningDialogOpen(true);
       if (result.case) setCases((current) => [...current.filter((item) => item.caseId !== result.case!.caseId), result.case!]);
       await refresh();
     } catch (error) {
       setWarning(`${error instanceof Error ? error.message : 'External service unavailable'} Current entitlement remains unchanged.`);
     } finally { setBusy(false); }
+  };
+
+  const actOnCase = async (
+    caseItem: EligibilityCase,
+    action: Parameters<typeof performEligibilityAction>[1],
+    outcomeCode: string,
+    reasonCode: string,
+    decision?: string
+  ) => {
+    setBusy(true);
+    try {
+      const updated = await performEligibilityAction(caseItem.caseId, action, {
+        idempotencyKey: `WEB-${action}-${caseItem.caseId}-${caseItem.version}`,
+        expectedVersion: caseItem.version, outcomeCode, reasonCode, ...(decision ? { decision } : {})
+      });
+      setCases((current) => [...current.filter((item) => item.caseId !== updated.caseId), updated]);
+      await refresh();
+    } catch (error) { setWarning(error instanceof Error ? error.message : 'Case action failed'); }
+    finally { setBusy(false); }
   };
 
   const act = async (
@@ -104,16 +165,14 @@ export function EligibilityReviewPage() {
     decision?: string
   ) => {
     if (!selectedCase) return;
-    setBusy(true);
-    try {
-      const updated = await performEligibilityAction(selectedCase.caseId, action, {
-        idempotencyKey: `WEB-${action}-${selectedCase.caseId}-${selectedCase.version}`,
-        expectedVersion: selectedCase.version, outcomeCode, reasonCode, ...(decision ? { decision } : {})
-      });
-      setCases((current) => [...current.filter((item) => item.caseId !== updated.caseId), updated]);
-      await refresh();
-    } catch (error) { setWarning(error instanceof Error ? error.message : 'Case action failed'); }
-    finally { setBusy(false); }
+    await actOnCase(selectedCase, action, outcomeCode, reasonCode, decision);
+  };
+
+  const markIneligible = async () => {
+    if (!decisionCase) return;
+    const target = decisionCase;
+    setDecisionCase(null);
+    await actOnCase(target, 'decision', 'AUTHORIZED', 'RCMS_AUTHORIZED_AFTER_REVIEW', 'CARD_CANCELLED');
   };
 
   const checkGate = async () => {
@@ -240,8 +299,10 @@ export function EligibilityReviewPage() {
                   <th>OTP mobile</th>
                   <th>Masked card</th>
                   <th>Status</th>
+                  <th>Review signal</th>
                   <th>Case</th>
                   <th>Entitlement</th>
+                  <th>DSO action</th>
                 </tr>
               </thead>
               <tbody>{summary.beneficiaries.map((item) => {
@@ -296,16 +357,53 @@ export function EligibilityReviewPage() {
                       </span>
                     )}
                   </td>
+                  <td>
+                    {itemCase ? (
+                      <>
+                        <Badge variant={reviewStatuses.has(itemCase.screening.status) ? 'destructive' : 'outline'}>
+                          {itemCase.screening.status}
+                        </Badge>
+                        <span className="mt-1 block max-w-52 text-xs text-muted-foreground">
+                          {screeningExplanation(itemCase.screening.status)}
+                        </span>
+                      </>
+                    ) : 'Not screened'}
+                  </td>
                   <td>{item.caseId ?? itemCase?.caseId ?? 'None'}</td>
                   <td>{item.monthlyRiceEntitlementKg - item.alreadyLiftedKg} kg remaining</td>
+                  <td onClick={(event) => event.stopPropagation()}>
+                    {itemCase ? (
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        aria-label={`Mark ${item.demoBeneficiaryId} ineligible`}
+                        disabled={
+                          !mutable ||
+                          busy ||
+                          item.eligibilityStatus === 'CANCELLED' ||
+                          !['REVIEW_READY', 'RECOMMENDED_INELIGIBLE'].includes(itemCase.state)
+                        }
+                        onClick={() => {
+                          setSelectedId(item.demoBeneficiaryId);
+                          setDecisionCase(itemCase);
+                        }}
+                      >
+                        {item.eligibilityStatus === 'CANCELLED' ? 'Ineligible' : 'Mark ineligible'}
+                      </Button>
+                    ) : '—'}
+                  </td>
                 </tr>
               );})}</tbody>
             </table>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button onClick={() => void runScreening()} disabled={!mutable || busy}>Run external eligibility check</Button>
+            <Button onClick={() => void runScreening()} disabled={!mutable || busy}>Screen for review signals</Button>
             <Button variant="outline" onClick={() => void checkGate()} disabled={offline || busy}>Entitlement gate check</Button>
           </div>
+          <p className="text-xs text-muted-foreground">
+            Select one beneficiary, then screen. Five of the ten synthetic households under each FPS have deterministic
+            review signals. Screening alone never changes eligibility; DSO verification and an authorized decision are required.
+          </p>
           <div className="flex flex-wrap items-center gap-2 rounded-xl border border-destructive/30 bg-destructive/5 p-3">
             <p className="text-sm font-medium">Remove from beneficiary list</p>
             <select
@@ -413,6 +511,72 @@ export function EligibilityReviewPage() {
         </Card>
       )}
 
+      <Dialog open={screeningDialogOpen && Boolean(response)} onOpenChange={setScreeningDialogOpen}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>
+              {response && reviewStatuses.has(response.status) ? 'Review signal found' : 'No ineligibility signal found'}
+            </DialogTitle>
+            <DialogDescription>
+              Screening result for {selectedBeneficiary?.fictionalName ?? selectedId}
+            </DialogDescription>
+          </DialogHeader>
+          {response ? (
+            <div className="grid gap-3 text-sm">
+              <div className="flex flex-wrap gap-2">
+                <Badge variant={reviewStatuses.has(response.status) ? 'destructive' : 'outline'}>
+                  {response.status}
+                </Badge>
+                <Badge variant="outline">Integrity score {response.integrityScore ?? 0}/100</Badge>
+              </div>
+              <p>{screeningExplanation(response.status)}</p>
+              <div className="rounded-xl border bg-muted/40 p-3">
+                <p className="font-medium">Effect on eligibility</p>
+                <p className="mt-1 text-muted-foreground">
+                  {reviewStatuses.has(response.status)
+                    ? 'The record is marked UNDER_REVIEW. This signal has not made the beneficiary ineligible. After verification, the DSO may use Mark ineligible to record an authorized decision.'
+                    : 'The record remains eligible and no review case is opened.'}
+                </p>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Recommended next step: {response.recommendedReviewAction}
+              </p>
+            </div>
+          ) : null}
+          <DialogFooter>
+            <Button type="button" onClick={() => setScreeningDialogOpen(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(decisionCase)} onOpenChange={(open) => { if (!open) setDecisionCase(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Mark beneficiary ineligible?</DialogTitle>
+            <DialogDescription>
+              This is the DSO's authorized RCMS decision, not an automatic result of screening.
+            </DialogDescription>
+          </DialogHeader>
+          {decisionCase ? (
+            <div className="grid gap-2 text-sm">
+              <p><strong>Beneficiary:</strong> {summary.beneficiaries.find((item) => item.demoBeneficiaryId === decisionCase.demoBeneficiaryId)?.fictionalName}</p>
+              <p><strong>Verified review signal:</strong> {decisionCase.screening.status}</p>
+              <p>{screeningExplanation(decisionCase.screening.status)}</p>
+              <p className="rounded-xl border border-destructive/30 bg-destructive/5 p-3">
+                Confirming will set the card to CANCELLED, block further distribution, and show a status-change
+                notification when this beneficiary signs into self-service.
+              </p>
+            </div>
+          ) : null}
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setDecisionCase(null)}>Cancel</Button>
+            <Button type="button" variant="destructive" onClick={() => void markIneligible()}>
+              Confirm ineligible
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {response && <Card><CardHeader><CardTitle>External screening response</CardTitle></CardHeader><CardContent className="grid gap-3">
         <div className="flex flex-wrap gap-2">
           <Badge>{response.status}</Badge>
@@ -462,6 +626,27 @@ export function EligibilityReviewPage() {
 
       {selectedCase && <Card><CardHeader><CardTitle>Guided case actions · {selectedCase.state}</CardTitle></CardHeader><CardContent className="grid gap-3">
         <p className="text-sm">Operational RCMS: <strong>{selectedCase.rcmsStatus}</strong> · Fabric proof: <strong>{selectedCase.proofStatus}</strong> · version {selectedCase.version}</p>
+        {selectedCase.proofEventId ? (
+          <div className="grid gap-1 rounded-xl border bg-muted/30 p-3 text-sm">
+            <p className="font-medium">Fabric decision proof</p>
+            <div className="flex items-center gap-2">
+              <span>Commit status:</span>
+              <Badge variant={selectedCase.proofStatus === 'COMMITTED' ? 'outline' : 'secondary'}>{selectedCase.proofStatus}</Badge>
+            </div>
+            <p className="break-all text-xs">Proof event ID: <code>{selectedCase.proofEventId}</code></p>
+            {selectedCase.proofFabricTxId ? (
+              <p className="break-all text-xs">Fabric transaction ID: <code>{selectedCase.proofFabricTxId}</code></p>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                The Fabric transaction ID appears after the outbox worker receives successful commit status.
+              </p>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Fabric peers validate endorsements during commit. This UI exposes the verifiable transaction reference,
+              not raw peer signature bytes.
+            </p>
+          </div>
+        ) : null}
         <div className="flex flex-wrap gap-2">
           {['OPEN', 'AWAITING_DATA', 'AWAITING_FIELD_VERIFICATION'].includes(selectedCase.state) && (
             <Button disabled={!mutable || busy} onClick={() => void act('notice', 'ISSUED', 'GUIDED_NOTICE')}>Issue notice</Button>

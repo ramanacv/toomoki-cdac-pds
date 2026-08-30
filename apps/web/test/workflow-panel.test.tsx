@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { WorkflowActionPanel } from '@/components/WorkflowActionPanel.js';
 
@@ -250,6 +250,121 @@ describe('WorkflowActionPanel', () => {
         evidence: expect.objectContaining({ entityId: 'TR-POC-RICE-DEPOT-BLOCK' })
       })
     );
+  });
+
+  it('shows downstream roles only commodities whose upstream workflow is active', () => {
+    const keroseneStageOne = receivedTransfer(
+      'TR-POC-KEROSENE-FCI-DEPOT',
+      'FCI-001',
+      'GODOWN-S-001',
+      'LOT-KEROSENE-2026-001'
+    );
+    const keroseneStageTwo = receivedTransfer(
+      'TR-POC-KEROSENE-DEPOT-BLOCK',
+      'GODOWN-S-001',
+      'GODOWN-B-001',
+      'LOT-KEROSENE-2026-001'
+    );
+    const authorization = {
+      ledgerTxId: 'TX-KEROSENE-RO',
+      entityType: 'workflow' as const,
+      entityId: 'TR-POC-KEROSENE-DEPOT-BLOCK',
+      eventType: 'RO_LITE_APPROVED',
+      payload: {},
+      timestamp: '2026-06-30T10:00:00.000Z'
+    };
+    const cases = [
+      { role: 'CONTROL_OFFICE' as const, transfers: [keroseneStageOne], ledgerEvents: [] },
+      {
+        role: 'GODOWN' as const,
+        transfers: [
+          {
+            ...keroseneStageOne,
+            receivedQtyKg: undefined,
+            status: TransferStatus.DISPATCHED,
+            receiveTimestamp: undefined
+          }
+        ],
+        ledgerEvents: []
+      },
+      {
+        role: 'BLOCK_OFFICE' as const,
+        transfers: [keroseneStageOne, keroseneStageTwo],
+        ledgerEvents: [authorization]
+      },
+      {
+        role: 'FPS' as const,
+        transfers: [keroseneStageOne, keroseneStageTwo],
+        ledgerEvents: [authorization],
+        allocations: [
+          {
+            allocationId: 'ALLOC-POC-KEROSENE-FPS',
+            fpsId: 'FPS-101',
+            commodity: 'Kerosene',
+            allocatedQtyKg: 300,
+            month: '2026-06',
+            sourceGodownId: 'GODOWN-B-001',
+            status: 'ALLOCATED'
+          }
+        ]
+      }
+    ];
+
+    for (const testCase of cases) {
+      const { unmount } = render(
+        <WorkflowActionPanel
+          {...baseProps}
+          apiOnline={false}
+          role={testCase.role}
+          transfers={testCase.transfers}
+          ledgerEvents={testCase.ledgerEvents}
+          allocations={testCase.allocations ?? []}
+        />
+      );
+
+      expect(screen.getByTestId('commodity-group-Kerosene')).toBeInTheDocument();
+      for (const commodity of COMMODITIES.filter((item) => item.name !== 'Kerosene')) {
+        expect(screen.queryByTestId(`commodity-group-${commodity.name}`)).not.toBeInTheDocument();
+      }
+      expect(screen.getAllByRole('button', { name: 'Run action' })).toHaveLength(1);
+      unmount();
+    }
+  });
+
+  it('shows submission state only on the action that was clicked', async () => {
+    const user = userEvent.setup();
+    let resolveAction: ((value: { ledgerTxId: string }) => void) | undefined;
+    vi.mocked(executeWorkflowAction).mockImplementationOnce(
+      () => new Promise((resolve) => { resolveAction = resolve; })
+    );
+    const allCommoditiesReady = COMMODITIES.map((commodity) =>
+      receivedTransfer(
+        `TR-POC-${commodity.slug}-FCI-DEPOT`,
+        'FCI-001',
+        'GODOWN-S-001',
+        `LOT-${commodity.slug}-2026-001`
+      )
+    );
+
+    render(
+      <WorkflowActionPanel
+        {...baseProps}
+        apiOnline
+        role="CONTROL_OFFICE"
+        transfers={allCommoditiesReady}
+      />
+    );
+
+    const riceGroup = within(screen.getByTestId('commodity-group-Rice'));
+    await user.click(riceGroup.getByRole('button', { name: 'Run action' }));
+
+    expect(riceGroup.getByRole('button', { name: 'Submitting...' })).toBeDisabled();
+    expect(screen.getAllByRole('button', { name: 'Submitting...' })).toHaveLength(1);
+    expect(within(screen.getByTestId('commodity-group-Wheat')).getByRole('button', { name: 'Run action' })).toBeDisabled();
+
+    await act(async () => {
+      resolveAction?.({ ledgerTxId: 'TX-RICE' });
+    });
   });
 
   it('posts live actions through the API when online', async () => {

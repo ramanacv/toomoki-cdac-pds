@@ -29,6 +29,20 @@ export function validateFabricArtifacts() {
     throw new Error('Expected pdschannel in the Fabric manifest');
   }
 
+  const deployedMsps = manifest.organizations
+    .filter((organization) => organization.deploymentStatus === 'DEPLOYED')
+    .map((organization) => organization.mspId)
+    .sort();
+  const expectedDeployedMsps = ['FoodAndCivilSuppliesMSP', 'GodownWarehouseMSP'].sort();
+  if (JSON.stringify(deployedMsps) !== JSON.stringify(expectedDeployedMsps)) {
+    throw new Error(`Fabric manifest deployed MSPs do not match the maintained two-org topology: ${deployedMsps.join(', ')}`);
+  }
+  if (manifest.organizations.some((organization) =>
+    !['DEPLOYED', 'PLANNED'].includes(organization.deploymentStatus)
+  )) {
+    throw new Error('Every Fabric manifest organization must declare DEPLOYED or PLANNED status');
+  }
+
   if (contract.channel !== manifest.channel || contract.chaincode !== 'pds-chaincode') {
     throw new Error('Fabric contract is not aligned with the manifest');
   }

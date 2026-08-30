@@ -84,17 +84,23 @@ export class EligibilityRepository implements OnModuleDestroy {
     }
   }
 
-  async loadProofStatuses(eventIds: string[]): Promise<Map<string, EligibilityCase['proofStatus']>> {
+  async loadProofStatuses(eventIds: string[]): Promise<Map<string, {
+    status: EligibilityCase['proofStatus'];
+    fabricTxId?: string;
+  }>> {
     if (!this.pool || eventIds.length === 0) return new Map();
     const client = await this.pool.connect();
     try {
       const result = await client.query(
-        'SELECT event_id, status FROM ledger_outbox WHERE event_id = ANY($1::text[])',
+        'SELECT event_id, status, fabric_tx_id FROM ledger_outbox WHERE event_id = ANY($1::text[])',
         [eventIds]
       );
       return new Map(result.rows.map((row) => [
         String(row.event_id),
-        (String(row.status) === 'SUBMITTING' ? 'PENDING' : String(row.status)) as EligibilityCase['proofStatus']
+        {
+          status: (String(row.status) === 'SUBMITTING' ? 'PENDING' : String(row.status)) as EligibilityCase['proofStatus'],
+          ...(row.fabric_tx_id ? { fabricTxId: String(row.fabric_tx_id) } : {})
+        }
       ]));
     } finally {
       client.release();

@@ -9,6 +9,7 @@ export class ProofsController {
   constructor(@Inject(ProofsService) private readonly proofs: ProofsService) {}
 
   @Get('/ledger-proofs/analytics')
+  @Roles('auditor', 'management', 'platform-admin')
   analytics() {
     return this.proofs.getAnalytics();
   }

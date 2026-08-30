@@ -63,7 +63,8 @@ Legacy `PDS_LEDGER_BACKEND=fabric-gateway` is mapped to fabric mode. Demo mode (
 
 ## Artifacts
 
-- `network-manifest.json` — intended consortium layout (5 orgs documented; 2 orgs deployed in demo)
+- `network-manifest.json` — intended consortium layout with explicit
+  `DEPLOYED`/`PLANNED` status (5 orgs documented; 2 orgs deployed in demo)
 - `fabric-contract.json` — chaincode operation manifest
 - `docker-compose.fabric.yml` — Fabric 2.5.15 services (orderer, peers, CouchDB, CA)
 - `connection-profiles/*.json` — client connectivity targets

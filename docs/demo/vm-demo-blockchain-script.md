@@ -375,3 +375,85 @@ A: No — hashes and opaque references only.
 | 17–20 | Trust analytics + fabric_tx_id + outbox one-liner |
 
 Keep the full outbox briefing for Q&A unless someone asks mid-demo — then use the status machine table only.
+
+1. PdsControlContract
+
+  Governance and policy operations:
+
+  - Stakeholder registration
+  - Ration-card lifecycle
+  - Entitlement-rule proposal and approval
+  - Quota rollover
+  - Governance-related queries
+
+  2. PdsDataContract
+
+  Operational and evidence operations:
+
+  - Commodity movement and receipts
+  - FPS allocation and distribution
+  - Audit flags and grievances
+  - Operational queries
+  - RecordLedgerProof
+
+  The important architectural point: PostgreSQL remains authoritative. The API normally submits only asynchronous, privacy-safe
+  RecordLedgerProof transactions through PdsDataContract. The other named business transactions are retained as compatibility
+  functions—not the API’s primary Fabric integration path.
+
+  Both contracts are registered from the same chaincode package and share the same channel/world state. See blockchain/chaincode/
+  pds-chaincode/src/contract.ts:1 and blockchain/chaincode/pds-chaincode/src/server.ts:1.
+
+ - 2 MSP organizations: FoodAndCivilSuppliesMSP and GodownWarehouseMSP
+  - 1 channel: pdschannel
+  - 1 chaincode: pds-chaincode
+  - 2 contracts: PdsControlContract and PdsDataContract
+
+
+ RecordLedgerProof:
+
+  {
+    "eventId": "<unique business event ID>",
+    "operationId": "<usually the same as eventId>",
+    "eventType": "<operation type, e.g. DispatchLot>",
+    "schemaVersion": 1,
+    "entityType": "<lot | transfer | allocation | distribution | ...>",
+    "entityId": "<primary entity ID>",
+    "actor": {
+      "subject": "pds-api",
+      "applicationRole": "SYSTEM",
+      "submittingOrganization": "FoodAndCivilSuppliesMSP"
+    },
+    "payloadHash": "<64-character SHA-256 hash>",
+    "proofPayload": {
+      "<operation-specific non-sensitive evidence>": "<value>"
+    },
+    "businessTimestamp": "<ISO-8601 API-generated timestamp>"
+  }
+
+  For example:
+
+  {
+    "eventId": "EVT-DISPATCH-001",
+    "operationId": "EVT-DISPATCH-001",
+    "eventType": "DispatchLot",
+    "schemaVersion": 1,
+    "entityType": "transfer",
+    "entityId": "TRANSFER-001",
+    "actor": {
+      "subject": "pds-api",
+      "applicationRole": "SYSTEM",
+      "submittingOrganization": "FoodAndCivilSuppliesMSP"
+    },
+    "payloadHash": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    "proofPayload": {
+      "lotId": "LOT-001",
+      "quantityKg": 500,
+      "sourceStakeholderId": "GODOWN-001",
+      "destinationStakeholderId": "FPS-001"
+    },
+    "businessTimestamp": "2026-07-31T10:30:00.000Z"
+  }
+
+  The exact submission is effectively:
+
+  RecordLedgerProof(JSON.stringify(ledgerProof))
