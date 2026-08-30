@@ -7,6 +7,7 @@ import {
   getAllCommoditiesWorkflowActions,
   getNextWorkflowAction,
   getRoleQueue,
+  getSessionStockKg,
   getWorkflowActions,
   getWorkflowProgress,
   type WorkflowContext
@@ -137,6 +138,27 @@ describe('workflow actions', () => {
     expect(action?.id).toBe('TR-POC-RICE-DEPOT-BLOCK');
     expect(action?.request.kind).toBe('dispatch');
     expect(getRoleQueue(result.context, 'GODOWN')).toHaveLength(1);
+  });
+
+  it('preserves the RO reference recorded by an existing authorization event', () => {
+    const action = getNextWorkflowAction({
+      ...emptyContext,
+      transfers: completedTransfers.slice(0, 1),
+      ledgerEvents: [
+        {
+          ...roEvent,
+          payload: { roRef: 'RO-DSO-LEGACY-001', authorizedBy: 'DSO-001' }
+        }
+      ]
+    });
+
+    expect(action?.request).toMatchObject({
+      kind: 'dispatch',
+      payload: {
+        transferId: 'TR-POC-RICE-DEPOT-BLOCK',
+        roRef: 'RO-DSO-LEGACY-001'
+      }
+    });
   });
 
   it('requires block-godown receipt before FPS allocation', () => {
@@ -275,8 +297,35 @@ describe('workflow actions', () => {
 
     expect(groups.find((group) => group.commodity === 'Wheat')?.actions[0]?.request).toMatchObject({
       kind: 'authorize-movement',
-      transferId: 'TR-POC-WHEAT-DEPOT-BLOCK'
+      transferId: 'TR-POC-WHEAT-DEPOT-BLOCK',
+      roRef: 'RO-DSO-POC-WHEAT-DEPOT-BLOCK'
     });
+  });
+
+  it('gives every commodity approval a distinct card id and RO reference', () => {
+    const readyContext: WorkflowContext = {
+      ...emptyContext,
+      transfers: COMMODITIES.map((commodity) =>
+        receivedTransfer(
+          `TR-POC-${commodity.slug.toUpperCase()}-FCI-DEPOT`,
+          'FCI-001',
+          'GODOWN-S-001',
+          `LOT-${commodity.slug.toUpperCase()}-2026-001`
+        )
+      )
+    };
+
+    const approvals = getAllCommoditiesRoleQueue(readyContext, 'CONTROL_OFFICE')
+      .flatMap((group) => group.actions)
+      .filter((action) => action.request.kind === 'authorize-movement');
+    const ids = approvals.map((action) => action.id);
+    const roRefs = approvals.map((action) =>
+      action.request.kind === 'authorize-movement' ? action.request.roRef : undefined
+    );
+
+    expect(approvals).toHaveLength(COMMODITIES.length);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(new Set(roRefs).size).toBe(roRefs.length);
   });
 
   it('derives workbench transfer ids from the active lot series after reset', () => {
@@ -326,5 +375,41 @@ describe('workflow actions', () => {
         dispatchedQtyKg: demoQuantities.stageOneTransferKg
       }
     });
+  });
+
+  it('does not double-count a split child lot while it is in transit', () => {
+    const rootLot = {
+      ...demoLots.find((lot) => lot.commodity === 'Rice')!,
+      lotId: 'LOT-SPLIT-ROOT',
+      quantityKg: 40,
+      originalQuantityKg: 100,
+      remainingQuantityKg: 40,
+      rootLotId: 'LOT-SPLIT-ROOT'
+    };
+    const childLot = {
+      ...rootLot,
+      lotId: 'LOT-SPLIT-ROOT-SPLIT-TR-SPLIT-1',
+      quantityKg: 60,
+      originalQuantityKg: 60,
+      remainingQuantityKg: 60,
+      parentLotId: 'LOT-SPLIT-ROOT',
+      status: 'DISPATCHED' as const
+    };
+    const transfer = {
+      ...receivedTransfer('TR-SPLIT-1', rootLot.currentOwner, 'GODOWN-S-001', childLot.lotId),
+      dispatchedQtyKg: 60,
+      receivedQtyKg: undefined,
+      receiveTimestamp: undefined,
+      status: TransferStatus.DISPATCHED
+    };
+
+    expect(
+      getSessionStockKg(
+        { lots: [rootLot, childLot], transfers: [transfer], allocations: [], ledgerEvents: [] },
+        rootLot.currentOwner,
+        rootLot.lotId,
+        rootLot.commodity
+      )
+    ).toBe(40);
   });
 });

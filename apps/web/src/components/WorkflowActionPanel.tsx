@@ -16,6 +16,7 @@ import { hasAccessToken } from '@/auth-token.js';
 import type { DemoRole } from '@/demo-model.js';
 import {
   applyMockWorkflowAction,
+  getActiveWorkflowCommodities,
   getActionStockInfo,
   getAllCommoditiesRoleQueue,
   getAllCommoditiesWorkflowActions,
@@ -149,12 +150,87 @@ type WorkflowActionPanelProps = {
   alerts: AuditAlert[];
   ledgerEvents: LedgerEvent[];
   stockPositions: StockPosition[];
+  fpsId?: string;
   onComplete: () => Promise<void>;
   onMockComplete: (result: MockWorkflowResult) => void;
 };
 
 const nonBlockedCount = (actions: WorkflowActionSpec[]): number =>
   actions.filter((action) => action.status !== 'blocked').length;
+
+type RoleStockView = {
+  title: string;
+  description: string;
+  orgIds?: string[];
+  orgPrefix?: string;
+};
+
+const stockViewForRole = (role: DemoRole, fpsId?: string): RoleStockView => {
+  switch (role) {
+    case 'FCI_DEPOT':
+      return {
+        title: 'FCI stock on hand',
+        description: 'Retained stock at FCI-001, available for future Stage-I dispatches.',
+        orgIds: ['FCI-001']
+      };
+    case 'GODOWN':
+      return {
+        title: 'Godown stock on hand',
+        description: 'Current stock held separately at the state and block godowns.',
+        orgIds: ['GODOWN-S-001', 'GODOWN-B-001']
+      };
+    case 'CONTROL_OFFICE':
+      return {
+        title: 'Godown stock under DSO oversight',
+        description: 'Read-only custody positions relevant to Stage-II release authorization.',
+        orgIds: ['GODOWN-S-001', 'GODOWN-B-001']
+      };
+    case 'BLOCK_OFFICE':
+      return {
+        title: 'Block stock available for FPS allotment',
+        description: 'Current stock at GODOWN-B-001 before allocation to Fair Price Shops.',
+        orgIds: ['GODOWN-B-001']
+      };
+    case 'FPS':
+      return {
+        title: 'FPS stock on hand',
+        description: 'Shop-scoped stock received and available for beneficiary distribution.',
+        ...(fpsId ? { orgIds: [fpsId] } : { orgPrefix: 'FPS-' })
+      };
+    case 'MANAGEMENT':
+      return {
+        title: 'Network stock overview',
+        description: 'Read-only stock positions across the controlled-demo custody network.'
+      };
+    case 'AUDITOR':
+      return {
+        title: 'Network stock audit view',
+        description: 'Read-only stock positions for reconciliation with lots and movements.'
+      };
+  }
+};
+
+const stockPositionsForRole = (
+  positions: StockPosition[],
+  view: RoleStockView
+): StockPosition[] => {
+  const commodityOrder = new Map<string, number>(
+    COMMODITIES.map((commodity, index) => [commodity.name, index])
+  );
+  return positions
+    .filter((position) => {
+      if (view.orgIds) return view.orgIds.includes(position.entityId);
+      if (view.orgPrefix) return position.entityId.startsWith(view.orgPrefix);
+      return true;
+    })
+    .filter((position) => position.quantityKg > 0)
+    .sort(
+      (left, right) =>
+        left.entityId.localeCompare(right.entityId) ||
+        (commodityOrder.get(left.commodity) ?? Number.MAX_SAFE_INTEGER) -
+          (commodityOrder.get(right.commodity) ?? Number.MAX_SAFE_INTEGER)
+    );
+};
 
 export function WorkflowActionPanel({
   apiOnline,
@@ -168,10 +244,11 @@ export function WorkflowActionPanel({
   alerts,
   ledgerEvents,
   stockPositions,
+  fpsId,
   onComplete,
   onMockComplete
 }: WorkflowActionPanelProps) {
-  const [busy, setBusy] = useState(false);
+  const [busyActionId, setBusyActionId] = useState<string | null>(null);
   const [quantityInputs, setQuantityInputs] = useState<Record<string, string>>({});
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -186,13 +263,15 @@ export function WorkflowActionPanel({
 
   const strictGroups: CommodityActionGroup[] =
     role === 'MANAGEMENT' ? getAllCommoditiesWorkflowActions(context) : getAllCommoditiesRoleQueue(context, role);
+  const activeCommodities = getActiveWorkflowCommodities(context);
   // When a role has nothing of its own queued in any commodity, fall back to
-  // showing the next pending action per commodity anyway (read-only "waiting
-  // for" view) so operators can see what's blocking the pipeline instead of
-  // an empty screen that looks like the whole journey finished.
+  // showing the next pending action for commodities that have recorded activity
+  // (read-only "waiting for" view) so operators can see the relevant blocker
+  // without exposing untouched commodity routes as current work.
   const groupsForRole: CommodityActionGroup[] =
     role !== 'MANAGEMENT' && strictGroups.length === 0
       ? getAllCommoditiesWorkflowActions(context)
+          .filter((group) => activeCommodities.has(group.commodity))
           .map((group) => ({ commodity: group.commodity, actions: group.actions.slice(0, 1) }))
           .filter((group) => group.actions.length > 0)
       : strictGroups;
@@ -203,6 +282,9 @@ export function WorkflowActionPanel({
     { completed: 0, total: 0 }
   );
   const totalPending = groupsForRole.reduce((sum, group) => sum + nonBlockedCount(group.actions), 0);
+  const roleStockView = stockViewForRole(role, fpsId);
+  const visibleStockPositions = stockPositionsForRole(stockPositions, roleStockView);
+  const visibleStockTotalKg = visibleStockPositions.reduce((total, position) => total + position.quantityKg, 0);
 
   const getQuantityLimit = (action: WorkflowActionSpec, editable: EditableQuantity): number | undefined => {
     if (editable.maxValue != null) {
@@ -257,7 +339,7 @@ export function WorkflowActionPanel({
       return;
     }
 
-    setBusy(true);
+    setBusyActionId(action.id);
     setMessage(null);
     setError(null);
     setCompletedActionId(null);
@@ -303,7 +385,7 @@ export function WorkflowActionPanel({
         await onComplete();
       }
     } finally {
-      setBusy(false);
+      setBusyActionId(null);
     }
   };
 
@@ -319,6 +401,50 @@ export function WorkflowActionPanel({
           : 'Actions mutate local demo state and append mock ledger evidence for click-through POC review.'
       }
     >
+      <section
+        aria-labelledby="role-stock-on-hand"
+        data-testid="role-stock-on-hand"
+        className="mb-6 rounded-2xl border border-teal-700/25 bg-teal-50/70 p-4"
+      >
+        <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h3 id="role-stock-on-hand" className="font-semibold text-teal-950">
+              {roleStockView.title}
+            </h3>
+            <p className="mt-1 text-sm text-teal-950/75">{roleStockView.description}</p>
+          </div>
+          <Badge variant="secondary">
+            {visibleStockTotalKg.toLocaleString()} kg · {visibleStockPositions.length} position
+            {visibleStockPositions.length === 1 ? '' : 's'}
+          </Badge>
+        </div>
+        {visibleStockPositions.length > 0 ? (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {visibleStockPositions.map((position) => (
+              <div
+                key={`${position.entityId}:${position.commodity}`}
+                data-testid={`role-stock-${position.entityId}-${position.commodity}`}
+                className="rounded-xl border border-teal-700/20 bg-background/85 p-3"
+              >
+                <span className="text-xs font-medium uppercase tracking-[0.1em] text-muted-foreground">
+                  {position.commodity}
+                </span>
+                <strong className="mt-1 block text-xl text-teal-950">
+                  {position.quantityKg.toLocaleString()} kg
+                </strong>
+                <span className="mt-1 block text-xs text-muted-foreground">
+                  Available at {position.entityId}
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            No current stock position is available for this role from the selected data source.
+          </p>
+        )}
+      </section>
+
       <Tabs
         value={commodityFilter}
         onValueChange={(value) => setCommodityFilter(value as CommodityName | 'ALL')}
@@ -447,10 +573,10 @@ export function WorkflowActionPanel({
                           <Button
                             type="button"
                             className="mt-3"
-                            disabled={busy || action.status === 'blocked' || completedActionId === action.id}
+                            disabled={busyActionId !== null || action.status === 'blocked' || completedActionId === action.id}
                             onClick={() => void runAction(action)}
                           >
-                            {busy
+                            {busyActionId === action.id
                               ? 'Submitting...'
                               : completedActionId === action.id
                                 ? 'Done'
@@ -478,7 +604,9 @@ export function WorkflowActionPanel({
         </div>
       ) : (
         <p className="leading-relaxed text-muted-foreground">
-          Journey complete for the current API state. Reset or seed the backend to replay.
+          {role === 'MANAGEMENT' || activeCommodities.size > 0
+            ? 'Journey complete for the current API state. Reset or seed the backend to replay.'
+            : 'No active commodity workflow has reached this role yet.'}
         </p>
       )}
 

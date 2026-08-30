@@ -95,20 +95,49 @@ export function AdminNetworkPage() {
               </div>
             </Panel>
 
-            {overview.stakeholders.fabricOrgMapping.length > 0 && (
+            {overview.stakeholders.fabricOrgMapping.some((org) => org.deploymentStatus === 'DEPLOYED') && (
               <Panel
                 eyebrow="Fabric network"
-                title="Channel organizations"
-                pill={overview.network.fabric?.channel}
+                title="Deployed channel organizations"
+                pill={`${overview.stakeholders.fabricOrgMapping.filter((org) => org.deploymentStatus === 'DEPLOYED').length} deployed`}
               >
-                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
-                  {overview.stakeholders.fabricOrgMapping.map((org) => (
+                <p className="mb-4 text-sm text-muted-foreground">
+                  MSPs deployed in the maintained local <code>{overview.network.fabric?.channel ?? 'pdschannel'}</code> topology.
+                </p>
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                  {overview.stakeholders.fabricOrgMapping
+                    .filter((org) => org.deploymentStatus === 'DEPLOYED')
+                    .map((org) => (
                     <article key={org.mspId} className="rounded-3xl border border-border bg-card/75 p-4 space-y-1">
                       <strong className="block">{org.orgName}</strong>
                       <span className="block text-sm text-muted-foreground">{org.role}</span>
                       <code className="mt-3 block text-secondary">{org.mspId}</code>
                     </article>
-                  ))}
+                    ))}
+                </div>
+              </Panel>
+            )}
+
+            {overview.stakeholders.fabricOrgMapping.some((org) => org.deploymentStatus === 'PLANNED') && (
+              <Panel
+                eyebrow="Future topology"
+                title="Planned consortium organizations"
+                pill={`${overview.stakeholders.fabricOrgMapping.filter((org) => org.deploymentStatus === 'PLANNED').length} planned`}
+              >
+                <p className="mb-4 text-sm text-muted-foreground">
+                  Documented governance targets only. These organizations do not currently have deployed peers joined
+                  to the channel.
+                </p>
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                  {overview.stakeholders.fabricOrgMapping
+                    .filter((org) => org.deploymentStatus === 'PLANNED')
+                    .map((org) => (
+                      <article key={org.mspId} className="space-y-1 rounded-3xl border border-dashed border-border bg-card/45 p-4">
+                        <strong className="block">{org.orgName}</strong>
+                        <span className="block text-sm text-muted-foreground">{org.role}</span>
+                        <code className="mt-3 block text-secondary">{org.mspId}</code>
+                      </article>
+                    ))}
                 </div>
               </Panel>
             )}

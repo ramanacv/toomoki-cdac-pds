@@ -53,6 +53,28 @@ describe('external eligibility screening engine', () => {
     expect(JSON.stringify(a)).not.toMatch(/Aadhaar|UIDAI|biometric/i);
   });
 
+  it('provides five deterministic review profiles and five clear profiles per FPS demo panel', () => {
+    const engine = new EligibilityScreeningEngine();
+    const fps101 = [
+      'BEN-DEMO-001', 'BEN-DEMO-002', 'BEN-DEMO-003', 'BEN-JK-DEMO-001', 'BEN-JK-DEMO-003',
+      'BEN-DEMO-006', 'BEN-DEMO-007', 'BEN-DEMO-008', 'BEN-DEMO-009', 'BEN-DEMO-010'
+    ];
+    const fps202 = [
+      'BEN-DEMO-004', 'BEN-DEMO-005', 'BEN-JK-DEMO-002', 'BEN-JK-DEMO-004', 'BEN-DEMO-011',
+      'BEN-DEMO-012', 'BEN-DEMO-013', 'BEN-DEMO-014', 'BEN-DEMO-015', 'BEN-DEMO-016'
+    ];
+    const reviewStatuses = new Set([
+      'DEATH_MATCH_REVIEW', 'INACTIVITY_REVIEW', 'ECONOMIC_ELIGIBILITY_REVIEW',
+      'LANDHOLDING_REVIEW', 'MULTI_SOURCE_CONFLICT', 'DUPLICATE_RECORD_REVIEW'
+    ]);
+    const reviewCount = (ids: string[]) => ids.filter((id) =>
+      reviewStatuses.has(engine.screen(request(id, `PANEL-${id}`)).status)
+    ).length;
+
+    expect(reviewCount(fps101)).toBe(5);
+    expect(reviewCount(fps202)).toBe(5);
+  });
+
   it('replays identical request IDs and rejects conflicting reuse', () => {
     const engine = new EligibilityScreeningEngine();
     const first = engine.screen(request('BEN-DEMO-001', 'SCREEN-SAME-001'));

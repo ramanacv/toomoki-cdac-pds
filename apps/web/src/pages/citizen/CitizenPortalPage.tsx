@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { eligibilityBeneficiaries } from '@pds/fixtures';
 import { Panel } from '@/components/Panel';
 import { Button } from '@/components/ui/button';
+import { formatDateTime } from '@/lib/constants.js';
 import {
   citizenLogout,
   clearCitizenSession,
@@ -20,9 +22,31 @@ import {
 
 type Step = 'aadhaar' | 'otp' | 'dashboard';
 
-const formatTimestamp = (value: string): string => {
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString();
+const reviewDemoIds = new Set([
+  'BEN-DEMO-001',
+  'BEN-DEMO-003',
+  'BEN-JK-DEMO-001',
+  'BEN-DEMO-006',
+  'BEN-DEMO-007',
+  'BEN-DEMO-004',
+  'BEN-DEMO-005',
+  'BEN-JK-DEMO-002',
+  'BEN-JK-DEMO-004',
+  'BEN-DEMO-011'
+]);
+const affectedDemoLogins = eligibilityBeneficiaries.filter((item) => reviewDemoIds.has(item.demoBeneficiaryId));
+
+const removalReasonLabel = (reasonCode: string): string => {
+  switch (reasonCode) {
+    case 'FRAUD_CONFIRMED':
+      return 'Fraud confirmed after departmental verification.';
+    case 'DUPLICATE_RECORD':
+      return 'Duplicate active beneficiary record confirmed.';
+    case 'VOLUNTARY_SURRENDER':
+      return 'Voluntary surrender requested by the household.';
+    default:
+      return 'Authorized beneficiary-list removal.';
+  }
 };
 
 export function CitizenPortalPage() {
@@ -160,10 +184,31 @@ export function CitizenPortalPage() {
                 onChange={(event) => setAadhaarInput(event.target.value)}
               />
             </label>
-            <p className="text-sm text-muted-foreground">
-              Demo households: <code className="rounded bg-muted px-1">999988880001</code> (Asha Patil, FPS-101),{' '}
-              <code className="rounded bg-muted px-1">999988880002</code> (Ravi Shinde, FPS-101). All records are
-              fictional fixtures.
+            <div className="overflow-x-auto rounded-xl border border-border">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-muted/50">
+                    <th className="px-3 py-2 font-medium">Affected demo beneficiary / Aadhaar</th>
+                    <th className="px-3 py-2 font-medium">Demo OTP</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {affectedDemoLogins.map((item) => (
+                    <tr key={item.demoBeneficiaryId} className="border-b border-border/60 last:border-0">
+                      <td className="px-3 py-2">
+                        <span className="font-medium">{item.fictionalName}</span>
+                        <span className="ml-2 text-xs text-muted-foreground">{item.fpsId}</span>
+                        <code className="mt-1 block">{item.demoAadhaarNumber}</code>
+                      </td>
+                      <td className="px-3 py-2"><code>123456</code></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              These fictional accounts are the configured review-signal examples. After a DSO marks one ineligible,
+              sign in with the same Aadhaar to see its card-status notification.
             </p>
             <div>
               <Button type="submit" disabled={busy || aadhaarInput.trim().length === 0}>
@@ -212,13 +257,28 @@ export function CitizenPortalPage() {
 
       {step === 'dashboard' && profile ? (
         <div className="grid gap-6">
+          {profile.statusNotification ? (
+            <div role="alert" className="rounded-2xl border border-red-400 bg-red-50 p-4 text-sm text-red-950">
+              <p className="font-semibold">{profile.statusNotification.title}</p>
+              <p className="mt-2"><strong>Reason:</strong> {profile.statusNotification.reason}</p>
+              <p className="mt-1">{profile.statusNotification.message}</p>
+              <p className="mt-2 text-xs">
+                Effective {formatDateTime(profile.statusNotification.effectiveAt)} · Case {profile.statusNotification.caseId}
+              </p>
+              <p className="mt-2">{profile.statusNotification.appealMessage}</p>
+            </div>
+          ) : null}
           {profile.removal ? (
-            <p role="status" className="rounded-2xl border border-red-300 bg-red-50 p-4 text-sm text-red-950">
-              {profile.removal.reasonCode === 'VOLUNTARY_SURRENDER'
-                ? 'This demo ration card has been surrendered and removed from the active beneficiary list.'
-                : 'This demo ration card has been removed from the active beneficiary list by the department.'}{' '}
-              No further ration can be issued against it. Recorded on {formatTimestamp(profile.removal.removedAt)}.
-            </p>
+            <div role="status" className="rounded-2xl border border-red-300 bg-red-50 p-4 text-sm text-red-950">
+              <p>
+                {profile.removal.reasonCode === 'VOLUNTARY_SURRENDER'
+                  ? 'This demo ration card has been surrendered and removed from the active beneficiary list.'
+                  : 'This demo ration card has been removed from the active beneficiary list by the department.'}{' '}
+                No further ration can be issued against it.
+              </p>
+              <p className="mt-2"><strong>Reason:</strong> {removalReasonLabel(profile.removal.reasonCode)}</p>
+              <p className="mt-2 text-xs">Recorded on {formatDateTime(profile.removal.removedAt)}.</p>
+            </div>
           ) : null}
           <Panel
             eyebrow="My ration card"
@@ -310,7 +370,7 @@ export function CitizenPortalPage() {
                 <tbody>
                   {distributions.map((item) => (
                     <tr key={item.distributionId} className="border-b border-border/60 align-top">
-                      <td className="py-2 pr-3">{formatTimestamp(item.timestamp)}</td>
+                      <td className="py-2 pr-3">{formatDateTime(item.timestamp)}</td>
                       <td className="py-2 pr-3">{item.fpsId}</td>
                       <td className="py-2 pr-3">{item.commodity}</td>
                       <td className="py-2 pr-3">{item.deliveredKg} kg</td>
@@ -340,7 +400,7 @@ export function CitizenPortalPage() {
                 {authHistory.map((item) => (
                   <li key={item.authTxnId} className="rounded-xl border border-border/60 px-3 py-2">
                     <span className="font-medium">{item.authMode}</span> · {item.authResult} ·{' '}
-                    {formatTimestamp(item.timestamp)}
+                    {formatDateTime(item.timestamp)}
                     {item.fpsId ? <span className="text-muted-foreground"> · {item.fpsId}</span> : null}
                   </li>
                 ))}
@@ -348,7 +408,7 @@ export function CitizenPortalPage() {
             )}
           </Panel>
 
-          {!profile.removal ? (
+          {!profile.removal && profile.eligibility.status !== 'CANCELLED' ? (
             <Panel
               eyebrow="Card surrender"
               title="Surrender my ration card"

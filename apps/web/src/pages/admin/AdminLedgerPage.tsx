@@ -1,5 +1,6 @@
 import { Panel } from '@/components/Panel.js';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table.js';
+import { formatDateTime } from '@/lib/constants.js';
 import { AdminStateGate } from '@/pages/admin/AdminStateGate.js';
 
 export function AdminLedgerPage() {
@@ -100,7 +101,7 @@ export function AdminLedgerPage() {
                 <TableBody>
                   {overview.activity.recentEvents.map((event) => (
                     <TableRow key={event.ledgerTxId}>
-                      <TableCell>{event.timestamp}</TableCell>
+                      <TableCell>{formatDateTime(event.timestamp)}</TableCell>
                       <TableCell>{event.eventType}</TableCell>
                       <TableCell>
                         {event.entityType}/{event.entityId}

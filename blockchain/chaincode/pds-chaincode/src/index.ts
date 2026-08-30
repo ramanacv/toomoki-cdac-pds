@@ -494,7 +494,10 @@ export class PdsLedgerEngine {
     const lot: CommodityLot = {
       ...input,
       status: LotStatus.CREATED,
-      createdAt: input.createdAt ?? this.timestamp()
+      createdAt: input.createdAt ?? this.timestamp(),
+      rootLotId: input.rootLotId ?? input.lotId,
+      originalQuantityKg: input.originalQuantityKg ?? input.quantityKg,
+      remainingQuantityKg: input.remainingQuantityKg ?? input.quantityKg
     };
     this.lots.set(lot.lotId, lot);
     // Open the stock position for the originating owner so getCurrentStock is correct
@@ -521,25 +524,48 @@ export class PdsLedgerEngine {
     if (this.transfers.has(input.transferId)) {
       throw new Error(`Transfer ${input.transferId} already exists`);
     }
-    const lot = this.mustGetLot(input.lotId);
+    let lot = this.mustGetLot(input.lotId);
     this.assertActiveStakeholder(input.fromOrg);
     this.assertActiveStakeholder(input.toOrg);
     const transporter = this.resolveActiveTransporter(input.transporterId);
+    if (input.dispatchedQtyKg <= 0) {
+      throw new Error('dispatchedQtyKg must be positive');
+    }
+    if (lot.currentOwner !== input.fromOrg) {
+      const targetRoot = lot.rootLotId ?? lot.lotId;
+      const ownedSlice = [...this.lots.values()]
+        .filter(
+          (item) =>
+            item.commodity === lot.commodity &&
+            item.currentOwner === input.fromOrg &&
+            item.status !== LotStatus.DISPATCHED &&
+            (item.remainingQuantityKg ?? item.quantityKg) >= input.dispatchedQtyKg &&
+            (item.rootLotId === targetRoot || item.parentLotId === lot.lotId || item.lotId === targetRoot)
+        )
+        .sort((left, right) => left.lotId.localeCompare(right.lotId))[0];
+      if (ownedSlice) {
+        lot = ownedSlice;
+      } else {
+        throw new Error(`Lot ${lot.lotId} is owned by ${lot.currentOwner}, not ${input.fromOrg}`);
+      }
+    }
     if (lot.status === LotStatus.DISPATCHED) {
       throw new Error(`Lot ${lot.lotId} is already in transit (DISPATCHED); cannot re-dispatch until received`);
     }
-    if (input.dispatchedQtyKg <= 0) {
-      throw new Error('dispatchedQtyKg must be positive');
+    if (lot.currentOwner !== input.fromOrg) {
+      throw new Error(`Lot ${lot.lotId} is owned by ${lot.currentOwner}, not ${input.fromOrg}`);
+    }
+    const availableOnLot = lot.remainingQuantityKg ?? lot.quantityKg;
+    if (input.dispatchedQtyKg > availableOnLot) {
+      throw new Error(
+        `dispatchedQtyKg ${input.dispatchedQtyKg} exceeds remaining quantity ${availableOnLot} on lot ${lot.lotId}`
+      );
     }
     const lotKind = lot.transformedFromLotId ? 'transformed' : 'source';
     if (!isCommodityRouteEdgeAllowed(lot.commodity, input.fromOrg, input.toOrg, lotKind)) {
       throw new Error(
         `${lot.commodity} route does not allow movement from ${input.fromOrg} to ${input.toOrg}`
       );
-    }
-    const senderStock = this.stock.get(keyFor(input.fromOrg, lot.commodity)) ?? 0;
-    if (lot.currentOwner !== input.fromOrg && senderStock < input.dispatchedQtyKg) {
-      throw new Error(`Lot ${lot.lotId} is owned by ${lot.currentOwner}, not ${input.fromOrg}`);
     }
     const priorAuthorization = this.events.find(
       (event) =>
@@ -561,12 +587,23 @@ export class PdsLedgerEngine {
       });
       throw new Error('Stage-II dispatch requires roRef and authorizedBy');
     }
+    // Partial movement: leave the parent lot at the sender with remaining qty and
+    // put only the dispatched slice on a child lot (AGENTS.md domain invariant).
+    const isPartialDispatch = input.dispatchedQtyKg < availableOnLot;
+    const childLotId = `${lot.lotId}-SPLIT-${input.transferId}`;
+    if (isPartialDispatch && this.lots.has(childLotId)) {
+      throw new Error(`Child lot ${childLotId} already exists`);
+    }
+
     // Validate against the stock currently held by the sender for this lot's commodity.
     this.consumeStock(input.fromOrg, lot.commodity, input.dispatchedQtyKg);
+    const movingLotId = isPartialDispatch
+      ? this.splitLotForPartialDispatch(lot, childLotId, input.dispatchedQtyKg).lotId
+      : lot.lotId;
 
     const transfer: TransferOrder = {
       transferId: input.transferId,
-      lotId: input.lotId,
+      lotId: movingLotId,
       fromOrg: input.fromOrg,
       toOrg: input.toOrg,
       dispatchedQtyKg: input.dispatchedQtyKg,
@@ -590,12 +627,60 @@ export class PdsLedgerEngine {
     };
 
     this.transfers.set(transfer.transferId, transfer);
-    // In-transit model: ownership does NOT transfer at dispatch. The lot moves to
-    // DISPATCHED (in transit) with currentOwner still being the sender until receipt.
-    // currentLocation reflects the destination so the in-transit leg is traceable.
-    this.lots.set(lot.lotId, { ...lot, status: LotStatus.DISPATCHED, currentLocation: input.toOrg });
+    // In-transit model: ownership does NOT transfer at dispatch. The moving lot
+    // (full lot or child slice) becomes DISPATCHED with currentLocation = destination.
+    const movingLot = this.mustGetLot(movingLotId);
+    this.lots.set(movingLotId, {
+      ...movingLot,
+      status: LotStatus.DISPATCHED,
+      currentLocation: input.toOrg
+    });
     this.recordEvent('transfer', transfer.transferId, 'DispatchLot', transfer);
     return transfer;
+  }
+
+  /**
+   * Carve dispatchedQtyKg from parent into a child lot. Does not change pooled
+   * stock (caller already consumed the dispatched quantity).
+   */
+  private splitLotForPartialDispatch(
+    parent: CommodityLot,
+    childLotId: string,
+    dispatchedQtyKg: number
+  ): CommodityLot {
+    const availableOnLot = parent.remainingQuantityKg ?? parent.quantityKg;
+    const remainingQtyKg = availableOnLot - dispatchedQtyKg;
+    const child: CommodityLot = {
+      lotId: childLotId,
+      commodity: parent.commodity,
+      season: parent.season,
+      quantityKg: dispatchedQtyKg,
+      qualityGrade: parent.qualityGrade,
+      source: parent.source,
+      currentOwner: parent.currentOwner,
+      currentLocation: parent.currentLocation,
+      status: parent.status,
+      createdAt: this.timestamp(),
+      rootLotId: parent.rootLotId ?? parent.lotId,
+      parentLotId: parent.lotId,
+      originalQuantityKg: dispatchedQtyKg,
+      remainingQuantityKg: dispatchedQtyKg,
+      unit: parent.unit ?? 'KG',
+      version: 1,
+      ...(parent.transformedFromLotId ? { transformedFromLotId: parent.transformedFromLotId } : {})
+    };
+    this.lots.set(parent.lotId, {
+      ...parent,
+      quantityKg: remainingQtyKg,
+      remainingQuantityKg: remainingQtyKg,
+      originalQuantityKg: parent.originalQuantityKg ?? availableOnLot,
+      rootLotId: parent.rootLotId ?? parent.lotId,
+      version: (parent.version ?? 1) + 1
+    });
+    this.lots.set(child.lotId, child);
+    // Evidence-only create for the child slice — do not credit stock again.
+    this.recordEvent('lot', child.lotId, 'CreateCommodityLot', child);
+    return child;
   }
 
   authorizeMovement(input: {
@@ -660,7 +745,24 @@ export class PdsLedgerEngine {
 
     this.transfers.set(updated.transferId, updated);
     this.addStock(transfer.toOrg, lot.commodity, input.receivedQtyKg);
-    this.lots.set(lot.lotId, { ...lot, status: shortageQtyKg > 0 ? LotStatus.RECEIVED_WITH_SHORTAGE : LotStatus.RECEIVED, currentOwner: transfer.toOrg, currentLocation: transfer.toOrg });
+    this.lots.set(lot.lotId, {
+      ...lot,
+      status: shortageQtyKg > 0 ? LotStatus.RECEIVED_WITH_SHORTAGE : LotStatus.RECEIVED,
+      currentOwner: transfer.toOrg,
+      currentLocation: transfer.toOrg,
+      remainingQuantityKg: lot.remainingQuantityKg ?? lot.quantityKg
+    });
+    if (lot.rootLotId && this.lots.has(lot.rootLotId)) {
+      const rootLot = this.lots.get(lot.rootLotId)!;
+      if ((rootLot.remainingQuantityKg ?? rootLot.quantityKg) <= 0) {
+        this.lots.set(rootLot.lotId, {
+          ...rootLot,
+          status: shortageQtyKg > 0 ? LotStatus.RECEIVED_WITH_SHORTAGE : LotStatus.RECEIVED,
+          currentOwner: transfer.toOrg,
+          currentLocation: transfer.toOrg
+        });
+      }
+    }
     this.recordEvent('transfer', updated.transferId, 'ReceiveLot', updated);
 
     if (shortageQtyKg > 0) {
@@ -1561,7 +1663,9 @@ export class PdsLedgerEngine {
       case 'CreateCommodityLot': {
         const lot = payload as unknown as CommodityLot;
         this.lots.set(lot.lotId, lot);
-        this.stock.set(keyFor(lot.currentOwner, lot.commodity), lot.quantityKg);
+        if (!lot.parentLotId) {
+          this.stock.set(keyFor(lot.currentOwner, lot.commodity), lot.quantityKg);
+        }
         break;
       }
       case 'AuthorizeMovement':

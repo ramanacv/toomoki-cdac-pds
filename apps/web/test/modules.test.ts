@@ -8,6 +8,7 @@ import {
   roleCanAccessModule,
   screenToModule
 } from '../src/lib/modules.js';
+import { getRoleScreens } from '../src/demo-model.js';
 
 describe('demo modules', () => {
   it('maps roles to default module homes', () => {
@@ -19,11 +20,24 @@ describe('demo modules', () => {
     expect(getDefaultPath('FPS')).toBe('/m/fps');
   });
 
-  it('exposes eligibility to control office and hides it from FPS', () => {
+  it('exposes eligibility to control office and keeps FPS in its assigned module', () => {
     expect(roleCanAccessModule('CONTROL_OFFICE', 'eligibility')).toBe(true);
     expect(getModuleScreensForRole('eligibility', 'CONTROL_OFFICE')).toContain('eligibility-review');
     expect(roleCanAccessModule('FPS', 'eligibility')).toBe(false);
-    expect(getModulesForRole('FPS').map((item) => item.id)).toEqual(['fps', 'trust']);
+    expect(getModulesForRole('FPS').map((item) => item.id)).toEqual(['fps']);
+  });
+
+  it('reserves Trust & reconcile for oversight roles', () => {
+    for (const role of ['FCI_DEPOT', 'GODOWN', 'CONTROL_OFFICE', 'BLOCK_OFFICE', 'FPS'] as const) {
+      expect(roleCanAccessModule(role, 'trust')).toBe(false);
+      expect(getRoleScreens(role)).not.toContain('dashboard');
+      expect(getRoleScreens(role)).not.toContain('verify');
+    }
+    for (const role of ['MANAGEMENT', 'AUDITOR'] as const) {
+      expect(roleCanAccessModule(role, 'trust')).toBe(true);
+      expect(getRoleScreens(role)).toContain('dashboard');
+      expect(getRoleScreens(role)).toContain('verify');
+    }
   });
 
   it('resolves active module from flat routes and module homes', () => {

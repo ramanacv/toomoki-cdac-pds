@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthMode, AuthResult } from '@pds/shared-types';
+import type { EligibilityScreeningRequest } from '@pds/shared-types';
 import {
   BeneficiaryPortalService,
   CITIZEN_DEMO_OTP
@@ -181,7 +182,32 @@ describe('BeneficiaryPortalService card surrender', () => {
     clearEligibilityGates();
     fixture = await createDemoLedgerFixture();
     eligibility = new EligibilityService(
-      new EligibilityClient({ health: vi.fn().mockResolvedValue(true), screen: vi.fn() }),
+      new EligibilityClient({
+        health: vi.fn().mockResolvedValue(true),
+        screen: vi.fn(async (request: EligibilityScreeningRequest) => ({
+          screeningId: `SCREEN-${request.demoBeneficiaryId}`,
+          screeningRequestId: request.screeningRequestId,
+          status: 'MULTI_SOURCE_CONFLICT' as const,
+          signals: [{
+            source: 'RCMS' as const,
+            status: 'CONFLICT' as const,
+            risk: 'HIGH' as const,
+            observedAt: '2026-07-29T10:00:00.000Z',
+            factCode: 'DEMO_SOURCE_CONFLICT'
+          }],
+          recommendedReviewAction: 'RECONCILE_SOURCES_AND_ALLOW_APPEAL',
+          policy: {
+            policyId: 'MH-PANEL-DEMO-2026-V1' as const,
+            simulationOnly: true as const,
+            ruleIds: ['MULTI-CONFLICT-01']
+          },
+          assessedAt: '2026-07-29T10:00:00.000Z',
+          expiresAt: '2099-12-31T23:59:59.000Z',
+          evidenceDigest: 'a'.repeat(64),
+          responseAttestationHash: 'b'.repeat(64),
+          schemaVersion: '1.0' as const
+        }))
+      }),
       new EligibilityRepository(),
       new BeneficiaryRegistryService(new BeneficiaryRegistryRepository())
     );
@@ -223,5 +249,45 @@ describe('BeneficiaryPortalService card surrender', () => {
     const repeat = await service.surrender(sessionToken, 'SURRENDER');
     expect(['REMOVED', 'ALREADY_REMOVED']).toContain(repeat.disposition);
     expect(repeat.profile.removal?.reasonCode).toBe('VOLUNTARY_SURRENDER');
+  });
+
+  it('shows the reason and appeal guidance after an authorized DSO cancellation', async () => {
+    const screened = await eligibility.runScreening({
+      screeningRequestId: 'PORTAL-CASE-SCREEN-005',
+      demoBeneficiaryId: 'BEN-DEMO-005',
+      checks: ['ACTIVITY', 'ECONOMIC']
+    }, 'PORTAL-CORR-005');
+    const verified = await eligibility.verification(screened.case!.caseId, {
+      idempotencyKey: 'PORTAL-VERIFY-005',
+      expectedVersion: screened.case!.version,
+      outcomeCode: 'EVIDENCE_RECONCILED',
+      reasonCode: 'FIELD_VERIFIED'
+    }, 'dso-officer');
+    const recommended = await eligibility.recommendation(verified.caseId, {
+      idempotencyKey: 'PORTAL-RECOMMEND-005',
+      expectedVersion: verified.version,
+      outcomeCode: 'INELIGIBLE',
+      reasonCode: 'DEMO_POLICY_MATCH'
+    }, 'dso-officer');
+    await eligibility.decision(recommended.caseId, {
+      idempotencyKey: 'PORTAL-DECIDE-005',
+      expectedVersion: recommended.version,
+      outcomeCode: 'AUTHORIZED',
+      reasonCode: 'RCMS_AUTHORIZED_AFTER_REVIEW',
+      decision: 'CARD_CANCELLED'
+    }, 'dso-officer');
+
+    const challenge = service.requestOtp('999988880005', '127.0.0.5');
+    const token = service.verifyOtp(challenge.challengeId, CITIZEN_DEMO_OTP).sessionToken;
+    const profile = service.profile(token);
+
+    expect(profile.eligibility.status).toBe('CANCELLED');
+    expect(profile.statusNotification).toMatchObject({
+      title: 'Your ration card status has changed',
+      caseId: screened.case!.caseId,
+      reason: 'Conflicting eligibility records reconciled by the department.'
+    });
+    expect(profile.statusNotification?.message).toMatch(/conflicting eligibility records/i);
+    expect(profile.statusNotification?.appealMessage).toMatch(/appeal/i);
   });
 });

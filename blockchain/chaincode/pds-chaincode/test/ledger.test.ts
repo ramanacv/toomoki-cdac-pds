@@ -403,14 +403,27 @@ describe('PdsLedgerEngine', () => {
     expect(stockOf('PROC-001', 'Test Grain')).toBe(40);
     expect(stockOf('FCI-001', 'Test Grain')).toBe(0);
 
+    const firstTransfer = engine.exportState().transfers.find((item) => item.transferId === 'TR-CONSERVE-1');
+    expect(firstTransfer?.lotId).toBe('LOT-CONSERVE-SPLIT-TR-CONSERVE-1');
+    const parentAfterSplit = engine.exportState().lots.find((item) => item.lotId === 'LOT-CONSERVE');
+    expect(parentAfterSplit?.quantityKg).toBe(40);
+    expect(parentAfterSplit?.currentOwner).toBe('PROC-001');
+    expect(parentAfterSplit?.status).not.toBe('DISPATCHED');
+    const childAfterSplit = engine.exportState().lots.find((item) => item.lotId === firstTransfer?.lotId);
+    expect(childAfterSplit).toMatchObject({
+      rootLotId: 'LOT-CONSERVE',
+      parentLotId: 'LOT-CONSERVE',
+      originalQuantityKg: 60,
+      remainingQuantityKg: 60
+    });
+
     engine.receiveLot({ transferId: 'TR-CONSERVE-1', receivedQtyKg: 60 });
     expect(stockOf('PROC-001', 'Test Grain')).toBe(40);
     expect(stockOf('FCI-001', 'Test Grain')).toBe(60);
     // Total conserved across both orgs.
     expect(stockOf('PROC-001', 'Test Grain') + stockOf('FCI-001', 'Test Grain')).toBe(100);
 
-    // The remaining stock can still be dispatched by the holder even after a
-    // partial receipt moved the lot's currentOwner to the receiving org.
+    // Remaining parent lot stays at the sender and can be dispatched next.
     engine.dispatchLot({
       transferId: 'TR-CONSERVE-2',
       lotId: 'LOT-CONSERVE',
@@ -423,7 +436,7 @@ describe('PdsLedgerEngine', () => {
     expect(stockOf('PROC-001', 'Test Grain')).toBe(0);
     engine.receiveLot({ transferId: 'TR-CONSERVE-2', receivedQtyKg: 40 });
 
-    // Dispatch beyond the sender's remaining stock must still be rejected.
+    // Parent is fully moved; further dispatch from PROC must be rejected.
     expect(() =>
       engine.dispatchLot({
         transferId: 'TR-CONSERVE-3',
@@ -433,9 +446,8 @@ describe('PdsLedgerEngine', () => {
         dispatchedQtyKg: 10,
         vehicleNo: 'KA01AB0002',
         transporterId: 'TRANS-001'
-      
       })
-    ).toThrow(/owned by/);
+    ).toThrow(/owned by|DISPATCHED|remaining quantity|Insufficient stock/);
   });
 
   it('records shortage without creating stock and rejects non-positive or excess receipt quantities', () => {
@@ -562,7 +574,7 @@ describe('PdsLedgerEngine', () => {
         transporterId: 'TRANS-001'
       
       })
-    ).toThrow(/Insufficient stock/);
+    ).toThrow(/Insufficient stock|remaining quantity/);
   });
 
   it('rejects duplicate transfer, allocation, distribution and auth IDs (T6.3)', () => {
@@ -1189,6 +1201,46 @@ describe('resetTransactionalData', () => {
     expect(new Map(replayedState.stock).get('FCI-001:Wheat')).toBe(7000);
     expect(replayedState.events.some((event) => event.eventType === 'ResetTransactionalData')).toBe(true);
     expect(replayedState.stakeholders.length).toBeGreaterThan(0);
+  });
+
+  it('credits transformed root lots but does not double-credit split children during event replay', () => {
+    const engine = new PdsLedgerEngine(false);
+    const basePayload = {
+      commodity: 'Rice',
+      season: 'Kharif',
+      qualityGrade: 'A',
+      source: 'Demo',
+      currentOwner: 'FCI-001',
+      currentLocation: 'FCI-001',
+      status: 'CREATED',
+      createdAt: '2026-07-30T00:00:00.000Z'
+    };
+    const applyLot = (ledgerTxId: string, payload: Record<string, unknown>) =>
+      engine.applyLedgerEvent({
+        ledgerTxId,
+        entityType: 'lot',
+        entityId: String(payload.lotId),
+        eventType: 'CreateCommodityLot',
+        payload,
+        timestamp: '2026-07-30T00:00:00.000Z'
+      });
+
+    applyLot('TX-TRANSFORMED', {
+      ...basePayload,
+      lotId: 'LOT-TRANSFORMED',
+      quantityKg: 80,
+      transformedFromLotId: 'LOT-SOURCE'
+    });
+    applyLot('TX-SPLIT', {
+      ...basePayload,
+      lotId: 'LOT-TRANSFORMED-SPLIT',
+      quantityKg: 30,
+      rootLotId: 'LOT-TRANSFORMED',
+      parentLotId: 'LOT-TRANSFORMED',
+      transformedFromLotId: 'LOT-SOURCE'
+    });
+
+    expect(new Map(engine.exportState().stock).get('FCI-001:Rice')).toBe(80);
   });
 
   it('scopes the reset to a single commodity, leaving other commodities untouched', () => {

@@ -80,13 +80,17 @@ export const summaryCardData = (summary: DashboardSummary): Array<[string, strin
 
 export const roleTitle = (role: DemoRole): string => roleProfiles[role].title;
 
+const humanDateTimeFormatter = new Intl.DateTimeFormat('en-IN', {
+  dateStyle: 'medium',
+  timeStyle: 'short',
+  hour12: true
+});
+
 export const formatDateTime = (value?: string): string => {
   if (!value) return 'Pending';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat('en-IN', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-    hour12: false
-  }).format(date);
+  return humanDateTimeFormatter
+    .format(date)
+    .replace(/\b(am|pm)\b/gi, (period) => period.toUpperCase());
 };

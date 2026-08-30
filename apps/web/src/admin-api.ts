@@ -36,6 +36,7 @@ export type AdminNetworkInfo = {
       role: string;
       peerHost: string;
       peerPort: number;
+      deploymentStatus: 'DEPLOYED' | 'PLANNED';
     }>;
   };
 };
@@ -77,7 +78,12 @@ export type AdminOverview = {
   stakeholders: {
     byType: Array<{ stakeholderType: string; count: number }>;
     byStatus: Array<{ status: string; count: number }>;
-    fabricOrgMapping: Array<{ orgName: string; role: string; mspId: string }>;
+    fabricOrgMapping: Array<{
+      orgName: string;
+      role: string;
+      mspId: string;
+      deploymentStatus: 'DEPLOYED' | 'PLANNED';
+    }>;
   };
   activity: {
     recentEvents: LedgerEvent[];

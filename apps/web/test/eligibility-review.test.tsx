@@ -141,9 +141,11 @@ describe('eligibility review workspace', () => {
     expect(screen.getAllByText(/90000 80001/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Mock OTP inbox|Simulated AePDS OTP/i).length).toBeGreaterThan(0);
     expect(screen.getByRole('button', { name: 'Register lifecycle record' })).toBeEnabled();
-    await user.click(screen.getByRole('button', { name: 'Run external eligibility check' }));
+    await user.click(screen.getByRole('button', { name: 'Screen for review signals' }));
+    expect(await screen.findByRole('dialog')).toHaveTextContent(/Review signal found/);
+    expect(screen.getByRole('dialog')).toHaveTextContent(/has not made the beneficiary ineligible/i);
     expect(await screen.findByText('DEATH_REGISTRY')).toBeInTheDocument();
-    expect(screen.getByText(/Integrity score 40\/100/)).toBeInTheDocument();
+    expect(screen.getAllByText(/Integrity score 40\/100/).length).toBeGreaterThan(0);
     expect(screen.getByText(/Explainability \(signal → rule → score\)/)).toBeInTheDocument();
     expect(screen.getByText('SCORE-DEATH-HIGH')).toBeInTheDocument();
     expect(screen.getByText(/Evidence a{64}/)).toBeInTheDocument();
@@ -155,7 +157,7 @@ describe('eligibility review workspace', () => {
     api.runEligibilityScreening.mockRejectedValueOnce(new Error('Eligibility service timed out'));
     render(<EligibilityReviewPage />);
     expect(await screen.findAllByText('Asha Patil (Fictional)')).not.toHaveLength(0);
-    await user.click(screen.getByRole('button', { name: 'Run external eligibility check' }));
+    await user.click(screen.getByRole('button', { name: 'Screen for review signals' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(/entitlement remains unchanged/i);
     await user.click(screen.getByRole('button', { name: 'Entitlement gate check' }));
     expect(await screen.findByText(/Distribution allowed/)).toBeInTheDocument();
@@ -182,6 +184,58 @@ describe('eligibility review workspace', () => {
     expect(screen.getByRole('button', { name: 'Record verification' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Recommend ineligible' })).toBeEnabled();
     expect(screen.queryByRole('button', { name: 'Issue notice' })).not.toBeInTheDocument();
+  });
+
+  it('confirms a table-level DSO ineligibility decision after review is ready', async () => {
+    const user = userEvent.setup();
+    const reviewReadyCase = { ...openCase, state: 'REVIEW_READY' as const, version: 2 };
+    api.loadEligibilityCases.mockResolvedValueOnce([reviewReadyCase]);
+    api.performEligibilityAction.mockResolvedValueOnce({
+      ...reviewReadyCase,
+      state: 'DECIDED',
+      version: 3,
+      decision: 'CARD_CANCELLED',
+      rcmsStatus: 'CANCELLED',
+      entitlementBlocked: true
+    });
+    render(<EligibilityReviewPage />);
+
+    const markButton = await screen.findByRole('button', { name: 'Mark BEN-DEMO-001 ineligible' });
+    expect(markButton).toBeEnabled();
+    await user.click(markButton);
+    expect(await screen.findByRole('dialog')).toHaveTextContent(/authorized RCMS decision/i);
+    await user.click(screen.getByRole('button', { name: 'Confirm ineligible' }));
+
+    expect(api.performEligibilityAction).toHaveBeenCalledWith(
+      'ELIG-CASE-001',
+      'decision',
+      expect.objectContaining({
+        expectedVersion: 2,
+        outcomeCode: 'AUTHORIZED',
+        reasonCode: 'RCMS_AUTHORIZED_AFTER_REVIEW',
+        decision: 'CARD_CANCELLED'
+      })
+    );
+  });
+
+  it('shows the committed Fabric proof event and transaction references', async () => {
+    api.loadEligibilityCases.mockResolvedValueOnce([{
+      ...openCase,
+      state: 'DECIDED',
+      version: 3,
+      decision: 'CARD_CANCELLED',
+      rcmsStatus: 'CANCELLED',
+      entitlementBlocked: true,
+      proofStatus: 'COMMITTED',
+      proofEventId: 'ELIG-PROOF-DEMO-001',
+      proofFabricTxId: 'fabric-eligibility-tx-001'
+    }]);
+    render(<EligibilityReviewPage />);
+
+    expect(await screen.findByText('Fabric decision proof')).toBeInTheDocument();
+    expect(screen.getByText('ELIG-PROOF-DEMO-001')).toBeInTheDocument();
+    expect(screen.getByText('fabric-eligibility-tx-001')).toBeInTheDocument();
+    expect(screen.getByText(/not raw peer signature bytes/i)).toBeInTheDocument();
   });
 
   it('removes multiple selected beneficiaries with the chosen reason', async () => {
@@ -230,7 +284,7 @@ describe('eligibility review workspace', () => {
   it.each(['MANAGEMENT', 'AUDITOR'])('is read-only for %s', async (role) => {
     context.role = role;
     render(<EligibilityReviewPage />);
-    expect(await screen.findByRole('button', { name: 'Run external eligibility check' })).toBeDisabled();
+    expect(await screen.findByRole('button', { name: 'Screen for review signals' })).toBeDisabled();
     expect(screen.getByText('Management and Auditor views are read-only.')).toBeInTheDocument();
   });
 });

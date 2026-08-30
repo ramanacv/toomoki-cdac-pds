@@ -12,6 +12,7 @@ export type AdminFabricOrg = {
   role: string;
   peerHost: string;
   peerPort: number;
+  deploymentStatus: 'DEPLOYED' | 'PLANNED';
 };
 
 export type AdminNetworkInfo = {
@@ -79,7 +80,12 @@ export type AdminMetrics = {
 export type AdminStakeholderSummary = {
   byType: Array<{ stakeholderType: string; count: number }>;
   byStatus: Array<{ status: string; count: number }>;
-  fabricOrgMapping: Array<{ orgName: string; role: string; mspId: string }>;
+  fabricOrgMapping: Array<{
+    orgName: string;
+    role: string;
+    mspId: string;
+    deploymentStatus: AdminFabricOrg['deploymentStatus'];
+  }>;
 };
 
 export type AdminActivityFeed = {

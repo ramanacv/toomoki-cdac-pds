@@ -217,7 +217,7 @@ describe('app shell', () => {
     await user.click(modulesNav().getByRole('link', { name: 'Card & eligibility' }));
     await user.click(sidebar().getByRole('link', { name: 'Eligibility review' }));
     expect(await screen.findByText('External-service simulation using synthetic beneficiaries')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Run external eligibility check' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Screen for review signals' })).toBeDisabled();
     expect(screen.getByText(/Offline fixture mode is read-only/)).toBeInTheDocument();
   });
 
@@ -307,7 +307,8 @@ describe('app shell', () => {
   });
 
   it('redirects roles away from modules they cannot enter', async () => {
-    await renderApp('/m/eligibility?role=FPS');
+    await renderApp('/m/trust?role=FPS');
     expect(await screen.findByRole('heading', { name: 'FPS authentication home' })).toBeInTheDocument();
+    expect(modulesNav().queryByRole('link', { name: 'Trust & reconcile' })).not.toBeInTheDocument();
   });
 });

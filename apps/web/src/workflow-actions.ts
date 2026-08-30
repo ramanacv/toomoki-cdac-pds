@@ -255,7 +255,7 @@ export const getPlannedLegs = (
     ...(leg.requiresAuthorization
       ? {
           roRef:
-            leg.id.endsWith('DEPOT-BLOCK')
+            leg.id === 'TR-POC-RICE-DEPOT-BLOCK'
               ? 'RO-DSO-POC-001'
               : `RO-DSO-${leg.id.replace(/^TR-/, '')}`,
           authorizedBy: 'DSO-001'
@@ -278,8 +278,16 @@ const isAllocationReceived = (allocation: FPSAllocation | undefined): boolean =>
 const isAuthorizationEvent = (eventType: string): boolean =>
   eventType === 'RO_LITE_APPROVED' || eventType === 'AuthorizeMovement';
 
+const findLegAuthorization = (context: WorkflowContext, legId: string): LedgerEvent | undefined =>
+  context.ledgerEvents?.find((event) => event.entityId === legId && isAuthorizationEvent(event.eventType));
+
 const isLegAuthorized = (context: WorkflowContext, legId: string): boolean =>
-  context.ledgerEvents?.some((event) => event.entityId === legId && isAuthorizationEvent(event.eventType)) ?? false;
+  Boolean(findLegAuthorization(context, legId));
+
+const authorizationRoRef = (event: LedgerEvent | undefined): string | undefined => {
+  const value = event?.payload?.roRef;
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
+};
 
 const priorLegsReceived = (context: WorkflowContext, plannedLegs: PlannedLeg[], legIndex: number): boolean =>
   plannedLegs.slice(0, legIndex).every((priorLeg) => isReceived(findTransfer(context.transfers, priorLeg.id)));
@@ -332,11 +340,12 @@ export const getSessionStockKg = (
   }
   const rootLots = context.lots.filter(
     (lot) =>
+      !lot.parentLotId &&
       !lot.transformedFromLotId &&
       (!relevantCommodity || lot.commodity === relevantCommodity) &&
       (lot.currentOwner === org || lot.lotId === lotId)
   );
-  const registered = sumKg(rootLots.map((lot) => lot.quantityKg));
+  const registered = sumKg(rootLots.map((lot) => lot.originalQuantityKg ?? lot.quantityKg));
   return registered + allocationInflow - outflow - allocationOutflow;
 };
 
@@ -451,6 +460,22 @@ export function getAllCommoditiesRoleQueue(context: WorkflowContext, role: DemoR
     .filter((group) => group.actions.length > 0);
 }
 
+export function getActiveWorkflowCommodities(context: WorkflowContext): Set<CommodityName> {
+  const commodityByLotId = new Map(context.lots.map((lot) => [lot.lotId, lot.commodity]));
+  const active = new Set<CommodityName>();
+  const add = (commodity: string | undefined): void => {
+    if (COMMODITIES.some((definition) => definition.name === commodity)) {
+      active.add(commodity as CommodityName);
+    }
+  };
+
+  context.transfers.forEach((transfer) => add(commodityByLotId.get(transfer.lotId)));
+  context.allocations.forEach((allocation) => add(allocation.commodity));
+  context.distributions.forEach((distribution) => add(distribution.commodity));
+
+  return active;
+}
+
 export function getWorkflowActions(context: WorkflowContext, commodity: string = DEFAULT_WORKFLOW_COMMODITY): WorkflowActionSpec[] {
   const route = getWorkflowRoute(commodity, context.lots);
   const plannedLegs = getPlannedLegs(route.commodity, context.lots);
@@ -465,11 +490,13 @@ export function getWorkflowActions(context: WorkflowContext, commodity: string =
       continue;
     }
     const transfer = findTransfer(context.transfers, leg.id);
-    const missingApproval = Boolean(leg.roRef && !isLegAuthorized(context, leg.id));
+    const authorization = findLegAuthorization(context, leg.id);
+    const missingApproval = Boolean(leg.roRef && !authorization);
+    const effectiveRoRef = authorizationRoRef(authorization) ?? leg.roRef;
 
     if (!transfer && leg.roRef && priorLegsReceived(context, plannedLegs, legIndex) && missingApproval) {
       actions.push({
-        id: leg.roRef ?? `RO-DSO-${leg.id}`,
+        id: `${leg.id}-authorize`,
         label: `DSO approve Release Order: ${leg.label}`,
         detail: `District Supply Officer (DSO-001) must approve Stage-II before dispatch ${leg.fromOrg} → ${leg.toOrg}.`,
         roles: ['CONTROL_OFFICE'],
@@ -510,7 +537,7 @@ export function getWorkflowActions(context: WorkflowContext, commodity: string =
             dispatchedQtyKg: leg.qtyKg,
             vehicleNo: leg.vehicleNo,
             stage: leg.stage,
-            ...(leg.roRef ? { roRef: leg.roRef } : {}),
+            ...(effectiveRoRef ? { roRef: effectiveRoRef } : {}),
             ...(!missingApproval && leg.authorizedBy ? { authorizedBy: leg.authorizedBy } : {}),
             transporterId: leg.transporterId,
             ...(leg.transformedFromLotId ? { transformedFromLotId: leg.transformedFromLotId } : {})

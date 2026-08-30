@@ -9,7 +9,7 @@ describe('fabric network scaffold', () => {
   it('documents the intended topology', () => {
     const manifest = JSON.parse(read('blockchain/fabric-network/network-manifest.json')) as {
       channel: string;
-      organizations: Array<{ role: string }>;
+      organizations: Array<{ role: string; mspId: string; deploymentStatus: 'DEPLOYED' | 'PLANNED' }>;
       chaincode: { name: string };
     };
 
@@ -22,6 +22,11 @@ describe('fabric network scaffold', () => {
       'FAIR_PRICE_SHOP',
       'AUDITOR'
     ]);
+    expect(manifest.organizations
+      .filter((org) => org.deploymentStatus === 'DEPLOYED')
+      .map((org) => org.mspId)
+    ).toEqual(['FoodAndCivilSuppliesMSP', 'GodownWarehouseMSP']);
+    expect(manifest.organizations.filter((org) => org.deploymentStatus === 'PLANNED')).toHaveLength(3);
   });
 
   it('includes one connection profile per organization', () => {

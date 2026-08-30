@@ -40,7 +40,38 @@ const adminOverview = vi.hoisted(() => ({
   stakeholders: {
     byType: [{ stakeholderType: 'FCI', count: 1 }],
     byStatus: [{ status: 'ACTIVE', count: 5 }],
-    fabricOrgMapping: []
+    fabricOrgMapping: [
+      {
+        orgName: 'FoodAndCivilSupplies',
+        role: 'DISTRICT_SUPPLY_OFFICE',
+        mspId: 'FoodAndCivilSuppliesMSP',
+        deploymentStatus: 'DEPLOYED' as const
+      },
+      {
+        orgName: 'ProcurementMiller',
+        role: 'PROCUREMENT_CENTER',
+        mspId: 'ProcurementMillerMSP',
+        deploymentStatus: 'PLANNED' as const
+      },
+      {
+        orgName: 'GodownWarehouse',
+        role: 'STATE_GODOWN',
+        mspId: 'GodownWarehouseMSP',
+        deploymentStatus: 'DEPLOYED' as const
+      },
+      {
+        orgName: 'FairPriceShop',
+        role: 'FAIR_PRICE_SHOP',
+        mspId: 'FairPriceShopMSP',
+        deploymentStatus: 'PLANNED' as const
+      },
+      {
+        orgName: 'AuditAuthority',
+        role: 'AUDITOR',
+        mspId: 'AuditAuthorityMSP',
+        deploymentStatus: 'PLANNED' as const
+      }
+    ]
   },
   activity: {
     recentEvents: [
@@ -209,6 +240,11 @@ describe('Admin console', () => {
     renderAdmin('/admin/network');
     expect(await screen.findByText('Ledger and persistence')).toBeInTheDocument();
     expect(screen.getByText('Subsystem checks')).toBeInTheDocument();
+    expect(screen.getByText('Deployed channel organizations')).toBeInTheDocument();
+    expect(screen.getByText('2 deployed')).toBeInTheDocument();
+    expect(screen.getByText('Planned consortium organizations')).toBeInTheDocument();
+    expect(screen.getByText('3 planned')).toBeInTheDocument();
+    expect(screen.getByText(/do not currently have deployed peers/i)).toBeInTheDocument();
   });
 
   it('renders the recent ledger events table with scoped column headers', async () => {
@@ -227,6 +263,8 @@ describe('Admin console', () => {
     }
     expect(within(table).getByText('Timestamp')).toBeInTheDocument();
     expect(within(table).getByText('Event')).toBeInTheDocument();
+    expect(within(table).queryByText('2026-06-09T10:00:00.000Z')).not.toBeInTheDocument();
+    expect(within(table).getByText(/\b(?:AM|PM)\b/)).toBeInTheDocument();
   });
 
   it('exposes a skip link targeting admin content', async () => {

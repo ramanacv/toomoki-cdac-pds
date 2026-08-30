@@ -13,6 +13,7 @@ import { StakeholdersController } from '../src/modules/stakeholders/stakeholders
 import { TransfersController } from '../src/modules/transfers/transfers.controller.js';
 import { IntegrationsController } from '../src/modules/integrations/integrations.controller.js';
 import { EligibilityController } from '../src/modules/eligibility/eligibility.controller.js';
+import { ProofsController } from '../src/modules/proofs/proofs.controller.js';
 import { IS_PUBLIC_KEY } from '../src/modules/auth/public.decorator.js';
 import type { PdsRole } from '../src/modules/auth/identity-provider.js';
 
@@ -64,6 +65,7 @@ describe('canonical endpoint authorization policy', () => {
     [AuthController, 'authTransactions', ['fps', 'department', 'auditor']],
     [EntitlementsController, 'entitlementList', ['fps', 'department', 'auditor']],
     [DistributionsController, 'distributions', ['fps', 'department', 'auditor', 'management']],
+    [ProofsController, 'analytics', ['auditor', 'management', 'platform-admin']],
     [AdminController, 'overview', ['platform-admin']]
     ,[EligibilityController, 'summary', ['department', 'auditor', 'management']]
     ,[EligibilityController, 'cases', ['department', 'auditor', 'management']]

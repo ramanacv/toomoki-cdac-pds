@@ -111,6 +111,54 @@ describe('PdsControlContract / PdsDataContract authorization (T1.5)', () => {
     ).rejects.toThrow(/already exists/);
   });
 
+  it('resolves a received child lot for the next route leg when callers retain the root lot id', async () => {
+    const msp = { mspId: 'FoodAndCivilSuppliesMSP' };
+    const ctx = makeContext(msp);
+    const control = new PdsControlContract();
+    const data = new PdsDataContract();
+    for (const entry of [
+      stakeholder('FCI-001', 'FCI'),
+      stakeholder('GODOWN-S-001', 'STATE_GODOWN'),
+      stakeholder('GODOWN-B-001', 'BLOCK_GODOWN'),
+      stakeholder('TRANS-001', 'TRANSPORTER')
+    ]) {
+      await control.RegisterStakeholder(ctx, JSON.stringify(entry));
+    }
+    await data.CreateCommodityLot(ctx, JSON.stringify({
+      lotId: 'LOT-LINEAGE-001',
+      commodity: 'Rice',
+      season: 'Kharif 2026',
+      quantityKg: 100,
+      qualityGrade: 'A',
+      source: 'FCI Central Depot',
+      currentOwner: 'FCI-001',
+      currentLocation: 'FCI-001'
+    }));
+    await data.DispatchLot(ctx, JSON.stringify({
+      transferId: 'TR-LINEAGE-1',
+      lotId: 'LOT-LINEAGE-001',
+      fromOrg: 'FCI-001',
+      toOrg: 'GODOWN-S-001',
+      dispatchedQtyKg: 60,
+      vehicleNo: 'KA01AB0001',
+      transporterId: 'TRANS-001'
+    }));
+    await data.ReceiveLot(ctx, JSON.stringify({ transferId: 'TR-LINEAGE-1', receivedQtyKg: 60 }));
+
+    await expect(data.DispatchLot(ctx, JSON.stringify({
+      transferId: 'TR-LINEAGE-2',
+      lotId: 'LOT-LINEAGE-001',
+      fromOrg: 'GODOWN-S-001',
+      toOrg: 'GODOWN-B-001',
+      dispatchedQtyKg: 50,
+      vehicleNo: 'KA01AB0002',
+      transporterId: 'TRANS-001',
+      stage: 'II',
+      roRef: 'RO-LINEAGE-2',
+      authorizedBy: 'DSO-001'
+    }))).resolves.toContain('LOT-LINEAGE-001-SPLIT-TR-LINEAGE-1-SPLIT-TR-LINEAGE-2');
+  });
+
   it('RecordLedgerProof is gated and rejects malformed proofs', async () => {
     const msp = { mspId: 'FairPriceShopMSP' };
     const ctx = makeContext(msp);

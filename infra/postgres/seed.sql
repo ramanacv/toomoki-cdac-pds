@@ -58,7 +58,18 @@ VALUES
   ('ration-card-jk-demo-001-hash', 5, 'JK-DEMO-01', 'ACTIVE'),
   ('ration-card-jk-demo-002-hash', 4, 'JK-DEMO-02', 'ACTIVE'),
   ('ration-card-jk-demo-003-hash', 6, 'JK-DEMO-03', 'ACTIVE'),
-  ('ration-card-jk-demo-004-hash', 3, 'JK-DEMO-04', 'ACTIVE')
+  ('ration-card-jk-demo-004-hash', 3, 'JK-DEMO-04', 'ACTIVE'),
+  ('ration-card-demo-006-hash', 2, 'MH-DEMO-HAV', 'ACTIVE'),
+  ('ration-card-demo-007-hash', 3, 'MH-DEMO-HAV', 'ACTIVE'),
+  ('ration-card-demo-008-hash', 2, 'MH-DEMO-HAV', 'ACTIVE'),
+  ('ration-card-demo-009-hash', 4, 'MH-DEMO-HAV', 'ACTIVE'),
+  ('ration-card-demo-010-hash', 3, 'MH-DEMO-HAV', 'ACTIVE'),
+  ('ration-card-demo-011-hash', 3, 'MH-DEMO-MUL', 'ACTIVE'),
+  ('ration-card-demo-012-hash', 2, 'MH-DEMO-MUL', 'ACTIVE'),
+  ('ration-card-demo-013-hash', 4, 'MH-DEMO-MUL', 'ACTIVE'),
+  ('ration-card-demo-014-hash', 3, 'MH-DEMO-MUL', 'ACTIVE'),
+  ('ration-card-demo-015-hash', 2, 'MH-DEMO-MUL', 'ACTIVE'),
+  ('ration-card-demo-016-hash', 3, 'MH-DEMO-MUL', 'ACTIVE')
 ON CONFLICT (ration_card_hash) DO NOTHING;
 
 INSERT INTO beneficiary_registry_mock (beneficiary_ref_hash, name_masked, district, ration_card_hash, active)
@@ -75,7 +86,18 @@ VALUES
   ('beneficiary-jk-demo-001-hash', 'Zoya Dar (Fictional)', 'JK-DEMO-01', 'ration-card-jk-demo-001-hash', TRUE),
   ('beneficiary-jk-demo-002-hash', 'Arif Lone (Fictional)', 'JK-DEMO-02', 'ration-card-jk-demo-002-hash', TRUE),
   ('beneficiary-jk-demo-003-hash', 'Nusrat Bano (Fictional)', 'JK-DEMO-03', 'ration-card-jk-demo-003-hash', TRUE),
-  ('beneficiary-jk-demo-004-hash', 'Tariq Mir (Fictional)', 'JK-DEMO-04', 'ration-card-jk-demo-004-hash', TRUE)
+  ('beneficiary-jk-demo-004-hash', 'Tariq Mir (Fictional)', 'JK-DEMO-04', 'ration-card-jk-demo-004-hash', TRUE),
+  ('beneficiary-demo-006-hash', 'Sunita Jadhav (Fictional)', 'MH-DEMO-HAV', 'ration-card-demo-006-hash', TRUE),
+  ('beneficiary-demo-007-hash', 'Mahesh Pawar (Fictional)', 'MH-DEMO-HAV', 'ration-card-demo-007-hash', TRUE),
+  ('beneficiary-demo-008-hash', 'Lata More (Fictional)', 'MH-DEMO-HAV', 'ration-card-demo-008-hash', TRUE),
+  ('beneficiary-demo-009-hash', 'Dinesh Kale (Fictional)', 'MH-DEMO-HAV', 'ration-card-demo-009-hash', TRUE),
+  ('beneficiary-demo-010-hash', 'Farida Shaikh (Fictional)', 'MH-DEMO-HAV', 'ration-card-demo-010-hash', TRUE),
+  ('beneficiary-demo-011-hash', 'Nandita Salve (Fictional)', 'MH-DEMO-MUL', 'ration-card-demo-011-hash', TRUE),
+  ('beneficiary-demo-012-hash', 'Prakash Mane (Fictional)', 'MH-DEMO-MUL', 'ration-card-demo-012-hash', TRUE),
+  ('beneficiary-demo-013-hash', 'Geeta Bhosale (Fictional)', 'MH-DEMO-MUL', 'ration-card-demo-013-hash', TRUE),
+  ('beneficiary-demo-014-hash', 'Salim Khan (Fictional)', 'MH-DEMO-MUL', 'ration-card-demo-014-hash', TRUE),
+  ('beneficiary-demo-015-hash', 'Meenal Chavan (Fictional)', 'MH-DEMO-MUL', 'ration-card-demo-015-hash', TRUE),
+  ('beneficiary-demo-016-hash', 'Vijay Gaikwad (Fictional)', 'MH-DEMO-MUL', 'ration-card-demo-016-hash', TRUE)
 ON CONFLICT (beneficiary_ref_hash) DO NOTHING;
 
 INSERT INTO monthly_entitlements (ration_card_hash, commodity, month, monthly_entitlement_kg, already_lifted_kg, available_balance_kg, active)
@@ -102,5 +124,16 @@ VALUES
   ('ration-card-jk-demo-001-hash', 'Rice', '2026-07', 25, 5, 20, TRUE),
   ('ration-card-jk-demo-002-hash', 'Rice', '2026-07', 20, 0, 20, TRUE),
   ('ration-card-jk-demo-003-hash', 'Rice', '2026-07', 30, 10, 20, TRUE),
-  ('ration-card-jk-demo-004-hash', 'Rice', '2026-07', 15, 0, 15, TRUE)
+  ('ration-card-jk-demo-004-hash', 'Rice', '2026-07', 15, 0, 15, TRUE),
+  ('ration-card-demo-006-hash', 'Rice', '2026-07', 10, 0, 10, TRUE),
+  ('ration-card-demo-007-hash', 'Rice', '2026-07', 15, 5, 10, TRUE),
+  ('ration-card-demo-008-hash', 'Rice', '2026-07', 10, 0, 10, TRUE),
+  ('ration-card-demo-009-hash', 'Rice', '2026-07', 20, 5, 15, TRUE),
+  ('ration-card-demo-010-hash', 'Rice', '2026-07', 15, 0, 15, TRUE),
+  ('ration-card-demo-011-hash', 'Rice', '2026-07', 15, 0, 15, TRUE),
+  ('ration-card-demo-012-hash', 'Rice', '2026-07', 10, 0, 10, TRUE),
+  ('ration-card-demo-013-hash', 'Rice', '2026-07', 20, 5, 15, TRUE),
+  ('ration-card-demo-014-hash', 'Rice', '2026-07', 15, 0, 15, TRUE),
+  ('ration-card-demo-015-hash', 'Rice', '2026-07', 10, 0, 10, TRUE),
+  ('ration-card-demo-016-hash', 'Rice', '2026-07', 15, 5, 10, TRUE)
 ON CONFLICT (ration_card_hash, commodity, month) DO NOTHING;

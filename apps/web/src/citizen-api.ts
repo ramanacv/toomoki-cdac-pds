@@ -48,6 +48,14 @@ export type CitizenProfile = {
     source: string;
     removedAt: string;
   };
+  statusNotification?: {
+    title: string;
+    reason: string;
+    message: string;
+    effectiveAt: string;
+    caseId: string;
+    appealMessage: string;
+  };
 };
 
 export type CitizenDistribution = {

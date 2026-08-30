@@ -54,8 +54,13 @@ describe('LotsModule', () => {
       fixture.facade.receiveLot({ transferId, receivedQtyKg: demoQuantities.stageOneTransferKg });
     }
 
-    const lot = controller.lot('LOT-RICE-2026-001');
-    expect(lot.currentOwner).toBe('GODOWN-B-001');
+    const finalTransfer = fixture.facade.getTransfer('TR-LOT-CANONICAL-DEPOT-BLOCK');
+    const lot = controller.lot(finalTransfer.lotId);
+    expect(lot).toMatchObject({
+      currentOwner: 'GODOWN-B-001',
+      rootLotId: 'LOT-RICE-2026-001'
+    });
+    expect(controller.lot('LOT-RICE-2026-001').currentOwner).toBe('FCI-001');
     expect(controller.lotHistory('LOT-RICE-2026-001').some((event) => event.eventType === 'TransformLot')).toBe(false);
   });
 });

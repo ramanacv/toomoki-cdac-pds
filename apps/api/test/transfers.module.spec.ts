@@ -10,6 +10,19 @@ describe('TransfersModule', () => {
 
   afterEach(async () => { await fixture?.cleanup(); });
 
+  const receiveWheatAtStateGodown = (transferId: string): void => {
+    fixture.facade.dispatchLot({
+      transferId,
+      lotId: 'LOT-WHEAT-2026-001',
+      fromOrg: 'FCI-001',
+      toOrg: 'GODOWN-S-001',
+      dispatchedQtyKg: 250,
+      vehicleNo: 'KA01TR0000',
+      transporterId: 'TRANS-001'
+    });
+    fixture.facade.receiveLot({ transferId, receivedQtyKg: 250 });
+  };
+
   it('dispatches and receives a lot transfer', async () => {
     fixture = await createDemoLedgerFixture();
     controller = await createControllerWithFacade(TransfersController, fixture.facade);
@@ -46,7 +59,7 @@ describe('TransfersModule', () => {
 
     expect(approval.ledgerTxId).toMatch(/^TX-/);
     expect(controller.ledgerEvents().some((event: any) => event.eventType === 'AuthorizeMovement')).toBe(true);
-    fixture.facade.addStockForTest('GODOWN-S-001', 'Wheat', 250);
+    receiveWheatAtStateGodown('TR-MOD-STAGE-I-SETUP');
 
     const transfer = await controller.dispatch({
       transferId: 'TR-MOD-STAGE-II',
@@ -88,7 +101,7 @@ describe('TransfersModule', () => {
   it('rejects Stage-II dispatch without RO-lite authorization', async () => {
     fixture = await createDemoLedgerFixture();
     controller = await createControllerWithFacade(TransfersController, fixture.facade);
-    fixture.facade.addStockForTest('GODOWN-S-001', 'Wheat', 250);
+    receiveWheatAtStateGodown('TR-MOD-STAGE-I-BLOCK-SETUP');
 
     await expect(
       controller.dispatch({

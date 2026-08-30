@@ -142,6 +142,8 @@ export type EligibilityCase = {
   alreadyLiftedKg: number;
   proofStatus: EligibilityProofStatus;
   proofEventId?: string;
+  /** Fabric transaction reference once the outbox worker confirms commit status. */
+  proofFabricTxId?: string;
   history: EligibilityCaseAction[];
   updatedAt: string;
 };

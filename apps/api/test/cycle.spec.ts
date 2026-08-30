@@ -1,4 +1,5 @@
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -39,6 +40,7 @@ describe('infrastructure ↔ modules/fabric dependency direction (T5.1)', () => 
   });
 
   it('ChaincodeEventSink is injected into PostgresChaincodeLedgerPort (composition root in modules, not infra)', async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'pds-cycle-test-'));
     const sink: ChaincodeEventSink = {
       submitLedgerEvent: (event: LedgerEvent) => ({ txId: event.ledgerTxId }),
       getLotHistory: () => [],
@@ -51,8 +53,8 @@ describe('infrastructure ↔ modules/fabric dependency direction (T5.1)', () => 
     // interface methods — the in-memory adapter satisfies that structurally.
     const port = new PostgresChaincodeLedgerPort(
       adapter as unknown as ConstructorParameters<typeof PostgresChaincodeLedgerPort>[0],
-      'journal.ndjson',
-      'chaincode-state.json',
+      join(tempDir, 'journal.ndjson'),
+      join(tempDir, 'chaincode-state.json'),
       sink
     );
 
@@ -64,10 +66,14 @@ describe('infrastructure ↔ modules/fabric dependency direction (T5.1)', () => 
       payload: { lotId: 'LOT-CYCLE-1' },
       timestamp: '2026-06-25T10:00:00.000Z'
     };
-    await port.appendEvents([event]);
-    // The injected sink received the event; infrastructure never imported fabric.
-    expect(sink.getLotHistory('LOT-CYCLE-1')).toEqual([]);
-    expect(sink.verifyDatabaseHash('abc')).toEqual({ match: true, ledgerDigest: 'abc' });
+    try {
+      await port.appendEvents([event]);
+      // The injected sink received the event; infrastructure never imported fabric.
+      expect(sink.getLotHistory('LOT-CYCLE-1')).toEqual([]);
+      expect(sink.verifyDatabaseHash('abc')).toEqual({ match: true, ledgerDigest: 'abc' });
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
   });
 
   it('the chain-query-port abstraction lives in infrastructure and imports no fabric module', () => {
